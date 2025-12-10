@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { useLocation } from "wouter";
 import { Layout } from "@/components/layout/Layout";
 import { ProtectedRoute } from "@/components/ProtectedRoute";
 import { Button } from "@/components/ui/button";
@@ -13,7 +14,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
 import { customersApi } from "@/lib/api";
-import { Plus, Pencil, Trash2, Building2 } from "lucide-react";
+import { Plus, Pencil, Trash2, Building2, Eye } from "lucide-react";
 
 const customerTypeColors: Record<string, string> = {
   lead: "bg-gray-500",
@@ -23,6 +24,7 @@ const customerTypeColors: Record<string, string> = {
 };
 
 export default function Customers() {
+  const [, navigate] = useLocation();
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [editingCustomer, setEditingCustomer] = useState<any>(null);
   const { toast } = useToast();
@@ -197,6 +199,9 @@ export default function Customers() {
                         <TableCell>{customer.segment || "-"}</TableCell>
                         <TableCell>
                           <div className="flex gap-2">
+                            <Button size="sm" variant="ghost" onClick={() => navigate(`/customers/${customer.id}`)} data-testid={`button-view-customer-${customer.id}`}>
+                              <Eye className="w-4 h-4" />
+                            </Button>
                             <Button size="sm" variant="ghost" onClick={() => { setEditingCustomer(customer); setIsDialogOpen(true); }} data-testid={`button-edit-customer-${customer.id}`}>
                               <Pencil className="w-4 h-4" />
                             </Button>

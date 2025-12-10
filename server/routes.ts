@@ -560,6 +560,124 @@ export async function registerRoutes(
     }
   });
 
+  // Customer Journey - get all related data for a customer
+  app.get("/api/customers/:id/journey", requireAuth, validateTenant, async (req, res) => {
+    try {
+      const customer = await storage.getCustomerById(req.params.id, req.user!.tenantId);
+      if (!customer) {
+        return res.status(404).json({ message: "Customer not found" });
+      }
+      
+      const contacts = await storage.getContactsByCustomer(req.params.id, req.user!.tenantId);
+      const deals = await storage.getDealsByCustomer(req.params.id, req.user!.tenantId);
+      const quotations = await storage.getQuotationsByCustomer(req.params.id, req.user!.tenantId);
+      const invoices = await storage.getInvoicesByCustomer(req.params.id, req.user!.tenantId);
+      const activities = await storage.getActivitiesByCustomer(req.params.id, req.user!.tenantId);
+      const tasks = await storage.getTasksByCustomer(req.params.id, req.user!.tenantId);
+      
+      // Build timeline events from all data
+      const timelineEvents: any[] = [];
+      
+      // Add activities
+      activities.forEach(a => {
+        timelineEvents.push({
+          id: a.id,
+          type: 'activity',
+          subType: a.type,
+          title: a.subject,
+          description: a.description,
+          date: a.completedAt || a.scheduledAt || a.createdAt,
+          status: a.completedAt ? 'completed' : 'scheduled',
+          data: a,
+        });
+      });
+      
+      // Add deals
+      deals.forEach(d => {
+        timelineEvents.push({
+          id: d.id,
+          type: 'deal',
+          subType: d.stage,
+          title: d.title,
+          description: `Deal value: $${Number(d.value).toLocaleString()}`,
+          date: d.createdAt,
+          status: d.stage,
+          data: d,
+        });
+      });
+      
+      // Add quotations
+      quotations.forEach(q => {
+        timelineEvents.push({
+          id: q.id,
+          type: 'quotation',
+          subType: q.status,
+          title: `Quotation ${q.quoteNumber}`,
+          description: q.title,
+          date: q.createdAt,
+          status: q.status,
+          data: q,
+        });
+      });
+      
+      // Add invoices
+      invoices.forEach(i => {
+        timelineEvents.push({
+          id: i.id,
+          type: 'invoice',
+          subType: i.status,
+          title: `Invoice ${i.invoiceNumber}`,
+          description: `Total: $${Number(i.totalAmount).toLocaleString()}`,
+          date: i.issueDate,
+          status: i.status,
+          data: i,
+        });
+      });
+      
+      // Add tasks
+      tasks.forEach(t => {
+        timelineEvents.push({
+          id: t.id,
+          type: 'task',
+          subType: t.priority,
+          title: t.title,
+          description: t.description,
+          date: t.dueDate || t.createdAt,
+          status: t.status,
+          data: t,
+        });
+      });
+      
+      // Sort by date descending
+      timelineEvents.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+      
+      res.json({
+        customer,
+        contacts,
+        deals,
+        quotations,
+        invoices,
+        activities,
+        tasks,
+        timeline: timelineEvents,
+        summary: {
+          totalDeals: deals.length,
+          totalDealValue: deals.reduce((sum, d) => sum + Number(d.value), 0),
+          wonDeals: deals.filter(d => d.stage === 'closed-won' || d.stage === 'won').length,
+          activeDeals: deals.filter(d => !['closed-won', 'closed-lost', 'won', 'lost'].includes(d.stage)).length,
+          totalQuotations: quotations.length,
+          totalInvoices: invoices.length,
+          paidInvoices: invoices.filter(i => i.status === 'paid').length,
+          totalRevenue: invoices.filter(i => i.status === 'paid').reduce((sum, i) => sum + Number(i.paidAmount), 0),
+          pendingAmount: invoices.filter(i => i.status !== 'paid').reduce((sum, i) => sum + Number(i.balanceDue), 0),
+        }
+      });
+    } catch (error) {
+      console.error("Get customer journey error:", error);
+      res.status(500).json({ message: "Failed to fetch customer journey" });
+    }
+  });
+
   // ==================== QUOTATION ROUTES ====================
   
   app.get("/api/quotations", requireAuth, validateTenant, async (req, res) => {

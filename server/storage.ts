@@ -86,6 +86,13 @@ export interface IStorage {
   updateCustomer(id: string, tenantId: string, updates: Partial<InsertCustomer>): Promise<Customer | undefined>;
   deleteCustomer(id: string, tenantId: string): Promise<void>;
 
+  // Customer-related operations for journey view
+  getContactsByCustomer(customerId: string, tenantId: string): Promise<Contact[]>;
+  getDealsByCustomer(customerId: string, tenantId: string): Promise<Deal[]>;
+  getTasksByCustomer(customerId: string, tenantId: string): Promise<Task[]>;
+  getQuotationsByCustomer(customerId: string, tenantId: string): Promise<Quotation[]>;
+  getInvoicesByCustomer(customerId: string, tenantId: string): Promise<Invoice[]>;
+
   // Quotation operations
   createQuotation(quotation: InsertQuotation): Promise<Quotation>;
   getQuotationsByTenant(tenantId: string): Promise<Quotation[]>;
@@ -383,6 +390,37 @@ export class DatabaseStorage implements IStorage {
   async deleteCustomer(id: string, tenantId: string): Promise<void> {
     await db.delete(schema.customers)
       .where(and(eq(schema.customers.id, id), eq(schema.customers.tenantId, tenantId)));
+  }
+
+  // Customer-related operations for journey view
+  async getContactsByCustomer(customerId: string, tenantId: string): Promise<Contact[]> {
+    // Contacts don't have direct customerId link in current schema
+    // Return empty array - contacts are managed separately
+    return [];
+  }
+
+  async getDealsByCustomer(customerId: string, tenantId: string): Promise<Deal[]> {
+    return db.select().from(schema.deals)
+      .where(and(eq(schema.deals.customerId, customerId), eq(schema.deals.tenantId, tenantId)))
+      .orderBy(desc(schema.deals.createdAt));
+  }
+
+  async getTasksByCustomer(customerId: string, tenantId: string): Promise<Task[]> {
+    return db.select().from(schema.tasks)
+      .where(and(eq(schema.tasks.customerId, customerId), eq(schema.tasks.tenantId, tenantId)))
+      .orderBy(desc(schema.tasks.createdAt));
+  }
+
+  async getQuotationsByCustomer(customerId: string, tenantId: string): Promise<Quotation[]> {
+    return db.select().from(schema.quotations)
+      .where(and(eq(schema.quotations.customerId, customerId), eq(schema.quotations.tenantId, tenantId)))
+      .orderBy(desc(schema.quotations.createdAt));
+  }
+
+  async getInvoicesByCustomer(customerId: string, tenantId: string): Promise<Invoice[]> {
+    return db.select().from(schema.invoices)
+      .where(and(eq(schema.invoices.customerId, customerId), eq(schema.invoices.tenantId, tenantId)))
+      .orderBy(desc(schema.invoices.issueDate));
   }
 
   // Quotation operations

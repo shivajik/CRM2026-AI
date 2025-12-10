@@ -135,6 +135,7 @@ export const productsApi = {
 export const customersApi = {
   getAll: () => apiRequest("/customers"),
   getById: (id: string) => apiRequest(`/customers/${id}`),
+  getJourney: (id: string) => apiRequest(`/customers/${id}/journey`),
   create: (data: any) => apiRequest("/customers", { method: "POST", body: JSON.stringify(data) }),
   update: (id: string, data: any) => apiRequest(`/customers/${id}`, { method: "PATCH", body: JSON.stringify(data) }),
   delete: (id: string) => apiRequest(`/customers/${id}`, { method: "DELETE" }),
