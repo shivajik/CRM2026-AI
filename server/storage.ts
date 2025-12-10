@@ -174,7 +174,7 @@ export interface IStorage {
     tenantDistribution: { name: string; value: number }[];
   }>;
   getAllTenants(): Promise<(Tenant & { userCount: number })[]>;
-  getAllUsersWithTenants(): Promise<(User & { tenantName: string })[]>;
+  getAllUsersWithTenants(): Promise<(Omit<User, 'passwordHash'> & { tenantName: string })[]>;
 
   // Customer Portal operations
   getQuotationsForCustomerUser(userId: string, tenantId: string): Promise<Quotation[]>;
@@ -202,7 +202,7 @@ export interface IStorage {
   // Detailed Tenant operations (SaaS Admin)
   getTenantDetails(tenantId: string): Promise<{
     tenant: Tenant;
-    users: User[];
+    users: Omit<User, 'passwordHash'>[];
     customers: Customer[];
     deals: Deal[];
     invoices: Invoice[];
@@ -218,7 +218,7 @@ export interface IStorage {
 
   // Detailed User operations (SaaS Admin)
   getUserDetails(userId: string): Promise<{
-    user: User;
+    user: Omit<User, 'passwordHash'>;
     tenant: Tenant | undefined;
     ownedCustomers: Customer[];
     assignedTasks: Task[];
@@ -905,7 +905,7 @@ export class DatabaseStorage implements IStorage {
     }));
   }
 
-  async getAllUsersWithTenants(): Promise<(User & { tenantName: string })[]> {
+  async getAllUsersWithTenants(): Promise<(Omit<User, 'passwordHash'> & { tenantName: string })[]> {
     const users = await db.select().from(schema.users).orderBy(desc(schema.users.createdAt));
     const tenants = await db.select().from(schema.tenants);
     
@@ -914,7 +914,6 @@ export class DatabaseStorage implements IStorage {
       const { passwordHash, ...userWithoutPassword } = user;
       return {
         ...userWithoutPassword,
-        passwordHash: '',
         tenantName: tenant?.name || 'Unknown',
       };
     });
@@ -1045,7 +1044,7 @@ export class DatabaseStorage implements IStorage {
   // Detailed Tenant operations
   async getTenantDetails(tenantId: string): Promise<{
     tenant: Tenant;
-    users: User[];
+    users: Omit<User, 'passwordHash'>[];
     customers: Customer[];
     deals: Deal[];
     invoices: Invoice[];
@@ -1071,7 +1070,7 @@ export class DatabaseStorage implements IStorage {
 
     const usersWithoutPasswords = users.map(u => {
       const { passwordHash, ...userWithoutPassword } = u;
-      return { ...userWithoutPassword, passwordHash: '' } as User;
+      return userWithoutPassword;
     });
 
     const totalRevenue = invoices
@@ -1101,7 +1100,7 @@ export class DatabaseStorage implements IStorage {
 
   // Detailed User operations
   async getUserDetails(userId: string): Promise<{
-    user: User;
+    user: Omit<User, 'passwordHash'>;
     tenant: Tenant | undefined;
     ownedCustomers: Customer[];
     assignedTasks: Task[];
@@ -1112,7 +1111,6 @@ export class DatabaseStorage implements IStorage {
     if (!user) return undefined;
 
     const { passwordHash, ...userWithoutPassword } = user;
-    const safeUser = { ...userWithoutPassword, passwordHash: '' } as User;
 
     const [tenant] = await db.select().from(schema.tenants).where(eq(schema.tenants.id, user.tenantId));
 
@@ -1124,7 +1122,7 @@ export class DatabaseStorage implements IStorage {
     ]);
 
     return {
-      user: safeUser,
+      user: userWithoutPassword,
       tenant,
       ownedCustomers,
       assignedTasks,
