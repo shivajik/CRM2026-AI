@@ -1435,6 +1435,191 @@ export async function registerRoutes(
     }
   });
 
+  // Get tenant details
+  app.get("/api/saas-admin/tenants/:id", requireAuth, requireSaasAdmin, async (req, res) => {
+    try {
+      const tenantDetails = await storage.getTenantDetails(req.params.id);
+      if (!tenantDetails) {
+        return res.status(404).json({ message: "Tenant not found" });
+      }
+      res.json(tenantDetails);
+    } catch (error) {
+      console.error("Get tenant details error:", error);
+      res.status(500).json({ message: "Failed to fetch tenant details" });
+    }
+  });
+
+  // Get user details
+  app.get("/api/saas-admin/users/:id", requireAuth, requireSaasAdmin, async (req, res) => {
+    try {
+      const userDetails = await storage.getUserDetails(req.params.id);
+      if (!userDetails) {
+        return res.status(404).json({ message: "User not found" });
+      }
+      res.json(userDetails);
+    } catch (error) {
+      console.error("Get user details error:", error);
+      res.status(500).json({ message: "Failed to fetch user details" });
+    }
+  });
+
+  // Platform Settings routes
+  app.get("/api/saas-admin/settings", requireAuth, requireSaasAdmin, async (req, res) => {
+    try {
+      const settings = await storage.getPlatformSettings();
+      res.json(settings);
+    } catch (error) {
+      console.error("Get platform settings error:", error);
+      res.status(500).json({ message: "Failed to fetch settings" });
+    }
+  });
+
+  app.put("/api/saas-admin/settings", requireAuth, requireSaasAdmin, async (req, res) => {
+    try {
+      const { key, value, category, description } = req.body;
+      if (!key || value === undefined) {
+        return res.status(400).json({ message: "Key and value are required" });
+      }
+
+      const setting = await storage.upsertPlatformSetting({
+        key,
+        value: typeof value === 'string' ? value : JSON.stringify(value),
+        category: category || 'general',
+        description,
+        updatedBy: req.user!.userId,
+      });
+
+      await storage.createPlatformActivityLog({
+        actorId: req.user!.userId,
+        actorType: 'user',
+        targetType: 'platform_setting',
+        targetId: setting.id,
+        action: 'update_setting',
+        description: `Updated platform setting: ${key}`,
+        metadata: JSON.stringify({ key, value }),
+      });
+
+      res.json(setting);
+    } catch (error) {
+      console.error("Update platform setting error:", error);
+      res.status(500).json({ message: "Failed to update setting" });
+    }
+  });
+
+  app.delete("/api/saas-admin/settings/:key", requireAuth, requireSaasAdmin, async (req, res) => {
+    try {
+      await storage.deletePlatformSetting(req.params.key);
+
+      await storage.createPlatformActivityLog({
+        actorId: req.user!.userId,
+        actorType: 'user',
+        targetType: 'platform_setting',
+        targetId: req.params.key,
+        action: 'delete_setting',
+        description: `Deleted platform setting: ${req.params.key}`,
+      });
+
+      res.json({ message: "Setting deleted successfully" });
+    } catch (error) {
+      console.error("Delete platform setting error:", error);
+      res.status(500).json({ message: "Failed to delete setting" });
+    }
+  });
+
+  // Platform Activity Logs routes
+  app.get("/api/saas-admin/activity-logs", requireAuth, requireSaasAdmin, async (req, res) => {
+    try {
+      const { tenantId, actorId, action, targetType, from, to, limit, offset } = req.query;
+      
+      const logs = await storage.getPlatformActivityLogs({
+        tenantId: tenantId as string | undefined,
+        actorId: actorId as string | undefined,
+        action: action as string | undefined,
+        targetType: targetType as string | undefined,
+        from: from ? new Date(from as string) : undefined,
+        to: to ? new Date(to as string) : undefined,
+        limit: limit ? parseInt(limit as string) : 50,
+        offset: offset ? parseInt(offset as string) : 0,
+      });
+
+      res.json(logs);
+    } catch (error) {
+      console.error("Get activity logs error:", error);
+      res.status(500).json({ message: "Failed to fetch activity logs" });
+    }
+  });
+
+  // Super Admin Profile routes
+  app.get("/api/saas-admin/profile", requireAuth, requireSaasAdmin, async (req, res) => {
+    try {
+      const user = await storage.getUserById(req.user!.userId);
+      if (!user) {
+        return res.status(404).json({ message: "User not found" });
+      }
+      res.json({
+        id: user.id,
+        email: user.email,
+        firstName: user.firstName,
+        lastName: user.lastName,
+        userType: user.userType,
+        isAdmin: user.isAdmin,
+        createdAt: user.createdAt,
+      });
+    } catch (error) {
+      console.error("Get super admin profile error:", error);
+      res.status(500).json({ message: "Failed to fetch profile" });
+    }
+  });
+
+  app.patch("/api/saas-admin/profile", requireAuth, requireSaasAdmin, async (req, res) => {
+    try {
+      const { firstName, lastName, email } = req.body;
+      
+      if (!firstName && !lastName && !email) {
+        return res.status(400).json({ message: "No valid fields provided for update" });
+      }
+
+      if (email) {
+        const existingUser = await storage.getUserByEmail(email.trim().toLowerCase());
+        if (existingUser && existingUser.id !== req.user!.userId) {
+          return res.status(400).json({ message: "Email already in use" });
+        }
+      }
+
+      const updates: { firstName?: string; lastName?: string; email?: string } = {};
+      if (firstName) updates.firstName = firstName.trim();
+      if (lastName) updates.lastName = lastName.trim();
+      if (email) updates.email = email.trim().toLowerCase();
+
+      const updatedUser = await storage.updateSuperAdminProfile(req.user!.userId, updates);
+      if (!updatedUser) {
+        return res.status(404).json({ message: "User not found" });
+      }
+
+      await storage.createPlatformActivityLog({
+        actorId: req.user!.userId,
+        actorType: 'user',
+        targetType: 'user',
+        targetId: req.user!.userId,
+        action: 'update_profile',
+        description: 'Super admin updated their profile',
+        metadata: JSON.stringify(updates),
+      });
+
+      res.json({
+        id: updatedUser.id,
+        email: updatedUser.email,
+        firstName: updatedUser.firstName,
+        lastName: updatedUser.lastName,
+        userType: updatedUser.userType,
+        isAdmin: updatedUser.isAdmin,
+      });
+    } catch (error) {
+      console.error("Update super admin profile error:", error);
+      res.status(500).json({ message: "Failed to update profile" });
+    }
+  });
+
   // ==================== CUSTOMER PORTAL ROUTES ====================
   
   app.get("/api/customer-portal/quotations", requireAuth, async (req, res) => {
