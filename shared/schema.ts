@@ -428,3 +428,44 @@ export const insertTaskSchema = createInsertSchema(tasks, {
 });
 export type InsertTask = z.infer<typeof insertTaskSchema>;
 export type Task = typeof tasks.$inferSelect;
+
+// ==================== PLATFORM SETTINGS (SaaS Admin) ====================
+export const platformSettings = pgTable("platform_settings", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  key: text("key").notNull().unique(),
+  value: text("value").notNull(),
+  category: text("category").notNull().default("general"),
+  description: text("description"),
+  updatedBy: varchar("updated_by").references(() => users.id),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+export const insertPlatformSettingSchema = createInsertSchema(platformSettings).omit({ 
+  id: true, 
+  updatedAt: true 
+});
+export type InsertPlatformSetting = z.infer<typeof insertPlatformSettingSchema>;
+export type PlatformSetting = typeof platformSettings.$inferSelect;
+
+// ==================== PLATFORM ACTIVITY LOGS (SaaS Admin) ====================
+export const platformActivityLogs = pgTable("platform_activity_logs", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  actorId: varchar("actor_id").references(() => users.id),
+  actorType: text("actor_type").notNull().default("user"),
+  tenantId: varchar("tenant_id").references(() => tenants.id, { onDelete: "cascade" }),
+  targetType: text("target_type").notNull(),
+  targetId: varchar("target_id"),
+  action: text("action").notNull(),
+  description: text("description"),
+  metadata: text("metadata"),
+  ipAddress: text("ip_address"),
+  userAgent: text("user_agent"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+export const insertPlatformActivityLogSchema = createInsertSchema(platformActivityLogs).omit({ 
+  id: true, 
+  createdAt: true 
+});
+export type InsertPlatformActivityLog = z.infer<typeof insertPlatformActivityLogSchema>;
+export type PlatformActivityLog = typeof platformActivityLogs.$inferSelect;
