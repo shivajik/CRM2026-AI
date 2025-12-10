@@ -31,6 +31,7 @@ export interface IStorage {
   getUserById(id: string): Promise<User | undefined>;
   getUserByEmail(email: string): Promise<User | undefined>;
   getUsersByTenant(tenantId: string): Promise<User[]>;
+  updateUser(id: string, updates: { firstName?: string; lastName?: string; email?: string }): Promise<User | undefined>;
   
   // Role operations
   createRole(role: InsertRole): Promise<Role>;
@@ -133,9 +134,13 @@ export interface IStorage {
   createActivity(activity: InsertActivity): Promise<Activity>;
   getActivitiesByTenant(tenantId: string): Promise<Activity[]>;
   getActivitiesByCustomer(customerId: string, tenantId: string): Promise<Activity[]>;
+  getActivitiesByDeal(dealId: string, tenantId: string): Promise<Activity[]>;
   getActivityById(id: string, tenantId: string): Promise<Activity | undefined>;
   updateActivity(id: string, tenantId: string, updates: Partial<InsertActivity>): Promise<Activity | undefined>;
   deleteActivity(id: string, tenantId: string): Promise<void>;
+
+  // Deal-related operations
+  getTasksByDeal(dealId: string, tenantId: string): Promise<Task[]>;
 
   // Reports
   getDashboardStats(tenantId: string): Promise<{
@@ -179,6 +184,21 @@ export class DatabaseStorage implements IStorage {
   
   async getUsersByTenant(tenantId: string): Promise<User[]> {
     return db.select().from(schema.users).where(eq(schema.users.tenantId, tenantId));
+  }
+  
+  async updateUser(id: string, updates: { firstName?: string; lastName?: string; email?: string }): Promise<User | undefined> {
+    const updateData: { firstName?: string; lastName?: string; email?: string; updatedAt: Date } = {
+      updatedAt: new Date(),
+    };
+    if (updates.firstName) updateData.firstName = updates.firstName;
+    if (updates.lastName) updateData.lastName = updates.lastName;
+    if (updates.email) updateData.email = updates.email;
+    
+    const [user] = await db.update(schema.users)
+      .set(updateData)
+      .where(eq(schema.users.id, id))
+      .returning();
+    return user;
   }
   
   // Role operations
@@ -600,6 +620,18 @@ export class DatabaseStorage implements IStorage {
   async deleteActivity(id: string, tenantId: string): Promise<void> {
     await db.delete(schema.activities)
       .where(and(eq(schema.activities.id, id), eq(schema.activities.tenantId, tenantId)));
+  }
+
+  async getActivitiesByDeal(dealId: string, tenantId: string): Promise<Activity[]> {
+    return db.select().from(schema.activities)
+      .where(and(eq(schema.activities.dealId, dealId), eq(schema.activities.tenantId, tenantId)))
+      .orderBy(desc(schema.activities.createdAt));
+  }
+
+  async getTasksByDeal(dealId: string, tenantId: string): Promise<Task[]> {
+    return db.select().from(schema.tasks)
+      .where(and(eq(schema.tasks.dealId, dealId), eq(schema.tasks.tenantId, tenantId)))
+      .orderBy(desc(schema.tasks.createdAt));
   }
 
   // Reports

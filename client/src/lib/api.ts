@@ -108,9 +108,16 @@ export const contactsApi = {
 export const dealsApi = {
   getAll: () => apiRequest("/deals"),
   getById: (id: string) => apiRequest(`/deals/${id}`),
+  getJourney: (id: string) => apiRequest(`/deals/${id}/journey`),
   create: (data: any) => apiRequest("/deals", { method: "POST", body: JSON.stringify(data) }),
   update: (id: string, data: any) => apiRequest(`/deals/${id}`, { method: "PATCH", body: JSON.stringify(data) }),
   delete: (id: string) => apiRequest(`/deals/${id}`, { method: "DELETE" }),
+};
+
+// Users API
+export const usersApi = {
+  updateProfile: (data: { firstName?: string; lastName?: string; email?: string }) =>
+    apiRequest("/users/profile", { method: "PATCH", body: JSON.stringify(data) }),
 };
 
 // Tasks API

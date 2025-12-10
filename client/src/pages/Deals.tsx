@@ -12,7 +12,8 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Plus, MoreHorizontal, Calendar, Pencil, Trash2 } from "lucide-react";
+import { Plus, MoreHorizontal, Calendar, Pencil, Trash2, Eye } from "lucide-react";
+import { useLocation } from "wouter";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -74,6 +75,7 @@ const emptyDeal = {
 export default function Deals() {
   const queryClient = useQueryClient();
   const { toast } = useToast();
+  const [, navigate] = useLocation();
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
   const [editingDeal, setEditingDeal] = useState<Deal | null>(null);
@@ -248,6 +250,9 @@ export default function Deals() {
                                   </DropdownMenuTrigger>
                                   <DropdownMenuContent align="end">
                                     <DropdownMenuLabel>Actions</DropdownMenuLabel>
+                                    <DropdownMenuItem onClick={() => navigate(`/deals/${deal.id}`)} data-testid={`button-view-${deal.id}`}>
+                                      <Eye className="mr-2 h-4 w-4" /> View Details
+                                    </DropdownMenuItem>
                                     <DropdownMenuItem onClick={() => handleOpenEdit(deal)} data-testid={`button-edit-${deal.id}`}>
                                       <Pencil className="mr-2 h-4 w-4" /> Edit Deal
                                     </DropdownMenuItem>

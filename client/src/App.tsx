@@ -7,6 +7,7 @@ import NotFound from "@/pages/not-found";
 import Dashboard from "@/pages/Dashboard";
 import Contacts from "@/pages/Contacts";
 import Deals from "@/pages/Deals";
+import DealDetail from "@/pages/DealDetail";
 import Tasks from "@/pages/Tasks";
 import Settings from "@/pages/Settings";
 import Login from "@/pages/Login";
@@ -29,6 +30,7 @@ function Router() {
       <Route path="/customers/:id" component={CustomerDetail} />
       <Route path="/contacts" component={Contacts} />
       <Route path="/deals" component={Deals} />
+      <Route path="/deals/:id" component={DealDetail} />
       <Route path="/products" component={Products} />
       <Route path="/quotations" component={Quotations} />
       <Route path="/quotations/:id" component={QuotationDetail} />

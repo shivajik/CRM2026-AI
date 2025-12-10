@@ -196,6 +196,55 @@ export async function registerRoutes(
       res.status(500).json({ message: "Failed to fetch user" });
     }
   });
+
+  // ==================== USER PROFILE ROUTES ====================
+  
+  app.patch("/api/users/profile", requireAuth, async (req, res) => {
+    try {
+      const { firstName, lastName, email } = req.body;
+      
+      if (!firstName && !lastName && !email) {
+        return res.status(400).json({ message: "No valid fields provided for update" });
+      }
+      
+      const updates: { firstName?: string; lastName?: string; email?: string } = {};
+      
+      if (firstName && typeof firstName === 'string') {
+        updates.firstName = firstName.trim();
+      }
+      if (lastName && typeof lastName === 'string') {
+        updates.lastName = lastName.trim();
+      }
+      if (email && typeof email === 'string') {
+        const trimmedEmail = email.trim().toLowerCase();
+        const existingUser = await storage.getUserByEmail(trimmedEmail);
+        if (existingUser && existingUser.id !== req.user!.userId) {
+          return res.status(400).json({ message: "Email already in use" });
+        }
+        updates.email = trimmedEmail;
+      }
+      
+      if (Object.keys(updates).length === 0) {
+        return res.status(400).json({ message: "No valid fields provided for update" });
+      }
+      
+      const updatedUser = await storage.updateUser(req.user!.userId, updates);
+      if (!updatedUser) {
+        return res.status(404).json({ message: "User not found" });
+      }
+      
+      res.json({
+        id: updatedUser.id,
+        email: updatedUser.email,
+        firstName: updatedUser.firstName,
+        lastName: updatedUser.lastName,
+        tenantId: updatedUser.tenantId,
+      });
+    } catch (error) {
+      console.error("Update profile error:", error);
+      res.status(500).json({ message: "Failed to update profile" });
+    }
+  });
   
   // ==================== TENANT MODULE ROUTES ====================
   
@@ -357,6 +406,124 @@ export async function registerRoutes(
     } catch (error) {
       console.error("Delete deal error:", error);
       res.status(500).json({ message: "Failed to delete deal" });
+    }
+  });
+
+  // Deal Journey - get all related data for a deal
+  app.get("/api/deals/:id/journey", requireAuth, validateTenant, async (req, res) => {
+    try {
+      const deal = await storage.getDealById(req.params.id, req.user!.tenantId);
+      if (!deal) {
+        return res.status(404).json({ message: "Deal not found" });
+      }
+      
+      // Get customer if linked
+      let customer = null;
+      if (deal.customerId) {
+        customer = await storage.getCustomerById(deal.customerId, req.user!.tenantId);
+      }
+      
+      // Get contact if linked
+      let contact = null;
+      if (deal.contactId) {
+        contact = await storage.getContactById(deal.contactId, req.user!.tenantId);
+      }
+      
+      // Get related entities - scoped to deal
+      const activities = await storage.getActivitiesByDeal(req.params.id, req.user!.tenantId);
+      const tasks = await storage.getTasksByDeal(req.params.id, req.user!.tenantId);
+      
+      // Get quotations and invoices linked to the customer (if exists)
+      // These are customer-level as quotations/invoices are typically customer-scoped
+      let quotations: any[] = [];
+      let invoices: any[] = [];
+      if (deal.customerId) {
+        quotations = await storage.getQuotationsByCustomer(deal.customerId, req.user!.tenantId);
+        invoices = await storage.getInvoicesByCustomer(deal.customerId, req.user!.tenantId);
+      }
+      
+      // Build timeline events
+      interface TimelineEvent {
+        id: string;
+        type: string;
+        title: string;
+        description: string | null;
+        date: Date;
+        status: string;
+      }
+      
+      const timelineEvents: TimelineEvent[] = [];
+      
+      // Add activities
+      activities.forEach((a) => {
+        timelineEvents.push({
+          id: a.id,
+          type: a.type,
+          title: a.subject,
+          description: a.description,
+          date: a.completedAt || a.scheduledAt || a.createdAt,
+          status: a.completedAt ? 'completed' : 'scheduled',
+        });
+      });
+      
+      // Add quotations
+      quotations.forEach((q) => {
+        timelineEvents.push({
+          id: q.id,
+          type: 'quotation',
+          title: `Quotation ${q.quoteNumber}`,
+          description: q.title,
+          date: q.createdAt,
+          status: q.status,
+        });
+      });
+      
+      // Add invoices
+      invoices.forEach((i) => {
+        timelineEvents.push({
+          id: i.id,
+          type: 'invoice',
+          title: `Invoice ${i.invoiceNumber}`,
+          description: `Total: $${Number(i.totalAmount).toLocaleString()}`,
+          date: i.issueDate,
+          status: i.status,
+        });
+      });
+      
+      // Add tasks
+      tasks.forEach((t) => {
+        timelineEvents.push({
+          id: t.id,
+          type: 'task',
+          title: t.title,
+          description: t.description,
+          date: t.dueDate || t.createdAt,
+          status: t.status,
+        });
+      });
+      
+      // Sort by date descending
+      timelineEvents.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+      
+      res.json({
+        deal,
+        customer,
+        contact,
+        quotations,
+        invoices,
+        activities,
+        tasks,
+        timeline: timelineEvents,
+        summary: {
+          totalQuotations: quotations.length,
+          totalInvoices: invoices.length,
+          totalActivities: activities.length,
+          totalTasks: tasks.length,
+        },
+      });
+    } catch (error) {
+      console.error("Get deal journey error:", error);
+      res.status(500).json({ message: "Failed to fetch deal journey" });
     }
   });
   
