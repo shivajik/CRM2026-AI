@@ -19,6 +19,8 @@ import type {
   InsertInvoiceItem, InvoiceItem,
   InsertPayment, Payment,
   InsertActivity, Activity,
+  InsertPlatformSetting, PlatformSetting,
+  InsertPlatformActivityLog, PlatformActivityLog,
 } from "@shared/schema";
 
 export interface IStorage {
@@ -177,6 +179,55 @@ export interface IStorage {
   // Customer Portal operations
   getQuotationsForCustomerUser(userId: string, tenantId: string): Promise<Quotation[]>;
   getInvoicesForCustomerUser(userId: string, tenantId: string): Promise<Invoice[]>;
+
+  // Platform Settings operations (SaaS Admin)
+  getPlatformSettings(): Promise<PlatformSetting[]>;
+  getPlatformSettingByKey(key: string): Promise<PlatformSetting | undefined>;
+  upsertPlatformSetting(setting: InsertPlatformSetting): Promise<PlatformSetting>;
+  deletePlatformSetting(key: string): Promise<void>;
+
+  // Platform Activity Logs operations (SaaS Admin)
+  createPlatformActivityLog(log: InsertPlatformActivityLog): Promise<PlatformActivityLog>;
+  getPlatformActivityLogs(filters?: {
+    tenantId?: string;
+    actorId?: string;
+    action?: string;
+    targetType?: string;
+    from?: Date;
+    to?: Date;
+    limit?: number;
+    offset?: number;
+  }): Promise<PlatformActivityLog[]>;
+
+  // Detailed Tenant operations (SaaS Admin)
+  getTenantDetails(tenantId: string): Promise<{
+    tenant: Tenant;
+    users: User[];
+    customers: Customer[];
+    deals: Deal[];
+    invoices: Invoice[];
+    quotations: Quotation[];
+    stats: {
+      totalUsers: number;
+      totalCustomers: number;
+      totalDeals: number;
+      totalRevenue: number;
+      activeDeals: number;
+    };
+  } | undefined>;
+
+  // Detailed User operations (SaaS Admin)
+  getUserDetails(userId: string): Promise<{
+    user: User;
+    tenant: Tenant | undefined;
+    ownedCustomers: Customer[];
+    assignedTasks: Task[];
+    activities: Activity[];
+    deals: Deal[];
+  } | undefined>;
+
+  // Update super admin profile
+  updateSuperAdminProfile(userId: string, updates: { firstName?: string; lastName?: string; email?: string }): Promise<User | undefined>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -908,6 +959,194 @@ export class DatabaseStorage implements IStorage {
       .orderBy(desc(schema.invoices.createdAt));
     
     return invoices.filter(i => customerIds.includes(i.customerId));
+  }
+
+  // Platform Settings operations
+  async getPlatformSettings(): Promise<PlatformSetting[]> {
+    return db.select().from(schema.platformSettings).orderBy(schema.platformSettings.category, schema.platformSettings.key);
+  }
+
+  async getPlatformSettingByKey(key: string): Promise<PlatformSetting | undefined> {
+    const [setting] = await db.select().from(schema.platformSettings).where(eq(schema.platformSettings.key, key));
+    return setting;
+  }
+
+  async upsertPlatformSetting(setting: InsertPlatformSetting): Promise<PlatformSetting> {
+    const existing = await this.getPlatformSettingByKey(setting.key);
+    if (existing) {
+      const [updated] = await db.update(schema.platformSettings)
+        .set({ ...setting, updatedAt: new Date() })
+        .where(eq(schema.platformSettings.key, setting.key))
+        .returning();
+      return updated;
+    }
+    const [created] = await db.insert(schema.platformSettings).values(setting).returning();
+    return created;
+  }
+
+  async deletePlatformSetting(key: string): Promise<void> {
+    await db.delete(schema.platformSettings).where(eq(schema.platformSettings.key, key));
+  }
+
+  // Platform Activity Logs operations
+  async createPlatformActivityLog(log: InsertPlatformActivityLog): Promise<PlatformActivityLog> {
+    const [activityLog] = await db.insert(schema.platformActivityLogs).values(log).returning();
+    return activityLog;
+  }
+
+  async getPlatformActivityLogs(filters?: {
+    tenantId?: string;
+    actorId?: string;
+    action?: string;
+    targetType?: string;
+    from?: Date;
+    to?: Date;
+    limit?: number;
+    offset?: number;
+  }): Promise<PlatformActivityLog[]> {
+    let query = db.select().from(schema.platformActivityLogs);
+    const conditions: any[] = [];
+
+    if (filters?.tenantId) {
+      conditions.push(eq(schema.platformActivityLogs.tenantId, filters.tenantId));
+    }
+    if (filters?.actorId) {
+      conditions.push(eq(schema.platformActivityLogs.actorId, filters.actorId));
+    }
+    if (filters?.action) {
+      conditions.push(eq(schema.platformActivityLogs.action, filters.action));
+    }
+    if (filters?.targetType) {
+      conditions.push(eq(schema.platformActivityLogs.targetType, filters.targetType));
+    }
+    if (filters?.from) {
+      conditions.push(gte(schema.platformActivityLogs.createdAt, filters.from));
+    }
+    if (filters?.to) {
+      conditions.push(lte(schema.platformActivityLogs.createdAt, filters.to));
+    }
+
+    if (conditions.length > 0) {
+      query = query.where(and(...conditions)) as any;
+    }
+
+    query = query.orderBy(desc(schema.platformActivityLogs.createdAt)) as any;
+
+    if (filters?.limit) {
+      query = query.limit(filters.limit) as any;
+    }
+    if (filters?.offset) {
+      query = query.offset(filters.offset) as any;
+    }
+
+    return query;
+  }
+
+  // Detailed Tenant operations
+  async getTenantDetails(tenantId: string): Promise<{
+    tenant: Tenant;
+    users: User[];
+    customers: Customer[];
+    deals: Deal[];
+    invoices: Invoice[];
+    quotations: Quotation[];
+    stats: {
+      totalUsers: number;
+      totalCustomers: number;
+      totalDeals: number;
+      totalRevenue: number;
+      activeDeals: number;
+    };
+  } | undefined> {
+    const [tenant] = await db.select().from(schema.tenants).where(eq(schema.tenants.id, tenantId));
+    if (!tenant) return undefined;
+
+    const [users, customers, deals, invoices, quotations] = await Promise.all([
+      db.select().from(schema.users).where(eq(schema.users.tenantId, tenantId)),
+      db.select().from(schema.customers).where(eq(schema.customers.tenantId, tenantId)),
+      db.select().from(schema.deals).where(eq(schema.deals.tenantId, tenantId)),
+      db.select().from(schema.invoices).where(eq(schema.invoices.tenantId, tenantId)),
+      db.select().from(schema.quotations).where(eq(schema.quotations.tenantId, tenantId)),
+    ]);
+
+    const usersWithoutPasswords = users.map(u => {
+      const { passwordHash, ...userWithoutPassword } = u;
+      return { ...userWithoutPassword, passwordHash: '' } as User;
+    });
+
+    const totalRevenue = invoices
+      .filter(i => i.status === 'paid')
+      .reduce((sum, i) => sum + Number(i.paidAmount || 0), 0);
+
+    const activeDeals = deals.filter(d => 
+      d.stage !== 'closed-won' && d.stage !== 'closed-lost'
+    ).length;
+
+    return {
+      tenant,
+      users: usersWithoutPasswords,
+      customers,
+      deals,
+      invoices,
+      quotations,
+      stats: {
+        totalUsers: users.length,
+        totalCustomers: customers.length,
+        totalDeals: deals.length,
+        totalRevenue,
+        activeDeals,
+      },
+    };
+  }
+
+  // Detailed User operations
+  async getUserDetails(userId: string): Promise<{
+    user: User;
+    tenant: Tenant | undefined;
+    ownedCustomers: Customer[];
+    assignedTasks: Task[];
+    activities: Activity[];
+    deals: Deal[];
+  } | undefined> {
+    const [user] = await db.select().from(schema.users).where(eq(schema.users.id, userId));
+    if (!user) return undefined;
+
+    const { passwordHash, ...userWithoutPassword } = user;
+    const safeUser = { ...userWithoutPassword, passwordHash: '' } as User;
+
+    const [tenant] = await db.select().from(schema.tenants).where(eq(schema.tenants.id, user.tenantId));
+
+    const [ownedCustomers, assignedTasks, activities, deals] = await Promise.all([
+      db.select().from(schema.customers).where(eq(schema.customers.ownerId, userId)),
+      db.select().from(schema.tasks).where(eq(schema.tasks.assignedTo, userId)),
+      db.select().from(schema.activities).where(eq(schema.activities.userId, userId)),
+      db.select().from(schema.deals).where(eq(schema.deals.ownerId, userId)),
+    ]);
+
+    return {
+      user: safeUser,
+      tenant,
+      ownedCustomers,
+      assignedTasks,
+      activities,
+      deals,
+    };
+  }
+
+  // Update super admin profile
+  async updateSuperAdminProfile(userId: string, updates: { firstName?: string; lastName?: string; email?: string }): Promise<User | undefined> {
+    const updateData: { firstName?: string; lastName?: string; email?: string; updatedAt: Date } = {
+      updatedAt: new Date(),
+    };
+    if (updates.firstName) updateData.firstName = updates.firstName;
+    if (updates.lastName) updateData.lastName = updates.lastName;
+    if (updates.email) updateData.email = updates.email;
+    
+    const [user] = await db.update(schema.users)
+      .set(updateData)
+      .where(eq(schema.users.id, userId))
+      .returning();
+    return user;
   }
 }
 
