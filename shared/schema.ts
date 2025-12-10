@@ -130,7 +130,13 @@ export const deals = pgTable("deals", {
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });
 
-export const insertDealSchema = createInsertSchema(deals).omit({ 
+export const insertDealSchema = createInsertSchema(deals, {
+  expectedCloseDate: z.union([z.string(), z.date(), z.null()]).optional().transform(val => {
+    if (!val) return null;
+    if (val instanceof Date) return val;
+    return new Date(val);
+  }),
+}).omit({ 
   id: true, 
   createdAt: true, 
   updatedAt: true 
@@ -152,7 +158,13 @@ export const tasks = pgTable("tasks", {
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });
 
-export const insertTaskSchema = createInsertSchema(tasks).omit({ 
+export const insertTaskSchema = createInsertSchema(tasks, {
+  dueDate: z.union([z.string(), z.date(), z.null()]).optional().transform(val => {
+    if (!val) return null;
+    if (val instanceof Date) return val;
+    return new Date(val);
+  }),
+}).omit({ 
   id: true, 
   createdAt: true, 
   updatedAt: true 
