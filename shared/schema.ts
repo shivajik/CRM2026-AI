@@ -27,6 +27,16 @@ export const insertRoleSchema = createInsertSchema(roles).omit({ id: true, creat
 export type InsertRole = z.infer<typeof insertRoleSchema>;
 export type Role = typeof roles.$inferSelect;
 
+// User types for enterprise-grade access control
+export const USER_TYPES = {
+  SAAS_ADMIN: 'saas_admin',      // Super admin - manages all agencies/tenants
+  AGENCY_ADMIN: 'agency_admin',   // Admin within a specific tenant/agency
+  TEAM_MEMBER: 'team_member',     // Regular team member with specific permissions
+  CUSTOMER: 'customer',           // External customer - can only see their own data
+} as const;
+
+export type UserType = typeof USER_TYPES[keyof typeof USER_TYPES];
+
 // Users table - application users
 export const users = pgTable("users", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
@@ -36,6 +46,7 @@ export const users = pgTable("users", {
   firstName: text("first_name").notNull(),
   lastName: text("last_name").notNull(),
   roleId: varchar("role_id").references(() => roles.id),
+  userType: text("user_type").notNull().default("team_member"), // saas_admin, agency_admin, team_member, customer
   isAdmin: boolean("is_admin").default(false).notNull(),
   isActive: boolean("is_active").default(true).notNull(),
   createdAt: timestamp("created_at").defaultNow().notNull(),

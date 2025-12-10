@@ -63,21 +63,21 @@ export interface IStorage {
   
   // Contact operations
   createContact(contact: InsertContact): Promise<Contact>;
-  getContactsByTenant(tenantId: string): Promise<Contact[]>;
+  getContactsByTenant(tenantId: string, ownerId?: string): Promise<Contact[]>;
   getContactById(id: string, tenantId: string): Promise<Contact | undefined>;
   updateContact(id: string, tenantId: string, updates: Partial<InsertContact>): Promise<Contact | undefined>;
   deleteContact(id: string, tenantId: string): Promise<void>;
   
   // Deal operations
   createDeal(deal: InsertDeal): Promise<Deal>;
-  getDealsByTenant(tenantId: string): Promise<Deal[]>;
+  getDealsByTenant(tenantId: string, ownerId?: string): Promise<Deal[]>;
   getDealById(id: string, tenantId: string): Promise<Deal | undefined>;
   updateDeal(id: string, tenantId: string, updates: Partial<InsertDeal>): Promise<Deal | undefined>;
   deleteDeal(id: string, tenantId: string): Promise<void>;
   
   // Task operations
   createTask(task: InsertTask): Promise<Task>;
-  getTasksByTenant(tenantId: string): Promise<Task[]>;
+  getTasksByTenant(tenantId: string, assignedTo?: string): Promise<Task[]>;
   getTaskById(id: string, tenantId: string): Promise<Task | undefined>;
   updateTask(id: string, tenantId: string, updates: Partial<InsertTask>): Promise<Task | undefined>;
   deleteTask(id: string, tenantId: string): Promise<void>;
@@ -329,7 +329,10 @@ export class DatabaseStorage implements IStorage {
     return contact;
   }
   
-  async getContactsByTenant(tenantId: string): Promise<Contact[]> {
+  async getContactsByTenant(tenantId: string, ownerId?: string): Promise<Contact[]> {
+    if (ownerId) {
+      return db.select().from(schema.contacts).where(and(eq(schema.contacts.tenantId, tenantId), eq(schema.contacts.ownerId, ownerId)));
+    }
     return db.select().from(schema.contacts).where(eq(schema.contacts.tenantId, tenantId));
   }
   
@@ -358,7 +361,10 @@ export class DatabaseStorage implements IStorage {
     return deal;
   }
   
-  async getDealsByTenant(tenantId: string): Promise<Deal[]> {
+  async getDealsByTenant(tenantId: string, ownerId?: string): Promise<Deal[]> {
+    if (ownerId) {
+      return db.select().from(schema.deals).where(and(eq(schema.deals.tenantId, tenantId), eq(schema.deals.ownerId, ownerId)));
+    }
     return db.select().from(schema.deals).where(eq(schema.deals.tenantId, tenantId));
   }
   
@@ -387,7 +393,10 @@ export class DatabaseStorage implements IStorage {
     return task;
   }
   
-  async getTasksByTenant(tenantId: string): Promise<Task[]> {
+  async getTasksByTenant(tenantId: string, assignedTo?: string): Promise<Task[]> {
+    if (assignedTo) {
+      return db.select().from(schema.tasks).where(and(eq(schema.tasks.tenantId, tenantId), eq(schema.tasks.assignedTo, assignedTo)));
+    }
     return db.select().from(schema.tasks).where(eq(schema.tasks.tenantId, tenantId));
   }
   

@@ -30,6 +30,17 @@ async function seed() {
 
     const passwordHash = await bcrypt.hash("password123", 10);
 
+    const [saasAdmin] = await db.insert(schema.users).values({
+      tenantId: tenant.id,
+      email: "superadmin@nexuscrm.com",
+      passwordHash,
+      firstName: "Super",
+      lastName: "Admin",
+      roleId: adminRole.id,
+      userType: "saas_admin",
+      isAdmin: true,
+    }).returning();
+
     const [adminUser] = await db.insert(schema.users).values({
       tenantId: tenant.id,
       email: "admin@acme.com",
@@ -37,6 +48,8 @@ async function seed() {
       firstName: "John",
       lastName: "Admin",
       roleId: adminRole.id,
+      userType: "agency_admin",
+      isAdmin: true,
     }).returning();
 
     const [salesUser] = await db.insert(schema.users).values({
@@ -46,6 +59,8 @@ async function seed() {
       firstName: "Sarah",
       lastName: "Sales",
       roleId: salesRole.id,
+      userType: "team_member",
+      isAdmin: false,
     }).returning();
 
     const [salesUser2] = await db.insert(schema.users).values({
@@ -55,8 +70,21 @@ async function seed() {
       firstName: "Mike",
       lastName: "Johnson",
       roleId: salesRole.id,
+      userType: "team_member",
+      isAdmin: false,
     }).returning();
-    console.log("Created users: admin@acme.com, sarah@acme.com, mike@acme.com (password: password123)");
+
+    const [customerUser] = await db.insert(schema.users).values({
+      tenantId: tenant.id,
+      email: "customer@techstart.com",
+      passwordHash,
+      firstName: "Alice",
+      lastName: "Customer",
+      roleId: null,
+      userType: "customer",
+      isAdmin: false,
+    }).returning();
+    console.log("Created users with different role types:");
 
     const productsData = [
       { name: "Enterprise CRM License", description: "Annual enterprise CRM software license", sku: "CRM-ENT-001", type: "service", unitPrice: "4999.00", taxRate: "18", category: "Software" },
@@ -295,12 +323,16 @@ async function seed() {
     console.log("\n========================================");
     console.log("Database seeded successfully!");
     console.log("========================================");
-    console.log("\nLogin credentials:");
-    console.log("  Email: admin@acme.com");
-    console.log("  Password: password123");
-    console.log("\nOr:");
-    console.log("  Email: sarah@acme.com");
-    console.log("  Password: password123");
+    console.log("\nLogin credentials (password: password123 for all):");
+    console.log("\n1. SaaS Admin (Super Admin - all tenants access):");
+    console.log("   Email: superadmin@nexuscrm.com");
+    console.log("\n2. Agency Admin (Admin - full agency access):");
+    console.log("   Email: admin@acme.com");
+    console.log("\n3. Team Member (sees only their own data):");
+    console.log("   Email: sarah@acme.com");
+    console.log("   Email: mike@acme.com");
+    console.log("\n4. Customer (limited portal access):");
+    console.log("   Email: customer@techstart.com");
     console.log("========================================\n");
 
   } catch (error) {

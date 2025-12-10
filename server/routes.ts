@@ -2,7 +2,7 @@ import type { Express } from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
 import { hashPassword, verifyPassword, generateAccessToken, generateRefreshToken, getRefreshTokenExpiry, verifyToken } from "./auth";
-import { requireAuth, validateTenant } from "./middleware";
+import { requireAuth, validateTenant, requireAgencyAdmin, denyCustomerAccess } from "./middleware";
 import { z } from "zod";
 import { insertContactSchema, insertDealSchema, insertTaskSchema, insertProductSchema, insertCustomerSchema, insertQuotationSchema, insertQuotationItemSchema, insertInvoiceSchema, insertInvoiceItemSchema, insertPaymentSchema, insertActivitySchema } from "@shared/schema";
 
@@ -121,6 +121,8 @@ export async function registerRoutes(
           firstName: user.firstName,
           lastName: user.lastName,
           tenantId: user.tenantId,
+          userType: user.userType,
+          isAdmin: user.isAdmin,
         },
       });
     } catch (error) {
@@ -193,6 +195,7 @@ export async function registerRoutes(
         lastName: user.lastName,
         tenantId: user.tenantId,
         isAdmin: user.isAdmin,
+        userType: user.userType,
         permissions: user.role?.permissions || [],
       });
     } catch (error) {
@@ -203,8 +206,8 @@ export async function registerRoutes(
 
   // ==================== TEAM MANAGEMENT ROUTES ====================
   
-  // Get all team members
-  app.get("/api/team/members", requireAuth, validateTenant, async (req, res) => {
+  // Get all team members (admin only)
+  app.get("/api/team/members", requireAuth, validateTenant, requireAgencyAdmin, async (req, res) => {
     try {
       const users = await storage.getUsersByTenant(req.user!.tenantId);
       const roles = await storage.getRolesByTenant(req.user!.tenantId);
@@ -226,13 +229,9 @@ export async function registerRoutes(
     }
   });
   
-  // Create team member
-  app.post("/api/team/members", requireAuth, validateTenant, async (req, res) => {
+  // Create team member (admin only)
+  app.post("/api/team/members", requireAuth, validateTenant, requireAgencyAdmin, async (req, res) => {
     try {
-      const currentUser = await storage.getUserById(req.user!.userId);
-      if (!currentUser?.isAdmin) {
-        return res.status(403).json({ message: "Only admins can create team members" });
-      }
       
       const { email, password, firstName, lastName, roleId, permissions } = req.body;
       
@@ -502,7 +501,9 @@ export async function registerRoutes(
   
   app.get("/api/contacts", requireAuth, validateTenant, async (req, res) => {
     try {
-      const contacts = await storage.getContactsByTenant(req.user!.tenantId);
+      const userType = req.user!.userType;
+      const ownerId = (userType === 'team_member' || userType === 'customer') ? req.user!.userId : undefined;
+      const contacts = await storage.getContactsByTenant(req.user!.tenantId, ownerId);
       res.json(contacts);
     } catch (error) {
       console.error("Get contacts error:", error);
@@ -523,7 +524,7 @@ export async function registerRoutes(
     }
   });
   
-  app.post("/api/contacts", requireAuth, validateTenant, async (req, res) => {
+  app.post("/api/contacts", requireAuth, validateTenant, denyCustomerAccess, async (req, res) => {
     try {
       const validatedData = insertContactSchema.parse({
         ...req.body,
@@ -542,7 +543,7 @@ export async function registerRoutes(
     }
   });
   
-  app.patch("/api/contacts/:id", requireAuth, validateTenant, async (req, res) => {
+  app.patch("/api/contacts/:id", requireAuth, validateTenant, denyCustomerAccess, async (req, res) => {
     try {
       const contact = await storage.updateContact(req.params.id, req.user!.tenantId, req.body);
       if (!contact) {
@@ -555,7 +556,7 @@ export async function registerRoutes(
     }
   });
   
-  app.delete("/api/contacts/:id", requireAuth, validateTenant, async (req, res) => {
+  app.delete("/api/contacts/:id", requireAuth, validateTenant, denyCustomerAccess, async (req, res) => {
     try {
       await storage.deleteContact(req.params.id, req.user!.tenantId);
       res.json({ message: "Contact deleted successfully" });
@@ -569,7 +570,9 @@ export async function registerRoutes(
   
   app.get("/api/deals", requireAuth, validateTenant, async (req, res) => {
     try {
-      const deals = await storage.getDealsByTenant(req.user!.tenantId);
+      const userType = req.user!.userType;
+      const ownerId = (userType === 'team_member' || userType === 'customer') ? req.user!.userId : undefined;
+      const deals = await storage.getDealsByTenant(req.user!.tenantId, ownerId);
       res.json(deals);
     } catch (error) {
       console.error("Get deals error:", error);
@@ -590,7 +593,7 @@ export async function registerRoutes(
     }
   });
   
-  app.post("/api/deals", requireAuth, validateTenant, async (req, res) => {
+  app.post("/api/deals", requireAuth, validateTenant, denyCustomerAccess, async (req, res) => {
     try {
       const validatedData = insertDealSchema.parse({
         ...req.body,
@@ -609,7 +612,7 @@ export async function registerRoutes(
     }
   });
   
-  app.patch("/api/deals/:id", requireAuth, validateTenant, async (req, res) => {
+  app.patch("/api/deals/:id", requireAuth, validateTenant, denyCustomerAccess, async (req, res) => {
     try {
       const deal = await storage.updateDeal(req.params.id, req.user!.tenantId, req.body);
       if (!deal) {
@@ -622,7 +625,7 @@ export async function registerRoutes(
     }
   });
   
-  app.delete("/api/deals/:id", requireAuth, validateTenant, async (req, res) => {
+  app.delete("/api/deals/:id", requireAuth, validateTenant, denyCustomerAccess, async (req, res) => {
     try {
       await storage.deleteDeal(req.params.id, req.user!.tenantId);
       res.json({ message: "Deal deleted successfully" });
@@ -754,7 +757,9 @@ export async function registerRoutes(
   
   app.get("/api/tasks", requireAuth, validateTenant, async (req, res) => {
     try {
-      const tasks = await storage.getTasksByTenant(req.user!.tenantId);
+      const userType = req.user!.userType;
+      const assignedTo = (userType === 'team_member' || userType === 'customer') ? req.user!.userId : undefined;
+      const tasks = await storage.getTasksByTenant(req.user!.tenantId, assignedTo);
       res.json(tasks);
     } catch (error) {
       console.error("Get tasks error:", error);
@@ -775,7 +780,7 @@ export async function registerRoutes(
     }
   });
   
-  app.post("/api/tasks", requireAuth, validateTenant, async (req, res) => {
+  app.post("/api/tasks", requireAuth, validateTenant, denyCustomerAccess, async (req, res) => {
     try {
       const validatedData = insertTaskSchema.parse({
         ...req.body,
@@ -794,7 +799,7 @@ export async function registerRoutes(
     }
   });
   
-  app.patch("/api/tasks/:id", requireAuth, validateTenant, async (req, res) => {
+  app.patch("/api/tasks/:id", requireAuth, validateTenant, denyCustomerAccess, async (req, res) => {
     try {
       const task = await storage.updateTask(req.params.id, req.user!.tenantId, req.body);
       if (!task) {
@@ -807,7 +812,7 @@ export async function registerRoutes(
     }
   });
   
-  app.delete("/api/tasks/:id", requireAuth, validateTenant, async (req, res) => {
+  app.delete("/api/tasks/:id", requireAuth, validateTenant, denyCustomerAccess, async (req, res) => {
     try {
       await storage.deleteTask(req.params.id, req.user!.tenantId);
       res.json({ message: "Task deleted successfully" });

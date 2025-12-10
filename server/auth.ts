@@ -1,6 +1,6 @@
 import jwt from "jsonwebtoken";
 import bcrypt from "bcrypt";
-import type { User } from "@shared/schema";
+import type { User, UserType } from "@shared/schema";
 
 const JWT_SECRET = process.env.JWT_SECRET || "your-secret-key-change-in-production";
 const JWT_EXPIRES_IN = "15m";
@@ -10,6 +10,8 @@ export interface JWTPayload {
   userId: string;
   tenantId: string;
   email: string;
+  userType: UserType;
+  isAdmin: boolean;
 }
 
 export async function hashPassword(password: string): Promise<string> {
@@ -26,6 +28,8 @@ export function generateAccessToken(user: User): string {
     userId: user.id,
     tenantId: user.tenantId,
     email: user.email,
+    userType: user.userType as UserType,
+    isAdmin: user.isAdmin,
   };
   
   return jwt.sign(payload, JWT_SECRET, { expiresIn: JWT_EXPIRES_IN });
@@ -36,6 +40,8 @@ export function generateRefreshToken(user: User): string {
     userId: user.id,
     tenantId: user.tenantId,
     email: user.email,
+    userType: user.userType as UserType,
+    isAdmin: user.isAdmin,
   };
   
   return jwt.sign(payload, JWT_SECRET, { expiresIn: REFRESH_TOKEN_EXPIRES_IN });
