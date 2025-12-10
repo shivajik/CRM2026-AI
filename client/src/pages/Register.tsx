@@ -130,8 +130,8 @@ export default function Register() {
         <CardFooter className="flex flex-col gap-2">
           <div className="text-sm text-center text-muted-foreground">
             Already have an account?{" "}
-            <Link href="/login">
-              <a className="text-primary hover:underline font-medium" data-testid="link-login">Sign in</a>
+            <Link href="/login" className="text-primary hover:underline font-medium" data-testid="link-login">
+              Sign in
             </Link>
           </div>
         </CardFooter>
