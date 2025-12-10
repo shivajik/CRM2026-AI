@@ -77,20 +77,11 @@ export default function SaasAdminDashboard() {
     );
   }
 
-  const revenueData = [
-    { month: "Jan", revenue: 45000, users: 120 },
-    { month: "Feb", revenue: 52000, users: 145 },
-    { month: "Mar", revenue: 48000, users: 138 },
-    { month: "Apr", revenue: 61000, users: 162 },
-    { month: "May", revenue: 55000, users: 155 },
-    { month: "Jun", revenue: 67000, users: 180 },
-  ];
+  const revenueData = stats?.revenueData || [];
 
-  const tenantDistribution = [
-    { name: "Enterprise", value: 15 },
-    { name: "Professional", value: 35 },
-    { name: "Starter", value: 50 },
-  ];
+  const tenantDistribution = stats?.tenantDistribution?.length > 0 
+    ? stats.tenantDistribution 
+    : [];
 
   return (
     <ProtectedRoute>
@@ -186,10 +177,10 @@ export default function SaasAdminDashboard() {
                   </CardHeader>
                   <CardContent>
                     <div className="text-2xl font-bold" data-testid="stat-total-tenants">
-                      {stats?.totalTenants || tenants.length || 0}
+                      {stats?.totalTenants ?? tenants.length}
                     </div>
                     <p className="text-xs text-muted-foreground">
-                      <span className="text-green-500">+12%</span> from last month
+                      Registered organizations
                     </p>
                   </CardContent>
                 </Card>
@@ -200,10 +191,10 @@ export default function SaasAdminDashboard() {
                   </CardHeader>
                   <CardContent>
                     <div className="text-2xl font-bold" data-testid="stat-total-users">
-                      {stats?.totalUsers || allUsers.length || 0}
+                      {stats?.totalUsers ?? allUsers.length}
                     </div>
                     <p className="text-xs text-muted-foreground">
-                      <span className="text-green-500">+8%</span> from last month
+                      Platform users
                     </p>
                   </CardContent>
                 </Card>
@@ -214,24 +205,24 @@ export default function SaasAdminDashboard() {
                   </CardHeader>
                   <CardContent>
                     <div className="text-2xl font-bold" data-testid="stat-monthly-revenue">
-                      ${stats?.monthlyRevenue?.toLocaleString() || "67,000"}
+                      ${(stats?.monthlyRevenue ?? 0).toLocaleString()}
                     </div>
                     <p className="text-xs text-muted-foreground">
-                      <span className="text-green-500">+22%</span> from last month
+                      This month's revenue
                     </p>
                   </CardContent>
                 </Card>
                 <Card>
                   <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                    <CardTitle className="text-sm font-medium">Active Sessions</CardTitle>
+                    <CardTitle className="text-sm font-medium">Active Users</CardTitle>
                     <Activity className="h-4 w-4 text-muted-foreground" />
                   </CardHeader>
                   <CardContent>
                     <div className="text-2xl font-bold" data-testid="stat-active-sessions">
-                      {stats?.activeSessions || 42}
+                      {stats?.activeSessions ?? 0}
                     </div>
                     <p className="text-xs text-muted-foreground">
-                      Real-time users online
+                      Currently active accounts
                     </p>
                   </CardContent>
                 </Card>
@@ -252,20 +243,26 @@ export default function SaasAdminDashboard() {
                         <CardDescription>Monthly revenue over the last 6 months</CardDescription>
                       </CardHeader>
                       <CardContent>
-                        <ResponsiveContainer width="100%" height={300}>
-                          <AreaChart data={revenueData}>
-                            <defs>
-                              <linearGradient id="colorRevenue" x1="0" y1="0" x2="0" y2="1">
-                                <stop offset="5%" stopColor="hsl(var(--primary))" stopOpacity={0.3} />
-                                <stop offset="95%" stopColor="hsl(var(--primary))" stopOpacity={0} />
-                              </linearGradient>
-                            </defs>
-                            <XAxis dataKey="month" stroke="#888888" fontSize={12} tickLine={false} axisLine={false} />
-                            <YAxis stroke="#888888" fontSize={12} tickLine={false} axisLine={false} tickFormatter={(v) => `$${v/1000}k`} />
-                            <Tooltip />
-                            <Area type="monotone" dataKey="revenue" stroke="hsl(var(--primary))" strokeWidth={2} fill="url(#colorRevenue)" />
-                          </AreaChart>
-                        </ResponsiveContainer>
+                        {revenueData.length > 0 ? (
+                          <ResponsiveContainer width="100%" height={300}>
+                            <AreaChart data={revenueData}>
+                              <defs>
+                                <linearGradient id="colorRevenue" x1="0" y1="0" x2="0" y2="1">
+                                  <stop offset="5%" stopColor="hsl(var(--primary))" stopOpacity={0.3} />
+                                  <stop offset="95%" stopColor="hsl(var(--primary))" stopOpacity={0} />
+                                </linearGradient>
+                              </defs>
+                              <XAxis dataKey="month" stroke="#888888" fontSize={12} tickLine={false} axisLine={false} />
+                              <YAxis stroke="#888888" fontSize={12} tickLine={false} axisLine={false} tickFormatter={(v) => `$${v/1000}k`} />
+                              <Tooltip />
+                              <Area type="monotone" dataKey="revenue" stroke="hsl(var(--primary))" strokeWidth={2} fill="url(#colorRevenue)" />
+                            </AreaChart>
+                          </ResponsiveContainer>
+                        ) : (
+                          <div className="h-[300px] flex items-center justify-center text-muted-foreground">
+                            No revenue data available yet
+                          </div>
+                        )}
                       </CardContent>
                     </Card>
                     <Card>
@@ -274,26 +271,32 @@ export default function SaasAdminDashboard() {
                         <CardDescription>By subscription plan</CardDescription>
                       </CardHeader>
                       <CardContent>
-                        <ResponsiveContainer width="100%" height={300}>
-                          <PieChart>
-                            <Pie
-                              data={tenantDistribution}
-                              cx="50%"
-                              cy="50%"
-                              innerRadius={60}
-                              outerRadius={100}
-                              fill="#8884d8"
-                              paddingAngle={5}
-                              dataKey="value"
-                              label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}
-                            >
-                              {tenantDistribution.map((entry, index) => (
-                                <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
-                              ))}
-                            </Pie>
-                            <Tooltip />
-                          </PieChart>
-                        </ResponsiveContainer>
+                        {tenantDistribution.length > 0 ? (
+                          <ResponsiveContainer width="100%" height={300}>
+                            <PieChart>
+                              <Pie
+                                data={tenantDistribution}
+                                cx="50%"
+                                cy="50%"
+                                innerRadius={60}
+                                outerRadius={100}
+                                fill="#8884d8"
+                                paddingAngle={5}
+                                dataKey="value"
+                                label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}
+                              >
+                                {tenantDistribution.map((_entry: { name: string; value: number }, index: number) => (
+                                  <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                                ))}
+                              </Pie>
+                              <Tooltip />
+                            </PieChart>
+                          </ResponsiveContainer>
+                        ) : (
+                          <div className="h-[300px] flex items-center justify-center text-muted-foreground">
+                            No agency data available yet
+                          </div>
+                        )}
                       </CardContent>
                     </Card>
                   </div>

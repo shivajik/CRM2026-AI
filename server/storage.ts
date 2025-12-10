@@ -161,6 +161,22 @@ export interface IStorage {
     overdueInvoices: number;
   }>;
   getSalesReport(tenantId: string, startDate?: Date, endDate?: Date): Promise<any[]>;
+
+  // SaaS Admin operations
+  getSaasAdminStats(): Promise<{
+    totalTenants: number;
+    totalUsers: number;
+    monthlyRevenue: number;
+    activeSessions: number;
+    revenueData: { month: string; revenue: number; users: number }[];
+    tenantDistribution: { name: string; value: number }[];
+  }>;
+  getAllTenants(): Promise<(Tenant & { userCount: number })[]>;
+  getAllUsersWithTenants(): Promise<(User & { tenantName: string })[]>;
+
+  // Customer Portal operations
+  getQuotationsForCustomerUser(userId: string, tenantId: string): Promise<Quotation[]>;
+  getInvoicesForCustomerUser(userId: string, tenantId: string): Promise<Invoice[]>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -750,15 +766,81 @@ export class DatabaseStorage implements IStorage {
     totalUsers: number;
     monthlyRevenue: number;
     activeSessions: number;
+    revenueData: { month: string; revenue: number; users: number }[];
+    tenantDistribution: { name: string; value: number }[];
   }> {
     const tenants = await db.select().from(schema.tenants);
     const users = await db.select().from(schema.users);
+    const invoices = await db.select().from(schema.invoices);
+    
+    const now = new Date();
+    const currentMonth = now.getMonth();
+    const currentYear = now.getFullYear();
+    
+    const monthlyRevenue = invoices
+      .filter(inv => {
+        const invDate = new Date(inv.createdAt);
+        return invDate.getMonth() === currentMonth && invDate.getFullYear() === currentYear;
+      })
+      .reduce((sum, inv) => sum + Number(inv.paidAmount || 0), 0);
+    
+    const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+    const revenueData: { month: string; revenue: number; users: number }[] = [];
+    
+    for (let i = 5; i >= 0; i--) {
+      const targetMonth = (currentMonth - i + 12) % 12;
+      const targetYear = currentMonth - i < 0 ? currentYear - 1 : currentYear;
+      
+      const monthRevenue = invoices
+        .filter(inv => {
+          const invDate = new Date(inv.createdAt);
+          return invDate.getMonth() === targetMonth && invDate.getFullYear() === targetYear;
+        })
+        .reduce((sum, inv) => sum + Number(inv.paidAmount || 0), 0);
+      
+      const endOfTargetMonth = new Date(targetYear, targetMonth + 1, 0, 23, 59, 59, 999);
+      const monthUsers = users.filter(u => {
+        const uDate = new Date(u.createdAt);
+        return uDate <= endOfTargetMonth;
+      }).length;
+      
+      revenueData.push({
+        month: months[targetMonth],
+        revenue: monthRevenue,
+        users: monthUsers,
+      });
+    }
+    
+    const enterpriseTenants = tenants.filter(t => {
+      const userCount = users.filter(u => u.tenantId === t.id).length;
+      return userCount >= 10;
+    }).length;
+    
+    const professionalTenants = tenants.filter(t => {
+      const userCount = users.filter(u => u.tenantId === t.id).length;
+      return userCount >= 3 && userCount < 10;
+    }).length;
+    
+    const starterTenants = tenants.filter(t => {
+      const userCount = users.filter(u => u.tenantId === t.id).length;
+      return userCount < 3;
+    }).length;
+    
+    const tenantDistribution = [
+      { name: "Enterprise", value: enterpriseTenants },
+      { name: "Professional", value: professionalTenants },
+      { name: "Starter", value: starterTenants },
+    ].filter(d => d.value > 0);
+    
+    const activeUsers = users.filter(u => u.isActive).length;
     
     return {
       totalTenants: tenants.length,
       totalUsers: users.length,
-      monthlyRevenue: 67000,
-      activeSessions: 42,
+      monthlyRevenue: monthlyRevenue,
+      activeSessions: activeUsers,
+      revenueData,
+      tenantDistribution,
     };
   }
 
