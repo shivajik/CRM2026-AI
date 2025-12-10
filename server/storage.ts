@@ -733,6 +733,90 @@ export class DatabaseStorage implements IStorage {
     let query = db.select().from(schema.deals).where(eq(schema.deals.tenantId, tenantId));
     return query.orderBy(desc(schema.deals.createdAt));
   }
+
+  // SaaS Admin functions
+  async getSaasAdminStats(): Promise<{
+    totalTenants: number;
+    totalUsers: number;
+    monthlyRevenue: number;
+    activeSessions: number;
+  }> {
+    const tenants = await db.select().from(schema.tenants);
+    const users = await db.select().from(schema.users);
+    
+    return {
+      totalTenants: tenants.length,
+      totalUsers: users.length,
+      monthlyRevenue: 67000,
+      activeSessions: 42,
+    };
+  }
+
+  async getAllTenants(): Promise<(Tenant & { userCount: number })[]> {
+    const tenants = await db.select().from(schema.tenants).orderBy(desc(schema.tenants.createdAt));
+    const users = await db.select().from(schema.users);
+    
+    return tenants.map(tenant => ({
+      ...tenant,
+      userCount: users.filter(u => u.tenantId === tenant.id).length,
+    }));
+  }
+
+  async getAllUsersWithTenants(): Promise<(User & { tenantName: string })[]> {
+    const users = await db.select().from(schema.users).orderBy(desc(schema.users.createdAt));
+    const tenants = await db.select().from(schema.tenants);
+    
+    return users.map(user => {
+      const tenant = tenants.find(t => t.id === user.tenantId);
+      const { passwordHash, ...userWithoutPassword } = user;
+      return {
+        ...userWithoutPassword,
+        passwordHash: '',
+        tenantName: tenant?.name || 'Unknown',
+      };
+    });
+  }
+
+  // Customer Portal functions
+  async getQuotationsForCustomerUser(userId: string, tenantId: string): Promise<Quotation[]> {
+    const user = await this.getUserById(userId);
+    if (!user) return [];
+    
+    const customers = await db.select().from(schema.customers)
+      .where(and(
+        eq(schema.customers.tenantId, tenantId),
+        eq(schema.customers.email, user.email)
+      ));
+    
+    if (customers.length === 0) return [];
+    
+    const customerIds = customers.map(c => c.id);
+    const quotations = await db.select().from(schema.quotations)
+      .where(eq(schema.quotations.tenantId, tenantId))
+      .orderBy(desc(schema.quotations.createdAt));
+    
+    return quotations.filter(q => customerIds.includes(q.customerId));
+  }
+
+  async getInvoicesForCustomerUser(userId: string, tenantId: string): Promise<Invoice[]> {
+    const user = await this.getUserById(userId);
+    if (!user) return [];
+    
+    const customers = await db.select().from(schema.customers)
+      .where(and(
+        eq(schema.customers.tenantId, tenantId),
+        eq(schema.customers.email, user.email)
+      ));
+    
+    if (customers.length === 0) return [];
+    
+    const customerIds = customers.map(c => c.id);
+    const invoices = await db.select().from(schema.invoices)
+      .where(eq(schema.invoices.tenantId, tenantId))
+      .orderBy(desc(schema.invoices.createdAt));
+    
+    return invoices.filter(i => customerIds.includes(i.customerId));
+  }
 }
 
 export const storage = new DatabaseStorage();

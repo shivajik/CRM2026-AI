@@ -2,7 +2,7 @@ import type { Express } from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
 import { hashPassword, verifyPassword, generateAccessToken, generateRefreshToken, getRefreshTokenExpiry, verifyToken } from "./auth";
-import { requireAuth, validateTenant, requireAgencyAdmin, denyCustomerAccess } from "./middleware";
+import { requireAuth, validateTenant, requireAgencyAdmin, requireSaasAdmin, denyCustomerAccess } from "./middleware";
 import { z } from "zod";
 import { insertContactSchema, insertDealSchema, insertTaskSchema, insertProductSchema, insertCustomerSchema, insertQuotationSchema, insertQuotationItemSchema, insertInvoiceSchema, insertInvoiceItemSchema, insertPaymentSchema, insertActivitySchema } from "@shared/schema";
 
@@ -1396,6 +1396,87 @@ export async function registerRoutes(
     } catch (error) {
       console.error("Get sales report error:", error);
       res.status(500).json({ message: "Failed to fetch sales report" });
+    }
+  });
+
+  // ==================== SAAS ADMIN ROUTES ====================
+  
+  app.get("/api/saas-admin/stats", requireAuth, requireSaasAdmin, async (req, res) => {
+    try {
+      const stats = await storage.getSaasAdminStats();
+      res.json(stats);
+    } catch (error) {
+      console.error("Get SaaS admin stats error:", error);
+      res.status(500).json({ message: "Failed to fetch stats" });
+    }
+  });
+  
+  app.get("/api/saas-admin/tenants", requireAuth, requireSaasAdmin, async (req, res) => {
+    try {
+      const tenants = await storage.getAllTenants();
+      res.json(tenants);
+    } catch (error) {
+      console.error("Get all tenants error:", error);
+      res.status(500).json({ message: "Failed to fetch tenants" });
+    }
+  });
+  
+  app.get("/api/saas-admin/users", requireAuth, requireSaasAdmin, async (req, res) => {
+    try {
+      const users = await storage.getAllUsersWithTenants();
+      res.json(users);
+    } catch (error) {
+      console.error("Get all users error:", error);
+      res.status(500).json({ message: "Failed to fetch users" });
+    }
+  });
+
+  // ==================== CUSTOMER PORTAL ROUTES ====================
+  
+  app.get("/api/customer-portal/quotations", requireAuth, async (req, res) => {
+    try {
+      if (req.user!.userType !== 'customer') {
+        return res.status(403).json({ message: "Customer access only" });
+      }
+      const quotations = await storage.getQuotationsForCustomerUser(req.user!.userId, req.user!.tenantId);
+      res.json(quotations);
+    } catch (error) {
+      console.error("Get customer quotations error:", error);
+      res.status(500).json({ message: "Failed to fetch quotations" });
+    }
+  });
+  
+  app.get("/api/customer-portal/invoices", requireAuth, async (req, res) => {
+    try {
+      if (req.user!.userType !== 'customer') {
+        return res.status(403).json({ message: "Customer access only" });
+      }
+      const invoices = await storage.getInvoicesForCustomerUser(req.user!.userId, req.user!.tenantId);
+      res.json(invoices);
+    } catch (error) {
+      console.error("Get customer invoices error:", error);
+      res.status(500).json({ message: "Failed to fetch invoices" });
+    }
+  });
+  
+  app.get("/api/customer-portal/profile", requireAuth, async (req, res) => {
+    try {
+      if (req.user!.userType !== 'customer') {
+        return res.status(403).json({ message: "Customer access only" });
+      }
+      const user = await storage.getUserById(req.user!.userId);
+      if (!user) {
+        return res.status(404).json({ message: "User not found" });
+      }
+      res.json({
+        id: user.id,
+        email: user.email,
+        firstName: user.firstName,
+        lastName: user.lastName,
+      });
+    } catch (error) {
+      console.error("Get customer profile error:", error);
+      res.status(500).json({ message: "Failed to fetch profile" });
     }
   });
 
