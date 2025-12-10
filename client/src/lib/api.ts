@@ -205,3 +205,47 @@ export const teamApi = {
     apiRequest("/team/roles", { method: "POST", body: JSON.stringify(data) }),
   checkAdmin: () => apiRequest("/auth/admin-check"),
 };
+
+// SaaS Admin API
+export const saasAdminApi = {
+  getStats: () => apiRequest("/saas-admin/stats"),
+  getTenants: () => apiRequest("/saas-admin/tenants"),
+  getTenantById: (id: string) => apiRequest(`/saas-admin/tenants/${id}`),
+  getAllUsers: () => apiRequest("/saas-admin/users"),
+  getUserById: (id: string) => apiRequest(`/saas-admin/users/${id}`),
+  
+  // Platform Settings
+  getSettings: () => apiRequest("/saas-admin/settings"),
+  updateSetting: (data: { key: string; value: string; category?: string; description?: string }) =>
+    apiRequest("/saas-admin/settings", { method: "PUT", body: JSON.stringify(data) }),
+  deleteSetting: (key: string) => apiRequest(`/saas-admin/settings/${key}`, { method: "DELETE" }),
+  
+  // Activity Logs
+  getActivityLogs: (params?: {
+    tenantId?: string;
+    actorId?: string;
+    action?: string;
+    targetType?: string;
+    from?: string;
+    to?: string;
+    limit?: number;
+    offset?: number;
+  }) => {
+    const searchParams = new URLSearchParams();
+    if (params?.tenantId) searchParams.set('tenantId', params.tenantId);
+    if (params?.actorId) searchParams.set('actorId', params.actorId);
+    if (params?.action) searchParams.set('action', params.action);
+    if (params?.targetType) searchParams.set('targetType', params.targetType);
+    if (params?.from) searchParams.set('from', params.from);
+    if (params?.to) searchParams.set('to', params.to);
+    if (params?.limit) searchParams.set('limit', params.limit.toString());
+    if (params?.offset) searchParams.set('offset', params.offset.toString());
+    const query = searchParams.toString();
+    return apiRequest(`/saas-admin/activity-logs${query ? `?${query}` : ''}`);
+  },
+  
+  // Super Admin Profile
+  getProfile: () => apiRequest("/saas-admin/profile"),
+  updateProfile: (data: { firstName?: string; lastName?: string; email?: string }) =>
+    apiRequest("/saas-admin/profile", { method: "PATCH", body: JSON.stringify(data) }),
+};

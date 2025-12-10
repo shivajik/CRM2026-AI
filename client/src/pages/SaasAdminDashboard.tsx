@@ -1,32 +1,43 @@
 import { useState, useEffect } from "react";
-import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
+import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from "@/components/ui/sheet";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { ProtectedRoute } from "@/components/ProtectedRoute";
-import { authApi, apiRequest } from "@/lib/api";
+import { authApi, saasAdminApi } from "@/lib/api";
 import { useLocation } from "wouter";
 import { 
   Building2, Users, DollarSign, TrendingUp, Shield, 
-  Activity, Settings, LogOut, LayoutDashboard, Globe
+  Activity, Settings, LogOut, LayoutDashboard, Globe,
+  User, FileText, ChevronRight, Save, RefreshCw, Eye,
+  Calendar, Clock, Search, X, Briefcase, Receipt
 } from "lucide-react";
 import { format } from "date-fns";
 import { clearAuth } from "@/lib/auth";
-import { Area, AreaChart, ResponsiveContainer, Tooltip, XAxis, YAxis, BarChart, Bar, PieChart, Pie, Cell } from "recharts";
-
-const saasAdminApi = {
-  getStats: () => apiRequest("/saas-admin/stats"),
-  getTenants: () => apiRequest("/saas-admin/tenants"),
-  getAllUsers: () => apiRequest("/saas-admin/users"),
-};
+import { Area, AreaChart, ResponsiveContainer, Tooltip, XAxis, YAxis, PieChart, Pie, Cell } from "recharts";
+import { toast } from "sonner";
 
 const COLORS = ['#0088FE', '#00C49F', '#FFBB28', '#FF8042', '#8884d8'];
 
 export default function SaasAdminDashboard() {
   const [, setLocation] = useLocation();
   const queryClient = useQueryClient();
+  const [activeTab, setActiveTab] = useState("overview");
+  const [selectedTenant, setSelectedTenant] = useState<any>(null);
+  const [selectedUser, setSelectedUser] = useState<any>(null);
+  const [showProfileDialog, setShowProfileDialog] = useState(false);
+  const [showSettingsSheet, setShowSettingsSheet] = useState(false);
+  const [showActivityLogs, setShowActivityLogs] = useState(false);
+  const [profileForm, setProfileForm] = useState({ firstName: "", lastName: "", email: "" });
+  const [settingForm, setSettingForm] = useState({ key: "", value: "", category: "general", description: "" });
+  const [activityFilters, setActivityFilters] = useState({ action: "", targetType: "", limit: 50 });
   
   const { data: currentUser } = useQuery({
     queryKey: ["currentUser"],
@@ -51,6 +62,54 @@ export default function SaasAdminDashboard() {
     enabled: currentUser?.userType === "saas_admin",
   });
 
+  const { data: settings = [] } = useQuery({
+    queryKey: ["platformSettings"],
+    queryFn: saasAdminApi.getSettings,
+    enabled: currentUser?.userType === "saas_admin",
+  });
+
+  const { data: activityLogs = [], refetch: refetchLogs } = useQuery({
+    queryKey: ["activityLogs", activityFilters],
+    queryFn: () => saasAdminApi.getActivityLogs(activityFilters),
+    enabled: currentUser?.userType === "saas_admin" && showActivityLogs,
+  });
+
+  const { data: tenantDetails, isLoading: loadingTenant } = useQuery({
+    queryKey: ["tenantDetails", selectedTenant?.id],
+    queryFn: () => saasAdminApi.getTenantById(selectedTenant?.id),
+    enabled: !!selectedTenant?.id,
+  });
+
+  const { data: userDetails, isLoading: loadingUser } = useQuery({
+    queryKey: ["userDetails", selectedUser?.id],
+    queryFn: () => saasAdminApi.getUserById(selectedUser?.id),
+    enabled: !!selectedUser?.id,
+  });
+
+  const updateProfileMutation = useMutation({
+    mutationFn: saasAdminApi.updateProfile,
+    onSuccess: () => {
+      toast.success("Profile updated successfully");
+      queryClient.invalidateQueries({ queryKey: ["currentUser"] });
+      setShowProfileDialog(false);
+    },
+    onError: () => {
+      toast.error("Failed to update profile");
+    },
+  });
+
+  const updateSettingMutation = useMutation({
+    mutationFn: saasAdminApi.updateSetting,
+    onSuccess: () => {
+      toast.success("Setting saved successfully");
+      queryClient.invalidateQueries({ queryKey: ["platformSettings"] });
+      setSettingForm({ key: "", value: "", category: "general", description: "" });
+    },
+    onError: () => {
+      toast.error("Failed to save setting");
+    },
+  });
+
   const handleLogout = async () => {
     try {
       await authApi.logout();
@@ -69,6 +128,16 @@ export default function SaasAdminDashboard() {
     }
   }, [currentUser, setLocation]);
 
+  useEffect(() => {
+    if (currentUser) {
+      setProfileForm({
+        firstName: currentUser.firstName || "",
+        lastName: currentUser.lastName || "",
+        email: currentUser.email || "",
+      });
+    }
+  }, [currentUser]);
+
   if (currentUser && currentUser.userType !== "saas_admin") {
     return (
       <div className="min-h-screen flex items-center justify-center">
@@ -78,15 +147,13 @@ export default function SaasAdminDashboard() {
   }
 
   const revenueData = stats?.revenueData || [];
-
-  const tenantDistribution = stats?.tenantDistribution?.length > 0 
-    ? stats.tenantDistribution 
-    : [];
+  const tenantDistribution = stats?.tenantDistribution?.length > 0 ? stats.tenantDistribution : [];
 
   return (
     <ProtectedRoute>
       <div className="min-h-screen bg-background">
         <div className="flex">
+          {/* Sidebar */}
           <div className="h-screen w-64 bg-slate-900 text-white border-r flex flex-col fixed left-0 top-0 hidden md:flex z-50">
             <div className="p-6">
               <div className="flex items-center gap-2 font-bold text-xl tracking-tight">
@@ -101,48 +168,76 @@ export default function SaasAdminDashboard() {
               <div className="px-3 py-2 text-xs uppercase text-slate-400 font-semibold">
                 Platform
               </div>
-              <a href="#overview" className="flex items-center gap-3 px-3 py-2.5 rounded-md text-sm font-medium bg-primary text-white" data-testid="link-saas-overview">
+              <button 
+                onClick={() => setActiveTab("overview")}
+                className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-md text-sm font-medium ${activeTab === "overview" ? "bg-primary text-white" : "text-slate-300 hover:bg-slate-800"}`}
+                data-testid="link-saas-overview"
+              >
                 <LayoutDashboard className="w-4 h-4" />
                 Overview
-              </a>
-              <a href="#tenants" className="flex items-center gap-3 px-3 py-2.5 rounded-md text-sm font-medium text-slate-300 hover:bg-slate-800" data-testid="link-saas-tenants">
+              </button>
+              <button 
+                onClick={() => setActiveTab("tenants")}
+                className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-md text-sm font-medium ${activeTab === "tenants" ? "bg-primary text-white" : "text-slate-300 hover:bg-slate-800"}`}
+                data-testid="link-saas-tenants"
+              >
                 <Building2 className="w-4 h-4" />
                 Agencies/Tenants
-              </a>
-              <a href="#users" className="flex items-center gap-3 px-3 py-2.5 rounded-md text-sm font-medium text-slate-300 hover:bg-slate-800" data-testid="link-saas-users">
+              </button>
+              <button 
+                onClick={() => setActiveTab("users")}
+                className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-md text-sm font-medium ${activeTab === "users" ? "bg-primary text-white" : "text-slate-300 hover:bg-slate-800"}`}
+                data-testid="link-saas-users"
+              >
                 <Users className="w-4 h-4" />
                 All Users
-              </a>
-              <a href="#revenue" className="flex items-center gap-3 px-3 py-2.5 rounded-md text-sm font-medium text-slate-300 hover:bg-slate-800" data-testid="link-saas-revenue">
+              </button>
+              <button 
+                onClick={() => setActiveTab("revenue")}
+                className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-md text-sm font-medium ${activeTab === "revenue" ? "bg-primary text-white" : "text-slate-300 hover:bg-slate-800"}`}
+                data-testid="link-saas-revenue"
+              >
                 <DollarSign className="w-4 h-4" />
                 Revenue
-              </a>
+              </button>
               
               <div className="px-3 py-2 text-xs uppercase text-slate-400 font-semibold mt-4">
                 System
               </div>
-              <a href="#settings" className="flex items-center gap-3 px-3 py-2.5 rounded-md text-sm font-medium text-slate-300 hover:bg-slate-800" data-testid="link-saas-settings">
+              <button 
+                onClick={() => { setShowSettingsSheet(true); }}
+                className="w-full flex items-center gap-3 px-3 py-2.5 rounded-md text-sm font-medium text-slate-300 hover:bg-slate-800"
+                data-testid="link-saas-settings"
+              >
                 <Settings className="w-4 h-4" />
                 Platform Settings
-              </a>
-              <a href="#activity" className="flex items-center gap-3 px-3 py-2.5 rounded-md text-sm font-medium text-slate-300 hover:bg-slate-800" data-testid="link-saas-activity">
+              </button>
+              <button 
+                onClick={() => { setShowActivityLogs(true); setActiveTab("activity"); }}
+                className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-md text-sm font-medium ${activeTab === "activity" ? "bg-primary text-white" : "text-slate-300 hover:bg-slate-800"}`}
+                data-testid="link-saas-activity"
+              >
                 <Activity className="w-4 h-4" />
                 Activity Logs
-              </a>
+              </button>
             </nav>
 
             <div className="p-4 border-t border-slate-800">
-              <div className="flex items-center gap-3 px-3 py-2 mb-2">
+              <button 
+                onClick={() => setShowProfileDialog(true)}
+                className="w-full flex items-center gap-3 px-3 py-2 mb-2 hover:bg-slate-800 rounded-md transition-colors"
+                data-testid="button-profile"
+              >
                 <div className="w-8 h-8 rounded-full bg-primary flex items-center justify-center text-xs font-bold">
                   SA
                 </div>
-                <div className="flex-1 overflow-hidden">
+                <div className="flex-1 overflow-hidden text-left">
                   <p className="text-sm font-medium truncate" data-testid="text-saas-admin-name">
                     {currentUser?.firstName} {currentUser?.lastName}
                   </p>
                   <p className="text-xs text-slate-400 truncate">Super Admin</p>
                 </div>
-              </div>
+              </button>
               <Button
                 variant="ghost"
                 className="w-full justify-start text-slate-400 hover:text-white hover:bg-slate-800 h-8 text-xs"
@@ -155,6 +250,7 @@ export default function SaasAdminDashboard() {
             </div>
           </div>
 
+          {/* Main Content */}
           <div className="md:pl-64 flex-1 min-h-screen">
             <header className="sticky top-0 z-40 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 border-b">
               <div className="flex h-16 items-center px-6">
@@ -169,6 +265,7 @@ export default function SaasAdminDashboard() {
             </header>
 
             <main className="p-6 space-y-6">
+              {/* Stats Cards */}
               <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
                 <Card>
                   <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
@@ -179,9 +276,7 @@ export default function SaasAdminDashboard() {
                     <div className="text-2xl font-bold" data-testid="stat-total-tenants">
                       {stats?.totalTenants ?? tenants.length}
                     </div>
-                    <p className="text-xs text-muted-foreground">
-                      Registered organizations
-                    </p>
+                    <p className="text-xs text-muted-foreground">Registered organizations</p>
                   </CardContent>
                 </Card>
                 <Card>
@@ -193,9 +288,7 @@ export default function SaasAdminDashboard() {
                     <div className="text-2xl font-bold" data-testid="stat-total-users">
                       {stats?.totalUsers ?? allUsers.length}
                     </div>
-                    <p className="text-xs text-muted-foreground">
-                      Platform users
-                    </p>
+                    <p className="text-xs text-muted-foreground">Platform users</p>
                   </CardContent>
                 </Card>
                 <Card>
@@ -207,9 +300,7 @@ export default function SaasAdminDashboard() {
                     <div className="text-2xl font-bold" data-testid="stat-monthly-revenue">
                       ${(stats?.monthlyRevenue ?? 0).toLocaleString()}
                     </div>
-                    <p className="text-xs text-muted-foreground">
-                      This month's revenue
-                    </p>
+                    <p className="text-xs text-muted-foreground">This month's revenue</p>
                   </CardContent>
                 </Card>
                 <Card>
@@ -221,187 +312,881 @@ export default function SaasAdminDashboard() {
                     <div className="text-2xl font-bold" data-testid="stat-active-sessions">
                       {stats?.activeSessions ?? 0}
                     </div>
-                    <p className="text-xs text-muted-foreground">
-                      Currently active accounts
-                    </p>
+                    <p className="text-xs text-muted-foreground">Currently active accounts</p>
                   </CardContent>
                 </Card>
               </div>
 
-              <Tabs defaultValue="overview" className="space-y-4">
-                <TabsList>
-                  <TabsTrigger value="overview" data-testid="tab-saas-overview">Overview</TabsTrigger>
-                  <TabsTrigger value="tenants" data-testid="tab-saas-tenants">Agencies</TabsTrigger>
-                  <TabsTrigger value="users" data-testid="tab-saas-users">Users</TabsTrigger>
-                </TabsList>
-
-                <TabsContent value="overview" className="space-y-4">
-                  <div className="grid gap-4 md:grid-cols-2">
-                    <Card>
-                      <CardHeader>
-                        <CardTitle>Revenue Trend</CardTitle>
-                        <CardDescription>Monthly revenue over the last 6 months</CardDescription>
-                      </CardHeader>
-                      <CardContent>
-                        {revenueData.length > 0 ? (
-                          <ResponsiveContainer width="100%" height={300}>
-                            <AreaChart data={revenueData}>
-                              <defs>
-                                <linearGradient id="colorRevenue" x1="0" y1="0" x2="0" y2="1">
-                                  <stop offset="5%" stopColor="hsl(var(--primary))" stopOpacity={0.3} />
-                                  <stop offset="95%" stopColor="hsl(var(--primary))" stopOpacity={0} />
-                                </linearGradient>
-                              </defs>
-                              <XAxis dataKey="month" stroke="#888888" fontSize={12} tickLine={false} axisLine={false} />
-                              <YAxis stroke="#888888" fontSize={12} tickLine={false} axisLine={false} tickFormatter={(v) => `$${v/1000}k`} />
-                              <Tooltip />
-                              <Area type="monotone" dataKey="revenue" stroke="hsl(var(--primary))" strokeWidth={2} fill="url(#colorRevenue)" />
-                            </AreaChart>
-                          </ResponsiveContainer>
-                        ) : (
-                          <div className="h-[300px] flex items-center justify-center text-muted-foreground">
-                            No revenue data available yet
-                          </div>
-                        )}
-                      </CardContent>
-                    </Card>
-                    <Card>
-                      <CardHeader>
-                        <CardTitle>Agency Distribution</CardTitle>
-                        <CardDescription>By subscription plan</CardDescription>
-                      </CardHeader>
-                      <CardContent>
-                        {tenantDistribution.length > 0 ? (
-                          <ResponsiveContainer width="100%" height={300}>
-                            <PieChart>
-                              <Pie
-                                data={tenantDistribution}
-                                cx="50%"
-                                cy="50%"
-                                innerRadius={60}
-                                outerRadius={100}
-                                fill="#8884d8"
-                                paddingAngle={5}
-                                dataKey="value"
-                                label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}
-                              >
-                                {tenantDistribution.map((_entry: { name: string; value: number }, index: number) => (
-                                  <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
-                                ))}
-                              </Pie>
-                              <Tooltip />
-                            </PieChart>
-                          </ResponsiveContainer>
-                        ) : (
-                          <div className="h-[300px] flex items-center justify-center text-muted-foreground">
-                            No agency data available yet
-                          </div>
-                        )}
-                      </CardContent>
-                    </Card>
-                  </div>
-                </TabsContent>
-
-                <TabsContent value="tenants">
+              {/* Tab Content */}
+              {activeTab === "overview" && (
+                <div className="grid gap-4 md:grid-cols-2">
                   <Card>
                     <CardHeader>
-                      <CardTitle>All Agencies/Companies</CardTitle>
-                      <CardDescription>Manage all registered agencies on the platform</CardDescription>
+                      <CardTitle>Revenue Trend</CardTitle>
+                      <CardDescription>Monthly revenue over the last 6 months</CardDescription>
                     </CardHeader>
                     <CardContent>
-                      <Table>
-                        <TableHeader>
-                          <TableRow>
-                            <TableHead>Agency Name</TableHead>
-                            <TableHead>Users</TableHead>
-                            <TableHead>Status</TableHead>
-                            <TableHead>Created</TableHead>
-                          </TableRow>
-                        </TableHeader>
-                        <TableBody>
-                          {tenants.length === 0 ? (
-                            <TableRow>
-                              <TableCell colSpan={4} className="text-center text-muted-foreground py-8">
-                                No agencies registered yet
-                              </TableCell>
-                            </TableRow>
-                          ) : (
-                            tenants.map((tenant: any) => (
-                              <TableRow key={tenant.id} data-testid={`row-tenant-${tenant.id}`}>
-                                <TableCell className="font-medium">{tenant.name}</TableCell>
-                                <TableCell>{tenant.userCount || 0}</TableCell>
-                                <TableCell>
-                                  <Badge variant="outline" className="bg-green-500/10 text-green-500">
-                                    Active
-                                  </Badge>
-                                </TableCell>
-                                <TableCell>
-                                  {tenant.createdAt ? format(new Date(tenant.createdAt), "MMM dd, yyyy") : "-"}
-                                </TableCell>
-                              </TableRow>
-                            ))
-                          )}
-                        </TableBody>
-                      </Table>
+                      {revenueData.length > 0 ? (
+                        <ResponsiveContainer width="100%" height={300}>
+                          <AreaChart data={revenueData}>
+                            <defs>
+                              <linearGradient id="colorRevenue" x1="0" y1="0" x2="0" y2="1">
+                                <stop offset="5%" stopColor="hsl(var(--primary))" stopOpacity={0.3} />
+                                <stop offset="95%" stopColor="hsl(var(--primary))" stopOpacity={0} />
+                              </linearGradient>
+                            </defs>
+                            <XAxis dataKey="month" stroke="#888888" fontSize={12} tickLine={false} axisLine={false} />
+                            <YAxis stroke="#888888" fontSize={12} tickLine={false} axisLine={false} tickFormatter={(v) => `$${v/1000}k`} />
+                            <Tooltip />
+                            <Area type="monotone" dataKey="revenue" stroke="hsl(var(--primary))" strokeWidth={2} fill="url(#colorRevenue)" />
+                          </AreaChart>
+                        </ResponsiveContainer>
+                      ) : (
+                        <div className="h-[300px] flex items-center justify-center text-muted-foreground">
+                          No revenue data available yet
+                        </div>
+                      )}
                     </CardContent>
                   </Card>
-                </TabsContent>
-
-                <TabsContent value="users">
                   <Card>
                     <CardHeader>
-                      <CardTitle>All Platform Users</CardTitle>
-                      <CardDescription>View all users across all agencies</CardDescription>
+                      <CardTitle>Agency Distribution</CardTitle>
+                      <CardDescription>By subscription plan</CardDescription>
                     </CardHeader>
                     <CardContent>
-                      <Table>
-                        <TableHeader>
-                          <TableRow>
-                            <TableHead>Name</TableHead>
-                            <TableHead>Email</TableHead>
-                            <TableHead>Agency</TableHead>
-                            <TableHead>Role</TableHead>
-                            <TableHead>Status</TableHead>
-                          </TableRow>
-                        </TableHeader>
-                        <TableBody>
-                          {allUsers.length === 0 ? (
-                            <TableRow>
-                              <TableCell colSpan={5} className="text-center text-muted-foreground py-8">
-                                No users found
-                              </TableCell>
-                            </TableRow>
-                          ) : (
-                            allUsers.map((user: any) => (
-                              <TableRow key={user.id} data-testid={`row-user-${user.id}`}>
-                                <TableCell className="font-medium">{user.firstName} {user.lastName}</TableCell>
-                                <TableCell>{user.email}</TableCell>
-                                <TableCell>{user.tenantName || "-"}</TableCell>
-                                <TableCell>
-                                  <Badge variant={user.userType === "saas_admin" ? "default" : "secondary"}>
-                                    {user.userType === "saas_admin" ? "Super Admin" :
-                                     user.userType === "agency_admin" ? "Agency Admin" :
-                                     user.userType === "team_member" ? "Team Member" :
-                                     user.userType === "customer" ? "Customer" : user.userType}
-                                  </Badge>
-                                </TableCell>
-                                <TableCell>
-                                  <Badge variant="outline" className={user.isActive ? "bg-green-500/10 text-green-500" : "bg-red-500/10 text-red-500"}>
-                                    {user.isActive ? "Active" : "Inactive"}
-                                  </Badge>
-                                </TableCell>
-                              </TableRow>
-                            ))
-                          )}
-                        </TableBody>
-                      </Table>
+                      {tenantDistribution.length > 0 ? (
+                        <ResponsiveContainer width="100%" height={300}>
+                          <PieChart>
+                            <Pie
+                              data={tenantDistribution}
+                              cx="50%"
+                              cy="50%"
+                              innerRadius={60}
+                              outerRadius={100}
+                              fill="#8884d8"
+                              paddingAngle={5}
+                              dataKey="value"
+                              label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}
+                            >
+                              {tenantDistribution.map((_entry: any, index: number) => (
+                                <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                              ))}
+                            </Pie>
+                            <Tooltip />
+                          </PieChart>
+                        </ResponsiveContainer>
+                      ) : (
+                        <div className="h-[300px] flex items-center justify-center text-muted-foreground">
+                          No agency data available yet
+                        </div>
+                      )}
                     </CardContent>
                   </Card>
-                </TabsContent>
-              </Tabs>
+                </div>
+              )}
+
+              {activeTab === "tenants" && (
+                <Card>
+                  <CardHeader>
+                    <CardTitle>All Agencies/Companies</CardTitle>
+                    <CardDescription>Click on any agency to view detailed information</CardDescription>
+                  </CardHeader>
+                  <CardContent>
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead>Agency Name</TableHead>
+                          <TableHead>Users</TableHead>
+                          <TableHead>Status</TableHead>
+                          <TableHead>Created</TableHead>
+                          <TableHead className="w-[50px]"></TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {tenants.length === 0 ? (
+                          <TableRow>
+                            <TableCell colSpan={5} className="text-center text-muted-foreground py-8">
+                              No agencies registered yet
+                            </TableCell>
+                          </TableRow>
+                        ) : (
+                          tenants.map((tenant: any) => (
+                            <TableRow 
+                              key={tenant.id} 
+                              className="cursor-pointer hover:bg-muted/50"
+                              onClick={() => setSelectedTenant(tenant)}
+                              data-testid={`row-tenant-${tenant.id}`}
+                            >
+                              <TableCell className="font-medium">{tenant.name}</TableCell>
+                              <TableCell>{tenant.userCount || 0}</TableCell>
+                              <TableCell>
+                                <Badge variant="outline" className="bg-green-500/10 text-green-500">
+                                  Active
+                                </Badge>
+                              </TableCell>
+                              <TableCell>
+                                {tenant.createdAt ? format(new Date(tenant.createdAt), "MMM dd, yyyy") : "-"}
+                              </TableCell>
+                              <TableCell>
+                                <ChevronRight className="w-4 h-4 text-muted-foreground" />
+                              </TableCell>
+                            </TableRow>
+                          ))
+                        )}
+                      </TableBody>
+                    </Table>
+                  </CardContent>
+                </Card>
+              )}
+
+              {activeTab === "users" && (
+                <Card>
+                  <CardHeader>
+                    <CardTitle>All Platform Users</CardTitle>
+                    <CardDescription>Click on any user to view detailed information</CardDescription>
+                  </CardHeader>
+                  <CardContent>
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead>Name</TableHead>
+                          <TableHead>Email</TableHead>
+                          <TableHead>Agency</TableHead>
+                          <TableHead>Role</TableHead>
+                          <TableHead>Status</TableHead>
+                          <TableHead className="w-[50px]"></TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {allUsers.length === 0 ? (
+                          <TableRow>
+                            <TableCell colSpan={6} className="text-center text-muted-foreground py-8">
+                              No users found
+                            </TableCell>
+                          </TableRow>
+                        ) : (
+                          allUsers.map((user: any) => (
+                            <TableRow 
+                              key={user.id} 
+                              className="cursor-pointer hover:bg-muted/50"
+                              onClick={() => setSelectedUser(user)}
+                              data-testid={`row-user-${user.id}`}
+                            >
+                              <TableCell className="font-medium">{user.firstName} {user.lastName}</TableCell>
+                              <TableCell>{user.email}</TableCell>
+                              <TableCell>{user.tenantName || "-"}</TableCell>
+                              <TableCell>
+                                <Badge variant={user.userType === "saas_admin" ? "default" : "secondary"}>
+                                  {user.userType === "saas_admin" ? "Super Admin" :
+                                   user.userType === "agency_admin" ? "Agency Admin" :
+                                   user.userType === "team_member" ? "Team Member" :
+                                   user.userType === "customer" ? "Customer" : user.userType}
+                                </Badge>
+                              </TableCell>
+                              <TableCell>
+                                <Badge variant="outline" className={user.isActive ? "bg-green-500/10 text-green-500" : "bg-red-500/10 text-red-500"}>
+                                  {user.isActive ? "Active" : "Inactive"}
+                                </Badge>
+                              </TableCell>
+                              <TableCell>
+                                <ChevronRight className="w-4 h-4 text-muted-foreground" />
+                              </TableCell>
+                            </TableRow>
+                          ))
+                        )}
+                      </TableBody>
+                    </Table>
+                  </CardContent>
+                </Card>
+              )}
+
+              {activeTab === "activity" && (
+                <Card>
+                  <CardHeader>
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <CardTitle>Platform Activity Logs</CardTitle>
+                        <CardDescription>Track all system activities across the platform</CardDescription>
+                      </div>
+                      <Button variant="outline" size="sm" onClick={() => refetchLogs()}>
+                        <RefreshCw className="w-4 h-4 mr-2" />
+                        Refresh
+                      </Button>
+                    </div>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="flex gap-4 mb-4">
+                      <Select 
+                        value={activityFilters.action} 
+                        onValueChange={(v) => setActivityFilters({...activityFilters, action: v})}
+                      >
+                        <SelectTrigger className="w-[180px]" data-testid="select-action-filter">
+                          <SelectValue placeholder="Filter by action" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="all">All Actions</SelectItem>
+                          <SelectItem value="update_setting">Setting Updates</SelectItem>
+                          <SelectItem value="update_profile">Profile Updates</SelectItem>
+                          <SelectItem value="delete_setting">Setting Deletions</SelectItem>
+                        </SelectContent>
+                      </Select>
+                      <Select 
+                        value={activityFilters.targetType} 
+                        onValueChange={(v) => setActivityFilters({...activityFilters, targetType: v})}
+                      >
+                        <SelectTrigger className="w-[180px]" data-testid="select-target-filter">
+                          <SelectValue placeholder="Filter by target" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="all">All Targets</SelectItem>
+                          <SelectItem value="user">Users</SelectItem>
+                          <SelectItem value="platform_setting">Settings</SelectItem>
+                          <SelectItem value="tenant">Tenants</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead>Timestamp</TableHead>
+                          <TableHead>Action</TableHead>
+                          <TableHead>Description</TableHead>
+                          <TableHead>Target</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {activityLogs.length === 0 ? (
+                          <TableRow>
+                            <TableCell colSpan={4} className="text-center text-muted-foreground py-8">
+                              No activity logs found
+                            </TableCell>
+                          </TableRow>
+                        ) : (
+                          activityLogs.map((log: any) => (
+                            <TableRow key={log.id} data-testid={`row-log-${log.id}`}>
+                              <TableCell className="text-sm">
+                                {log.createdAt ? format(new Date(log.createdAt), "MMM dd, yyyy HH:mm") : "-"}
+                              </TableCell>
+                              <TableCell>
+                                <Badge variant="outline">{log.action}</Badge>
+                              </TableCell>
+                              <TableCell>{log.description || "-"}</TableCell>
+                              <TableCell>
+                                <Badge variant="secondary">{log.targetType}</Badge>
+                              </TableCell>
+                            </TableRow>
+                          ))
+                        )}
+                      </TableBody>
+                    </Table>
+                  </CardContent>
+                </Card>
+              )}
+
+              {activeTab === "revenue" && (
+                <Card>
+                  <CardHeader>
+                    <CardTitle>Revenue Analytics</CardTitle>
+                    <CardDescription>Detailed revenue breakdown and trends</CardDescription>
+                  </CardHeader>
+                  <CardContent>
+                    {revenueData.length > 0 ? (
+                      <ResponsiveContainer width="100%" height={400}>
+                        <AreaChart data={revenueData}>
+                          <defs>
+                            <linearGradient id="colorRevenue2" x1="0" y1="0" x2="0" y2="1">
+                              <stop offset="5%" stopColor="hsl(var(--primary))" stopOpacity={0.3} />
+                              <stop offset="95%" stopColor="hsl(var(--primary))" stopOpacity={0} />
+                            </linearGradient>
+                          </defs>
+                          <XAxis dataKey="month" stroke="#888888" fontSize={12} tickLine={false} axisLine={false} />
+                          <YAxis stroke="#888888" fontSize={12} tickLine={false} axisLine={false} tickFormatter={(v) => `$${v/1000}k`} />
+                          <Tooltip />
+                          <Area type="monotone" dataKey="revenue" stroke="hsl(var(--primary))" strokeWidth={2} fill="url(#colorRevenue2)" />
+                        </AreaChart>
+                      </ResponsiveContainer>
+                    ) : (
+                      <div className="h-[400px] flex items-center justify-center text-muted-foreground">
+                        No revenue data available yet
+                      </div>
+                    )}
+                  </CardContent>
+                </Card>
+              )}
             </main>
           </div>
         </div>
+
+        {/* Tenant Detail Sheet */}
+        <Sheet open={!!selectedTenant} onOpenChange={() => setSelectedTenant(null)}>
+          <SheetContent className="w-full sm:max-w-2xl overflow-y-auto">
+            <SheetHeader>
+              <SheetTitle className="flex items-center gap-2">
+                <Building2 className="w-5 h-5" />
+                {selectedTenant?.name}
+              </SheetTitle>
+              <SheetDescription>Agency details and related data</SheetDescription>
+            </SheetHeader>
+            
+            {loadingTenant ? (
+              <div className="flex items-center justify-center py-12">
+                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+              </div>
+            ) : tenantDetails ? (
+              <div className="mt-6 space-y-6">
+                {/* Stats */}
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                  <Card>
+                    <CardContent className="pt-4">
+                      <div className="text-2xl font-bold">{tenantDetails.stats.totalUsers}</div>
+                      <p className="text-xs text-muted-foreground">Users</p>
+                    </CardContent>
+                  </Card>
+                  <Card>
+                    <CardContent className="pt-4">
+                      <div className="text-2xl font-bold">{tenantDetails.stats.totalCustomers}</div>
+                      <p className="text-xs text-muted-foreground">Customers</p>
+                    </CardContent>
+                  </Card>
+                  <Card>
+                    <CardContent className="pt-4">
+                      <div className="text-2xl font-bold">{tenantDetails.stats.activeDeals}</div>
+                      <p className="text-xs text-muted-foreground">Active Deals</p>
+                    </CardContent>
+                  </Card>
+                  <Card>
+                    <CardContent className="pt-4">
+                      <div className="text-2xl font-bold">${tenantDetails.stats.totalRevenue.toLocaleString()}</div>
+                      <p className="text-xs text-muted-foreground">Revenue</p>
+                    </CardContent>
+                  </Card>
+                </div>
+
+                {/* Tabs for related data */}
+                <Tabs defaultValue="users" className="w-full">
+                  <TabsList className="grid w-full grid-cols-4">
+                    <TabsTrigger value="users" data-testid="tab-tenant-users">Users</TabsTrigger>
+                    <TabsTrigger value="customers" data-testid="tab-tenant-customers">Customers</TabsTrigger>
+                    <TabsTrigger value="deals" data-testid="tab-tenant-deals">Deals</TabsTrigger>
+                    <TabsTrigger value="invoices" data-testid="tab-tenant-invoices">Invoices</TabsTrigger>
+                  </TabsList>
+                  
+                  <TabsContent value="users" className="mt-4">
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead>Name</TableHead>
+                          <TableHead>Email</TableHead>
+                          <TableHead>Role</TableHead>
+                          <TableHead>Status</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {tenantDetails.users.map((user: any) => (
+                          <TableRow key={user.id}>
+                            <TableCell>{user.firstName} {user.lastName}</TableCell>
+                            <TableCell>{user.email}</TableCell>
+                            <TableCell>
+                              <Badge variant="secondary">{user.userType}</Badge>
+                            </TableCell>
+                            <TableCell>
+                              <Badge variant={user.isActive ? "default" : "destructive"}>
+                                {user.isActive ? "Active" : "Inactive"}
+                              </Badge>
+                            </TableCell>
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
+                  </TabsContent>
+                  
+                  <TabsContent value="customers" className="mt-4">
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead>Name</TableHead>
+                          <TableHead>Email</TableHead>
+                          <TableHead>Company</TableHead>
+                          <TableHead>Type</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {tenantDetails.customers.length === 0 ? (
+                          <TableRow>
+                            <TableCell colSpan={4} className="text-center text-muted-foreground">
+                              No customers found
+                            </TableCell>
+                          </TableRow>
+                        ) : (
+                          tenantDetails.customers.map((customer: any) => (
+                            <TableRow key={customer.id}>
+                              <TableCell>{customer.name}</TableCell>
+                              <TableCell>{customer.email}</TableCell>
+                              <TableCell>{customer.company || "-"}</TableCell>
+                              <TableCell>
+                                <Badge variant="outline">{customer.customerType}</Badge>
+                              </TableCell>
+                            </TableRow>
+                          ))
+                        )}
+                      </TableBody>
+                    </Table>
+                  </TabsContent>
+                  
+                  <TabsContent value="deals" className="mt-4">
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead>Title</TableHead>
+                          <TableHead>Value</TableHead>
+                          <TableHead>Stage</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {tenantDetails.deals.length === 0 ? (
+                          <TableRow>
+                            <TableCell colSpan={3} className="text-center text-muted-foreground">
+                              No deals found
+                            </TableCell>
+                          </TableRow>
+                        ) : (
+                          tenantDetails.deals.map((deal: any) => (
+                            <TableRow key={deal.id}>
+                              <TableCell>{deal.title}</TableCell>
+                              <TableCell>${Number(deal.value).toLocaleString()}</TableCell>
+                              <TableCell>
+                                <Badge variant="outline">{deal.stage}</Badge>
+                              </TableCell>
+                            </TableRow>
+                          ))
+                        )}
+                      </TableBody>
+                    </Table>
+                  </TabsContent>
+                  
+                  <TabsContent value="invoices" className="mt-4">
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead>Invoice #</TableHead>
+                          <TableHead>Amount</TableHead>
+                          <TableHead>Status</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {tenantDetails.invoices.length === 0 ? (
+                          <TableRow>
+                            <TableCell colSpan={3} className="text-center text-muted-foreground">
+                              No invoices found
+                            </TableCell>
+                          </TableRow>
+                        ) : (
+                          tenantDetails.invoices.map((invoice: any) => (
+                            <TableRow key={invoice.id}>
+                              <TableCell>{invoice.invoiceNumber}</TableCell>
+                              <TableCell>${Number(invoice.totalAmount).toLocaleString()}</TableCell>
+                              <TableCell>
+                                <Badge variant={invoice.status === "paid" ? "default" : "secondary"}>
+                                  {invoice.status}
+                                </Badge>
+                              </TableCell>
+                            </TableRow>
+                          ))
+                        )}
+                      </TableBody>
+                    </Table>
+                  </TabsContent>
+                </Tabs>
+              </div>
+            ) : null}
+          </SheetContent>
+        </Sheet>
+
+        {/* User Detail Sheet */}
+        <Sheet open={!!selectedUser} onOpenChange={() => setSelectedUser(null)}>
+          <SheetContent className="w-full sm:max-w-2xl overflow-y-auto">
+            <SheetHeader>
+              <SheetTitle className="flex items-center gap-2">
+                <User className="w-5 h-5" />
+                {selectedUser?.firstName} {selectedUser?.lastName}
+              </SheetTitle>
+              <SheetDescription>User details and related data</SheetDescription>
+            </SheetHeader>
+            
+            {loadingUser ? (
+              <div className="flex items-center justify-center py-12">
+                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+              </div>
+            ) : userDetails ? (
+              <div className="mt-6 space-y-6">
+                {/* User Info Card */}
+                <Card>
+                  <CardContent className="pt-6">
+                    <div className="space-y-4">
+                      <div className="flex items-center gap-4">
+                        <div className="w-16 h-16 rounded-full bg-primary flex items-center justify-center text-xl font-bold text-white">
+                          {userDetails.user.firstName?.charAt(0)}{userDetails.user.lastName?.charAt(0)}
+                        </div>
+                        <div>
+                          <h3 className="text-lg font-semibold">{userDetails.user.firstName} {userDetails.user.lastName}</h3>
+                          <p className="text-muted-foreground">{userDetails.user.email}</p>
+                          <div className="flex gap-2 mt-2">
+                            <Badge>{userDetails.user.userType}</Badge>
+                            <Badge variant={userDetails.user.isActive ? "default" : "destructive"}>
+                              {userDetails.user.isActive ? "Active" : "Inactive"}
+                            </Badge>
+                          </div>
+                        </div>
+                      </div>
+                      {userDetails.tenant && (
+                        <div className="pt-4 border-t">
+                          <p className="text-sm text-muted-foreground">Agency</p>
+                          <p className="font-medium">{userDetails.tenant.name}</p>
+                        </div>
+                      )}
+                    </div>
+                  </CardContent>
+                </Card>
+
+                {/* Stats */}
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                  <Card>
+                    <CardContent className="pt-4">
+                      <div className="text-2xl font-bold">{userDetails.ownedCustomers.length}</div>
+                      <p className="text-xs text-muted-foreground">Customers</p>
+                    </CardContent>
+                  </Card>
+                  <Card>
+                    <CardContent className="pt-4">
+                      <div className="text-2xl font-bold">{userDetails.deals.length}</div>
+                      <p className="text-xs text-muted-foreground">Deals</p>
+                    </CardContent>
+                  </Card>
+                  <Card>
+                    <CardContent className="pt-4">
+                      <div className="text-2xl font-bold">{userDetails.assignedTasks.length}</div>
+                      <p className="text-xs text-muted-foreground">Tasks</p>
+                    </CardContent>
+                  </Card>
+                  <Card>
+                    <CardContent className="pt-4">
+                      <div className="text-2xl font-bold">{userDetails.activities.length}</div>
+                      <p className="text-xs text-muted-foreground">Activities</p>
+                    </CardContent>
+                  </Card>
+                </div>
+
+                {/* Tabs for related data */}
+                <Tabs defaultValue="customers" className="w-full">
+                  <TabsList className="grid w-full grid-cols-4">
+                    <TabsTrigger value="customers" data-testid="tab-user-customers">Customers</TabsTrigger>
+                    <TabsTrigger value="deals" data-testid="tab-user-deals">Deals</TabsTrigger>
+                    <TabsTrigger value="tasks" data-testid="tab-user-tasks">Tasks</TabsTrigger>
+                    <TabsTrigger value="activities" data-testid="tab-user-activities">Activities</TabsTrigger>
+                  </TabsList>
+                  
+                  <TabsContent value="customers" className="mt-4">
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead>Name</TableHead>
+                          <TableHead>Email</TableHead>
+                          <TableHead>Type</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {userDetails.ownedCustomers.length === 0 ? (
+                          <TableRow>
+                            <TableCell colSpan={3} className="text-center text-muted-foreground">
+                              No customers found
+                            </TableCell>
+                          </TableRow>
+                        ) : (
+                          userDetails.ownedCustomers.map((customer: any) => (
+                            <TableRow key={customer.id}>
+                              <TableCell>{customer.name}</TableCell>
+                              <TableCell>{customer.email}</TableCell>
+                              <TableCell>
+                                <Badge variant="outline">{customer.customerType}</Badge>
+                              </TableCell>
+                            </TableRow>
+                          ))
+                        )}
+                      </TableBody>
+                    </Table>
+                  </TabsContent>
+                  
+                  <TabsContent value="deals" className="mt-4">
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead>Title</TableHead>
+                          <TableHead>Value</TableHead>
+                          <TableHead>Stage</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {userDetails.deals.length === 0 ? (
+                          <TableRow>
+                            <TableCell colSpan={3} className="text-center text-muted-foreground">
+                              No deals found
+                            </TableCell>
+                          </TableRow>
+                        ) : (
+                          userDetails.deals.map((deal: any) => (
+                            <TableRow key={deal.id}>
+                              <TableCell>{deal.title}</TableCell>
+                              <TableCell>${Number(deal.value).toLocaleString()}</TableCell>
+                              <TableCell>
+                                <Badge variant="outline">{deal.stage}</Badge>
+                              </TableCell>
+                            </TableRow>
+                          ))
+                        )}
+                      </TableBody>
+                    </Table>
+                  </TabsContent>
+                  
+                  <TabsContent value="tasks" className="mt-4">
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead>Title</TableHead>
+                          <TableHead>Status</TableHead>
+                          <TableHead>Priority</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {userDetails.assignedTasks.length === 0 ? (
+                          <TableRow>
+                            <TableCell colSpan={3} className="text-center text-muted-foreground">
+                              No tasks found
+                            </TableCell>
+                          </TableRow>
+                        ) : (
+                          userDetails.assignedTasks.map((task: any) => (
+                            <TableRow key={task.id}>
+                              <TableCell>{task.title}</TableCell>
+                              <TableCell>
+                                <Badge variant="outline">{task.status}</Badge>
+                              </TableCell>
+                              <TableCell>
+                                <Badge variant={task.priority === "high" ? "destructive" : "secondary"}>
+                                  {task.priority}
+                                </Badge>
+                              </TableCell>
+                            </TableRow>
+                          ))
+                        )}
+                      </TableBody>
+                    </Table>
+                  </TabsContent>
+                  
+                  <TabsContent value="activities" className="mt-4">
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead>Subject</TableHead>
+                          <TableHead>Type</TableHead>
+                          <TableHead>Date</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {userDetails.activities.length === 0 ? (
+                          <TableRow>
+                            <TableCell colSpan={3} className="text-center text-muted-foreground">
+                              No activities found
+                            </TableCell>
+                          </TableRow>
+                        ) : (
+                          userDetails.activities.map((activity: any) => (
+                            <TableRow key={activity.id}>
+                              <TableCell>{activity.subject}</TableCell>
+                              <TableCell>
+                                <Badge variant="outline">{activity.type}</Badge>
+                              </TableCell>
+                              <TableCell>
+                                {activity.createdAt ? format(new Date(activity.createdAt), "MMM dd, yyyy") : "-"}
+                              </TableCell>
+                            </TableRow>
+                          ))
+                        )}
+                      </TableBody>
+                    </Table>
+                  </TabsContent>
+                </Tabs>
+              </div>
+            ) : null}
+          </SheetContent>
+        </Sheet>
+
+        {/* Profile Dialog */}
+        <Dialog open={showProfileDialog} onOpenChange={setShowProfileDialog}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>Super Admin Profile</DialogTitle>
+              <DialogDescription>Update your profile information</DialogDescription>
+            </DialogHeader>
+            <form onSubmit={(e) => {
+              e.preventDefault();
+              updateProfileMutation.mutate(profileForm);
+            }} className="space-y-4">
+              <div className="grid gap-4">
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="firstName">First Name</Label>
+                    <Input
+                      id="firstName"
+                      value={profileForm.firstName}
+                      onChange={(e) => setProfileForm({...profileForm, firstName: e.target.value})}
+                      data-testid="input-profile-firstname"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="lastName">Last Name</Label>
+                    <Input
+                      id="lastName"
+                      value={profileForm.lastName}
+                      onChange={(e) => setProfileForm({...profileForm, lastName: e.target.value})}
+                      data-testid="input-profile-lastname"
+                    />
+                  </div>
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="email">Email</Label>
+                  <Input
+                    id="email"
+                    type="email"
+                    value={profileForm.email}
+                    onChange={(e) => setProfileForm({...profileForm, email: e.target.value})}
+                    data-testid="input-profile-email"
+                  />
+                </div>
+              </div>
+              <div className="flex justify-end gap-2">
+                <Button type="button" variant="outline" onClick={() => setShowProfileDialog(false)}>
+                  Cancel
+                </Button>
+                <Button type="submit" disabled={updateProfileMutation.isPending} data-testid="button-save-profile">
+                  <Save className="w-4 h-4 mr-2" />
+                  Save Changes
+                </Button>
+              </div>
+            </form>
+          </DialogContent>
+        </Dialog>
+
+        {/* Platform Settings Sheet */}
+        <Sheet open={showSettingsSheet} onOpenChange={setShowSettingsSheet}>
+          <SheetContent className="w-full sm:max-w-xl overflow-y-auto">
+            <SheetHeader>
+              <SheetTitle className="flex items-center gap-2">
+                <Settings className="w-5 h-5" />
+                Platform Settings
+              </SheetTitle>
+              <SheetDescription>Configure platform-wide settings</SheetDescription>
+            </SheetHeader>
+            
+            <div className="mt-6 space-y-6">
+              {/* Add/Edit Setting Form */}
+              <Card>
+                <CardHeader>
+                  <CardTitle className="text-sm">Add/Update Setting</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <form onSubmit={(e) => {
+                    e.preventDefault();
+                    if (settingForm.key && settingForm.value) {
+                      updateSettingMutation.mutate(settingForm);
+                    }
+                  }} className="space-y-4">
+                    <div className="grid grid-cols-2 gap-4">
+                      <div className="space-y-2">
+                        <Label htmlFor="settingKey">Key</Label>
+                        <Input
+                          id="settingKey"
+                          value={settingForm.key}
+                          onChange={(e) => setSettingForm({...settingForm, key: e.target.value})}
+                          placeholder="setting.key"
+                          data-testid="input-setting-key"
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <Label htmlFor="settingCategory">Category</Label>
+                        <Select 
+                          value={settingForm.category} 
+                          onValueChange={(v) => setSettingForm({...settingForm, category: v})}
+                        >
+                          <SelectTrigger data-testid="select-setting-category">
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="general">General</SelectItem>
+                            <SelectItem value="branding">Branding</SelectItem>
+                            <SelectItem value="email">Email</SelectItem>
+                            <SelectItem value="billing">Billing</SelectItem>
+                            <SelectItem value="security">Security</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="settingValue">Value</Label>
+                      <Input
+                        id="settingValue"
+                        value={settingForm.value}
+                        onChange={(e) => setSettingForm({...settingForm, value: e.target.value})}
+                        placeholder="Setting value"
+                        data-testid="input-setting-value"
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="settingDescription">Description (optional)</Label>
+                      <Input
+                        id="settingDescription"
+                        value={settingForm.description}
+                        onChange={(e) => setSettingForm({...settingForm, description: e.target.value})}
+                        placeholder="What this setting does..."
+                        data-testid="input-setting-description"
+                      />
+                    </div>
+                    <Button type="submit" className="w-full" disabled={updateSettingMutation.isPending} data-testid="button-save-setting">
+                      <Save className="w-4 h-4 mr-2" />
+                      Save Setting
+                    </Button>
+                  </form>
+                </CardContent>
+              </Card>
+
+              {/* Current Settings */}
+              <Card>
+                <CardHeader>
+                  <CardTitle className="text-sm">Current Settings</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  {settings.length === 0 ? (
+                    <p className="text-muted-foreground text-center py-4">No settings configured yet</p>
+                  ) : (
+                    <div className="space-y-3">
+                      {settings.map((setting: any) => (
+                        <div key={setting.id} className="flex items-center justify-between p-3 bg-muted rounded-lg">
+                          <div>
+                            <p className="font-medium text-sm">{setting.key}</p>
+                            <p className="text-xs text-muted-foreground">{setting.description || setting.category}</p>
+                          </div>
+                          <div className="text-right">
+                            <p className="text-sm">{setting.value}</p>
+                            <Badge variant="outline" className="text-xs">{setting.category}</Badge>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+            </div>
+          </SheetContent>
+        </Sheet>
       </div>
     </ProtectedRoute>
   );
