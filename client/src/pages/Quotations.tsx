@@ -13,7 +13,8 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
 import { quotationsApi, customersApi } from "@/lib/api";
-import { Plus, Pencil, Trash2, FileText, X } from "lucide-react";
+import { Plus, Pencil, Trash2, FileText, X, Eye } from "lucide-react";
+import { useLocation } from "wouter";
 import { format } from "date-fns";
 
 const statusColors: Record<string, string> = {
@@ -30,6 +31,7 @@ export default function Quotations() {
   const [items, setItems] = useState<any[]>([]);
   const { toast } = useToast();
   const queryClient = useQueryClient();
+  const [, navigate] = useLocation();
 
   const { data: quotations = [], isLoading } = useQuery({
     queryKey: ["quotations"],
@@ -247,13 +249,24 @@ export default function Quotations() {
                       const customer = customers.find((c: any) => c.id === quotation.customerId);
                       return (
                         <TableRow key={quotation.id} data-testid={`row-quotation-${quotation.id}`}>
-                          <TableCell className="font-mono">{quotation.quoteNumber}</TableCell>
+                          <TableCell className="font-mono">
+                          <button 
+                            onClick={() => navigate(`/quotations/${quotation.id}`)} 
+                            className="text-primary hover:underline cursor-pointer"
+                            data-testid={`link-view-quotation-${quotation.id}`}
+                          >
+                            {quotation.quoteNumber}
+                          </button>
+                        </TableCell>
                           <TableCell className="font-medium">{quotation.title}</TableCell>
                           <TableCell>{customer?.name || "-"}</TableCell>
                           <TableCell><Badge className={statusColors[quotation.status]}>{quotation.status}</Badge></TableCell>
                           <TableCell>${Number(quotation.totalAmount).toFixed(2)}</TableCell>
                           <TableCell>
                             <div className="flex gap-2">
+                              <Button size="sm" variant="ghost" onClick={() => navigate(`/quotations/${quotation.id}`)} data-testid={`button-view-quotation-${quotation.id}`}>
+                                <Eye className="w-4 h-4" />
+                              </Button>
                               <Button size="sm" variant="ghost" onClick={() => { setEditingQuotation(quotation); setItems(quotation.items || []); setIsDialogOpen(true); }} data-testid={`button-edit-quotation-${quotation.id}`}>
                                 <Pencil className="w-4 h-4" />
                               </Button>

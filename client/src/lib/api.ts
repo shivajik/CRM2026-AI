@@ -191,3 +191,17 @@ export const tenantApi = {
       body: JSON.stringify({ isEnabled }),
     }),
 };
+
+// Team API
+export const teamApi = {
+  getMembers: () => apiRequest("/team/members"),
+  createMember: (data: { email: string; password: string; firstName: string; lastName: string; permissions?: string[] }) =>
+    apiRequest("/team/members", { method: "POST", body: JSON.stringify(data) }),
+  updateMember: (id: string, data: { firstName?: string; lastName?: string; email?: string; permissions?: string[]; isActive?: boolean }) =>
+    apiRequest(`/team/members/${id}`, { method: "PATCH", body: JSON.stringify(data) }),
+  deleteMember: (id: string) => apiRequest(`/team/members/${id}`, { method: "DELETE" }),
+  getRoles: () => apiRequest("/team/roles"),
+  createRole: (data: { name: string; permissions: string[] }) =>
+    apiRequest("/team/roles", { method: "POST", body: JSON.stringify(data) }),
+  checkAdmin: () => apiRequest("/auth/admin-check"),
+};

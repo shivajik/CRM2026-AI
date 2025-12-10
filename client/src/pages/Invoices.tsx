@@ -13,7 +13,8 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
 import { invoicesApi, customersApi } from "@/lib/api";
-import { Plus, Pencil, Trash2, Receipt, X, DollarSign } from "lucide-react";
+import { Plus, Pencil, Trash2, Receipt, X, DollarSign, Eye } from "lucide-react";
+import { useLocation } from "wouter";
 import { format } from "date-fns";
 
 const statusColors: Record<string, string> = {
@@ -33,6 +34,7 @@ export default function Invoices() {
   const [items, setItems] = useState<any[]>([]);
   const { toast } = useToast();
   const queryClient = useQueryClient();
+  const [, navigate] = useLocation();
 
   const { data: invoices = [], isLoading } = useQuery({
     queryKey: ["invoices"],
@@ -312,7 +314,15 @@ export default function Invoices() {
                       const customer = customers.find((c: any) => c.id === invoice.customerId);
                       return (
                         <TableRow key={invoice.id} data-testid={`row-invoice-${invoice.id}`}>
-                          <TableCell className="font-mono">{invoice.invoiceNumber}</TableCell>
+                          <TableCell className="font-mono">
+                          <button 
+                            onClick={() => navigate(`/invoices/${invoice.id}`)} 
+                            className="text-primary hover:underline cursor-pointer"
+                            data-testid={`link-view-invoice-${invoice.id}`}
+                          >
+                            {invoice.invoiceNumber}
+                          </button>
+                        </TableCell>
                           <TableCell>{customer?.name || "-"}</TableCell>
                           <TableCell><Badge className={statusColors[invoice.status]}>{invoice.status}</Badge></TableCell>
                           <TableCell>${Number(invoice.totalAmount).toFixed(2)}</TableCell>
@@ -325,6 +335,9 @@ export default function Invoices() {
                                   <DollarSign className="w-4 h-4" />
                                 </Button>
                               )}
+                              <Button size="sm" variant="ghost" onClick={() => navigate(`/invoices/${invoice.id}`)} data-testid={`button-view-invoice-${invoice.id}`}>
+                                <Eye className="w-4 h-4" />
+                              </Button>
                               <Button size="sm" variant="ghost" onClick={() => { setEditingInvoice(invoice); setItems(invoice.items || []); setIsDialogOpen(true); }} data-testid={`button-edit-invoice-${invoice.id}`}>
                                 <Pencil className="w-4 h-4" />
                               </Button>

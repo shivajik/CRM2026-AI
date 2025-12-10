@@ -17,11 +17,13 @@ export type Tenant = typeof tenants.$inferSelect;
 // Roles table - defines user roles within a tenant
 export const roles = pgTable("roles", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  tenantId: varchar("tenant_id").references(() => tenants.id, { onDelete: "cascade" }),
   name: text("name").notNull(),
   permissions: text("permissions").array().notNull().default(sql`'{}'::text[]`),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 
-export const insertRoleSchema = createInsertSchema(roles).omit({ id: true });
+export const insertRoleSchema = createInsertSchema(roles).omit({ id: true, createdAt: true });
 export type InsertRole = z.infer<typeof insertRoleSchema>;
 export type Role = typeof roles.$inferSelect;
 
@@ -34,6 +36,8 @@ export const users = pgTable("users", {
   firstName: text("first_name").notNull(),
   lastName: text("last_name").notNull(),
   roleId: varchar("role_id").references(() => roles.id),
+  isAdmin: boolean("is_admin").default(false).notNull(),
+  isActive: boolean("is_active").default(true).notNull(),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });

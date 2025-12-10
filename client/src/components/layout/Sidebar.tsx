@@ -1,8 +1,9 @@
 import { Link, useLocation } from "wouter";
+import { useQuery } from "@tanstack/react-query";
 import { cn } from "@/lib/utils";
 import { 
   LayoutDashboard, Users, Briefcase, CheckSquare, Settings, LogOut,
-  Package, Building2, FileText, Receipt, Activity, BarChart3 
+  Package, Building2, FileText, Receipt, Activity, BarChart3, UsersRound 
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { getUser, clearAuth } from "@/lib/auth";
@@ -19,12 +20,19 @@ const sidebarItems = [
   { icon: CheckSquare, label: "Tasks", href: "/tasks" },
   { icon: Activity, label: "Activities", href: "/activities" },
   { icon: BarChart3, label: "Reports", href: "/reports" },
+  { icon: UsersRound, label: "Team", href: "/team", adminOnly: true },
   { icon: Settings, label: "Settings", href: "/settings" },
 ];
 
 export function Sidebar() {
   const [location, setLocation] = useLocation();
   const user = getUser();
+
+  const { data: currentUser } = useQuery({
+    queryKey: ["currentUser"],
+    queryFn: authApi.me,
+    enabled: !!user,
+  });
 
   const handleLogout = async () => {
     try {
@@ -52,6 +60,9 @@ export function Sidebar() {
 
       <nav className="flex-1 px-4 py-4 space-y-1 overflow-y-auto">
         {sidebarItems.map((item) => {
+          if ((item as any).adminOnly && !currentUser?.isAdmin) {
+            return null;
+          }
           const isActive = location === item.href;
           return (
             <Link

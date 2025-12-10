@@ -46,6 +46,8 @@ export async function registerRoutes(
         firstName,
         lastName,
         roleId: adminRole.id,
+        isAdmin: true,
+        isActive: true,
       });
       
       const modules = await storage.getAllModules();
@@ -179,7 +181,7 @@ export async function registerRoutes(
   
   app.get("/api/auth/me", requireAuth, async (req, res) => {
     try {
-      const user = await storage.getUserById(req.user!.userId);
+      const user = await storage.getUserWithRole(req.user!.userId);
       if (!user) {
         return res.status(404).json({ message: "User not found" });
       }
@@ -190,10 +192,231 @@ export async function registerRoutes(
         firstName: user.firstName,
         lastName: user.lastName,
         tenantId: user.tenantId,
+        isAdmin: user.isAdmin,
+        permissions: user.role?.permissions || [],
       });
     } catch (error) {
       console.error("Get user error:", error);
       res.status(500).json({ message: "Failed to fetch user" });
+    }
+  });
+
+  // ==================== TEAM MANAGEMENT ROUTES ====================
+  
+  // Get all team members
+  app.get("/api/team/members", requireAuth, validateTenant, async (req, res) => {
+    try {
+      const users = await storage.getUsersByTenant(req.user!.tenantId);
+      const roles = await storage.getRolesByTenant(req.user!.tenantId);
+      
+      const membersWithRoles = users.map(user => {
+        const { passwordHash, ...userWithoutPassword } = user;
+        const role = roles.find(r => r.id === user.roleId);
+        return {
+          ...userWithoutPassword,
+          role: role || null,
+          permissions: role?.permissions || [],
+        };
+      });
+      
+      res.json(membersWithRoles);
+    } catch (error) {
+      console.error("Get team members error:", error);
+      res.status(500).json({ message: "Failed to fetch team members" });
+    }
+  });
+  
+  // Create team member
+  app.post("/api/team/members", requireAuth, validateTenant, async (req, res) => {
+    try {
+      const currentUser = await storage.getUserById(req.user!.userId);
+      if (!currentUser?.isAdmin) {
+        return res.status(403).json({ message: "Only admins can create team members" });
+      }
+      
+      const { email, password, firstName, lastName, roleId, permissions } = req.body;
+      
+      if (!email || !password || !firstName || !lastName) {
+        return res.status(400).json({ message: "Email, password, first name and last name are required" });
+      }
+      
+      const existingUser = await storage.getUserByEmail(email);
+      if (existingUser) {
+        return res.status(400).json({ message: "User with this email already exists" });
+      }
+      
+      let userRoleId = roleId;
+      
+      // Create custom role with permissions if provided
+      if (permissions && permissions.length > 0) {
+        const customRole = await storage.createRole({
+          tenantId: req.user!.tenantId,
+          name: `${firstName} ${lastName} Role`,
+          permissions,
+        });
+        userRoleId = customRole.id;
+      }
+      
+      const passwordHash = await hashPassword(password);
+      const user = await storage.createTeamMember({
+        tenantId: req.user!.tenantId,
+        email,
+        passwordHash,
+        firstName,
+        lastName,
+        roleId: userRoleId || null,
+        isAdmin: false,
+        isActive: true,
+      });
+      
+      // Get role permissions
+      let rolePermissions: string[] = [];
+      if (user.roleId) {
+        const role = await storage.getRoleById(user.roleId);
+        rolePermissions = role?.permissions || [];
+      }
+      
+      res.status(201).json({
+        id: user.id,
+        email: user.email,
+        firstName: user.firstName,
+        lastName: user.lastName,
+        roleId: user.roleId,
+        isActive: user.isActive,
+        permissions: rolePermissions,
+      });
+    } catch (error) {
+      console.error("Create team member error:", error);
+      res.status(500).json({ message: "Failed to create team member" });
+    }
+  });
+  
+  // Update team member
+  app.patch("/api/team/members/:id", requireAuth, validateTenant, async (req, res) => {
+    try {
+      const currentUser = await storage.getUserById(req.user!.userId);
+      if (!currentUser?.isAdmin) {
+        return res.status(403).json({ message: "Only admins can update team members" });
+      }
+      
+      const { firstName, lastName, email, roleId, permissions, isActive } = req.body;
+      
+      const updates: any = {};
+      if (firstName) updates.firstName = firstName;
+      if (lastName) updates.lastName = lastName;
+      if (email) updates.email = email;
+      if (typeof isActive === 'boolean') updates.isActive = isActive;
+      
+      // Update role permissions if provided
+      if (permissions && permissions.length > 0) {
+        const existingUser = await storage.getUserById(req.params.id);
+        if (existingUser?.roleId) {
+          await storage.updateRole(existingUser.roleId, { permissions });
+        } else {
+          const customRole = await storage.createRole({
+            tenantId: req.user!.tenantId,
+            name: `${firstName || existingUser?.firstName} Role`,
+            permissions,
+          });
+          updates.roleId = customRole.id;
+        }
+      } else if (roleId !== undefined) {
+        updates.roleId = roleId;
+      }
+      
+      const user = await storage.updateTeamMember(req.params.id, req.user!.tenantId, updates);
+      if (!user) {
+        return res.status(404).json({ message: "Team member not found" });
+      }
+      
+      // Get role permissions
+      let rolePermissions: string[] = [];
+      if (user.roleId) {
+        const role = await storage.getRoleById(user.roleId);
+        rolePermissions = role?.permissions || [];
+      }
+      
+      res.json({
+        id: user.id,
+        email: user.email,
+        firstName: user.firstName,
+        lastName: user.lastName,
+        roleId: user.roleId,
+        isActive: user.isActive,
+        permissions: rolePermissions,
+      });
+    } catch (error) {
+      console.error("Update team member error:", error);
+      res.status(500).json({ message: "Failed to update team member" });
+    }
+  });
+  
+  // Delete team member
+  app.delete("/api/team/members/:id", requireAuth, validateTenant, async (req, res) => {
+    try {
+      const currentUser = await storage.getUserById(req.user!.userId);
+      if (!currentUser?.isAdmin) {
+        return res.status(403).json({ message: "Only admins can delete team members" });
+      }
+      
+      if (req.params.id === req.user!.userId) {
+        return res.status(400).json({ message: "You cannot delete yourself" });
+      }
+      
+      await storage.deleteTeamMember(req.params.id, req.user!.tenantId);
+      res.json({ message: "Team member deleted successfully" });
+    } catch (error) {
+      console.error("Delete team member error:", error);
+      res.status(500).json({ message: "Failed to delete team member" });
+    }
+  });
+  
+  // Get roles
+  app.get("/api/team/roles", requireAuth, validateTenant, async (req, res) => {
+    try {
+      const roles = await storage.getRolesByTenant(req.user!.tenantId);
+      res.json(roles);
+    } catch (error) {
+      console.error("Get roles error:", error);
+      res.status(500).json({ message: "Failed to fetch roles" });
+    }
+  });
+  
+  // Create role
+  app.post("/api/team/roles", requireAuth, validateTenant, async (req, res) => {
+    try {
+      const currentUser = await storage.getUserById(req.user!.userId);
+      if (!currentUser?.isAdmin) {
+        return res.status(403).json({ message: "Only admins can create roles" });
+      }
+      
+      const { name, permissions } = req.body;
+      
+      if (!name) {
+        return res.status(400).json({ message: "Role name is required" });
+      }
+      
+      const role = await storage.createRole({
+        tenantId: req.user!.tenantId,
+        name,
+        permissions: permissions || [],
+      });
+      
+      res.status(201).json(role);
+    } catch (error) {
+      console.error("Create role error:", error);
+      res.status(500).json({ message: "Failed to create role" });
+    }
+  });
+  
+  // Check if current user is admin
+  app.get("/api/auth/admin-check", requireAuth, async (req, res) => {
+    try {
+      const user = await storage.getUserById(req.user!.userId);
+      res.json({ isAdmin: user?.isAdmin || false });
+    } catch (error) {
+      console.error("Admin check error:", error);
+      res.status(500).json({ message: "Failed to check admin status" });
     }
   });
 

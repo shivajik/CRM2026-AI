@@ -36,6 +36,15 @@ export interface IStorage {
   // Role operations
   createRole(role: InsertRole): Promise<Role>;
   getRoleById(id: string): Promise<Role | undefined>;
+  getRolesByTenant(tenantId: string): Promise<Role[]>;
+  updateRole(id: string, updates: Partial<InsertRole>): Promise<Role | undefined>;
+  deleteRole(id: string): Promise<void>;
+  
+  // Team member operations
+  createTeamMember(user: InsertUser): Promise<User>;
+  updateTeamMember(id: string, tenantId: string, updates: Partial<InsertUser>): Promise<User | undefined>;
+  deleteTeamMember(id: string, tenantId: string): Promise<void>;
+  getUserWithRole(id: string): Promise<(User & { role?: Role }) | undefined>;
   
   // Auth token operations
   createAuthToken(token: InsertAuthToken): Promise<AuthToken>;
@@ -210,6 +219,53 @@ export class DatabaseStorage implements IStorage {
   async getRoleById(id: string): Promise<Role | undefined> {
     const [role] = await db.select().from(schema.roles).where(eq(schema.roles.id, id));
     return role;
+  }
+  
+  async getRolesByTenant(tenantId: string): Promise<Role[]> {
+    return db.select().from(schema.roles).where(eq(schema.roles.tenantId, tenantId));
+  }
+  
+  async updateRole(id: string, updates: Partial<InsertRole>): Promise<Role | undefined> {
+    const [role] = await db.update(schema.roles)
+      .set(updates)
+      .where(eq(schema.roles.id, id))
+      .returning();
+    return role;
+  }
+  
+  async deleteRole(id: string): Promise<void> {
+    await db.delete(schema.roles).where(eq(schema.roles.id, id));
+  }
+  
+  // Team member operations
+  async createTeamMember(insertUser: InsertUser): Promise<User> {
+    const [user] = await db.insert(schema.users).values(insertUser).returning();
+    return user;
+  }
+  
+  async updateTeamMember(id: string, tenantId: string, updates: Partial<InsertUser>): Promise<User | undefined> {
+    const updateData: any = { ...updates, updatedAt: new Date() };
+    const [user] = await db.update(schema.users)
+      .set(updateData)
+      .where(and(eq(schema.users.id, id), eq(schema.users.tenantId, tenantId)))
+      .returning();
+    return user;
+  }
+  
+  async deleteTeamMember(id: string, tenantId: string): Promise<void> {
+    await db.delete(schema.users)
+      .where(and(eq(schema.users.id, id), eq(schema.users.tenantId, tenantId)));
+  }
+  
+  async getUserWithRole(id: string): Promise<(User & { role?: Role }) | undefined> {
+    const [user] = await db.select().from(schema.users).where(eq(schema.users.id, id));
+    if (!user) return undefined;
+    
+    if (user.roleId) {
+      const [role] = await db.select().from(schema.roles).where(eq(schema.roles.id, user.roleId));
+      return { ...user, role };
+    }
+    return user;
   }
   
   // Auth token operations

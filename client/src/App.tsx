@@ -21,6 +21,9 @@ import Invoices from "@/pages/Invoices";
 import InvoiceDetail from "@/pages/InvoiceDetail";
 import Activities from "@/pages/Activities";
 import Reports from "@/pages/Reports";
+import TeamManagement from "@/pages/TeamManagement";
+import TeamLogin from "@/pages/TeamLogin";
+import TeamDashboard from "@/pages/TeamDashboard";
 
 function Router() {
   return (
@@ -40,6 +43,9 @@ function Router() {
       <Route path="/activities" component={Activities} />
       <Route path="/reports" component={Reports} />
       <Route path="/settings" component={Settings} />
+      <Route path="/team" component={TeamManagement} />
+      <Route path="/team-login" component={TeamLogin} />
+      <Route path="/team-dashboard" component={TeamDashboard} />
       <Route path="/login" component={Login} />
       <Route path="/register" component={Register} />
       <Route component={NotFound} />
