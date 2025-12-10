@@ -105,7 +105,7 @@ export interface IStorage {
 
   // Quotation operations
   createQuotation(quotation: InsertQuotation): Promise<Quotation>;
-  getQuotationsByTenant(tenantId: string): Promise<Quotation[]>;
+  getQuotationsByTenant(tenantId: string, createdBy?: string): Promise<Quotation[]>;
   getQuotationById(id: string, tenantId: string): Promise<Quotation | undefined>;
   updateQuotation(id: string, tenantId: string, updates: Partial<InsertQuotation>): Promise<Quotation | undefined>;
   deleteQuotation(id: string, tenantId: string): Promise<void>;
@@ -120,7 +120,7 @@ export interface IStorage {
 
   // Invoice operations
   createInvoice(invoice: InsertInvoice): Promise<Invoice>;
-  getInvoicesByTenant(tenantId: string): Promise<Invoice[]>;
+  getInvoicesByTenant(tenantId: string, createdBy?: string): Promise<Invoice[]>;
   getInvoiceById(id: string, tenantId: string): Promise<Invoice | undefined>;
   updateInvoice(id: string, tenantId: string, updates: Partial<InsertInvoice>): Promise<Invoice | undefined>;
   deleteInvoice(id: string, tenantId: string): Promise<void>;
@@ -514,7 +514,12 @@ export class DatabaseStorage implements IStorage {
     return quotation;
   }
 
-  async getQuotationsByTenant(tenantId: string): Promise<Quotation[]> {
+  async getQuotationsByTenant(tenantId: string, createdBy?: string): Promise<Quotation[]> {
+    if (createdBy) {
+      return db.select().from(schema.quotations)
+        .where(and(eq(schema.quotations.tenantId, tenantId), eq(schema.quotations.createdBy, createdBy)))
+        .orderBy(desc(schema.quotations.createdAt));
+    }
     return db.select().from(schema.quotations).where(eq(schema.quotations.tenantId, tenantId)).orderBy(desc(schema.quotations.createdAt));
   }
 
@@ -577,7 +582,12 @@ export class DatabaseStorage implements IStorage {
     return invoice;
   }
 
-  async getInvoicesByTenant(tenantId: string): Promise<Invoice[]> {
+  async getInvoicesByTenant(tenantId: string, createdBy?: string): Promise<Invoice[]> {
+    if (createdBy) {
+      return db.select().from(schema.invoices)
+        .where(and(eq(schema.invoices.tenantId, tenantId), eq(schema.invoices.createdBy, createdBy)))
+        .orderBy(desc(schema.invoices.createdAt));
+    }
     return db.select().from(schema.invoices).where(eq(schema.invoices.tenantId, tenantId)).orderBy(desc(schema.invoices.createdAt));
   }
 

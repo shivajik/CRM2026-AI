@@ -1077,7 +1077,9 @@ export async function registerRoutes(
   
   app.get("/api/quotations", requireAuth, validateTenant, async (req, res) => {
     try {
-      const quotations = await storage.getQuotationsByTenant(req.user!.tenantId);
+      const userType = req.user!.userType;
+      const createdBy = userType === 'team_member' ? req.user!.userId : undefined;
+      const quotations = await storage.getQuotationsByTenant(req.user!.tenantId, createdBy);
       res.json(quotations);
     } catch (error) {
       console.error("Get quotations error:", error);
@@ -1170,7 +1172,9 @@ export async function registerRoutes(
   
   app.get("/api/invoices", requireAuth, validateTenant, async (req, res) => {
     try {
-      const invoices = await storage.getInvoicesByTenant(req.user!.tenantId);
+      const userType = req.user!.userType;
+      const createdBy = userType === 'team_member' ? req.user!.userId : undefined;
+      const invoices = await storage.getInvoicesByTenant(req.user!.tenantId, createdBy);
       res.json(invoices);
     } catch (error) {
       console.error("Get invoices error:", error);
