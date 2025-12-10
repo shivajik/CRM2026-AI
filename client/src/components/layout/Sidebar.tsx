@@ -1,5 +1,5 @@
 import { Link, useLocation } from "wouter";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { cn } from "@/lib/utils";
 import { 
   LayoutDashboard, Users, Briefcase, CheckSquare, Settings, LogOut,
@@ -67,6 +67,7 @@ function getUserTypeBadgeColor(userType: string): string {
 export function Sidebar() {
   const [location, setLocation] = useLocation();
   const user = getUser();
+  const queryClient = useQueryClient();
 
   const { data: currentUser } = useQuery({
     queryKey: ["currentUser"],
@@ -81,6 +82,7 @@ export function Sidebar() {
       console.error("Logout error:", error);
     } finally {
       clearAuth();
+      queryClient.clear();
       setLocation("/login");
     }
   };

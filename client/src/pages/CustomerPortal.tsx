@@ -1,5 +1,5 @@
 import { useEffect } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
@@ -35,6 +35,7 @@ const statusColors: Record<string, string> = {
 
 export default function CustomerPortal() {
   const [, setLocation] = useLocation();
+  const queryClient = useQueryClient();
   
   const { data: currentUser } = useQuery({
     queryKey: ["currentUser"],
@@ -60,6 +61,7 @@ export default function CustomerPortal() {
       console.error("Logout error:", error);
     } finally {
       clearAuth();
+      queryClient.clear();
       setLocation("/login");
     }
   };

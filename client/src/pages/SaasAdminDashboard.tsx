@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
@@ -26,6 +26,7 @@ const COLORS = ['#0088FE', '#00C49F', '#FFBB28', '#FF8042', '#8884d8'];
 
 export default function SaasAdminDashboard() {
   const [, setLocation] = useLocation();
+  const queryClient = useQueryClient();
   
   const { data: currentUser } = useQuery({
     queryKey: ["currentUser"],
@@ -57,6 +58,7 @@ export default function SaasAdminDashboard() {
       console.error("Logout error:", error);
     } finally {
       clearAuth();
+      queryClient.clear();
       setLocation("/login");
     }
   };
