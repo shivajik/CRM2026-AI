@@ -11,14 +11,26 @@ import Tasks from "@/pages/Tasks";
 import Settings from "@/pages/Settings";
 import Login from "@/pages/Login";
 import Register from "@/pages/Register";
+import Products from "@/pages/Products";
+import Customers from "@/pages/Customers";
+import Quotations from "@/pages/Quotations";
+import Invoices from "@/pages/Invoices";
+import Activities from "@/pages/Activities";
+import Reports from "@/pages/Reports";
 
 function Router() {
   return (
     <Switch>
       <Route path="/" component={Dashboard} />
+      <Route path="/customers" component={Customers} />
       <Route path="/contacts" component={Contacts} />
       <Route path="/deals" component={Deals} />
+      <Route path="/products" component={Products} />
+      <Route path="/quotations" component={Quotations} />
+      <Route path="/invoices" component={Invoices} />
       <Route path="/tasks" component={Tasks} />
+      <Route path="/activities" component={Activities} />
+      <Route path="/reports" component={Reports} />
       <Route path="/settings" component={Settings} />
       <Route path="/login" component={Login} />
       <Route path="/register" component={Register} />

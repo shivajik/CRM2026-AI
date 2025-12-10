@@ -4,19 +4,17 @@ import { storage } from "./storage";
 import { hashPassword, verifyPassword, generateAccessToken, generateRefreshToken, getRefreshTokenExpiry, verifyToken } from "./auth";
 import { requireAuth, validateTenant } from "./middleware";
 import { z } from "zod";
-import { insertContactSchema, insertDealSchema, insertTaskSchema } from "@shared/schema";
+import { insertContactSchema, insertDealSchema, insertTaskSchema, insertProductSchema, insertCustomerSchema, insertQuotationSchema, insertQuotationItemSchema, insertInvoiceSchema, insertInvoiceItemSchema, insertPaymentSchema, insertActivitySchema } from "@shared/schema";
 
 export async function registerRoutes(
   httpServer: Server,
   app: Express
 ): Promise<Server> {
   
-  // Initialize default modules on startup
   await initializeModules();
   
   // ==================== AUTH ROUTES ====================
   
-  // Register new tenant and admin user
   app.post("/api/auth/register", async (req, res) => {
     try {
       const { email, password, firstName, lastName, companyName } = req.body;
@@ -25,16 +23,13 @@ export async function registerRoutes(
         return res.status(400).json({ message: "All fields are required" });
       }
       
-      // Check if user already exists
       const existingUser = await storage.getUserByEmail(email);
       if (existingUser) {
         return res.status(400).json({ message: "User already exists" });
       }
       
-      // Create tenant
       const tenant = await storage.createTenant({ name: companyName });
       
-      // Create admin role if it doesn't exist
       let adminRole = await storage.getRoleById("admin");
       if (!adminRole) {
         adminRole = await storage.createRole({
@@ -43,7 +38,6 @@ export async function registerRoutes(
         });
       }
       
-      // Create user with hashed password
       const passwordHash = await hashPassword(password);
       const user = await storage.createUser({
         tenantId: tenant.id,
@@ -54,7 +48,6 @@ export async function registerRoutes(
         roleId: adminRole.id,
       });
       
-      // Enable all modules for new tenant
       const modules = await storage.getAllModules();
       for (const module of modules) {
         await storage.enableModuleForTenant({
@@ -64,11 +57,9 @@ export async function registerRoutes(
         });
       }
       
-      // Generate tokens
       const accessToken = generateAccessToken(user);
       const refreshToken = generateRefreshToken(user);
       
-      // Store refresh token
       await storage.createAuthToken({
         userId: user.id,
         refreshToken,
@@ -92,7 +83,6 @@ export async function registerRoutes(
     }
   });
   
-  // Login
   app.post("/api/auth/login", async (req, res) => {
     try {
       const { email, password } = req.body;
@@ -137,7 +127,6 @@ export async function registerRoutes(
     }
   });
   
-  // Refresh token
   app.post("/api/auth/refresh", async (req, res) => {
     try {
       const { refreshToken } = req.body;
@@ -170,7 +159,6 @@ export async function registerRoutes(
     }
   });
   
-  // Logout
   app.post("/api/auth/logout", requireAuth, async (req, res) => {
     try {
       const { refreshToken } = req.body;
@@ -189,7 +177,6 @@ export async function registerRoutes(
     }
   });
   
-  // Get current user
   app.get("/api/auth/me", requireAuth, async (req, res) => {
     try {
       const user = await storage.getUserById(req.user!.userId);
@@ -212,7 +199,6 @@ export async function registerRoutes(
   
   // ==================== TENANT MODULE ROUTES ====================
   
-  // Get enabled modules for current tenant
   app.get("/api/tenant/modules", requireAuth, validateTenant, async (req, res) => {
     try {
       const tenantModules = await storage.getTenantModules(req.user!.tenantId);
@@ -223,7 +209,6 @@ export async function registerRoutes(
     }
   });
   
-  // Toggle module for tenant
   app.patch("/api/tenant/modules/:id", requireAuth, validateTenant, async (req, res) => {
     try {
       const { id } = req.params;
@@ -243,7 +228,6 @@ export async function registerRoutes(
   
   // ==================== CONTACT ROUTES ====================
   
-  // Get all contacts for tenant
   app.get("/api/contacts", requireAuth, validateTenant, async (req, res) => {
     try {
       const contacts = await storage.getContactsByTenant(req.user!.tenantId);
@@ -254,7 +238,6 @@ export async function registerRoutes(
     }
   });
   
-  // Get single contact
   app.get("/api/contacts/:id", requireAuth, validateTenant, async (req, res) => {
     try {
       const contact = await storage.getContactById(req.params.id, req.user!.tenantId);
@@ -268,7 +251,6 @@ export async function registerRoutes(
     }
   });
   
-  // Create contact
   app.post("/api/contacts", requireAuth, validateTenant, async (req, res) => {
     try {
       const validatedData = insertContactSchema.parse({
@@ -288,19 +270,12 @@ export async function registerRoutes(
     }
   });
   
-  // Update contact
   app.patch("/api/contacts/:id", requireAuth, validateTenant, async (req, res) => {
     try {
-      const contact = await storage.updateContact(
-        req.params.id,
-        req.user!.tenantId,
-        req.body
-      );
-      
+      const contact = await storage.updateContact(req.params.id, req.user!.tenantId, req.body);
       if (!contact) {
         return res.status(404).json({ message: "Contact not found" });
       }
-      
       res.json(contact);
     } catch (error) {
       console.error("Update contact error:", error);
@@ -308,7 +283,6 @@ export async function registerRoutes(
     }
   });
   
-  // Delete contact
   app.delete("/api/contacts/:id", requireAuth, validateTenant, async (req, res) => {
     try {
       await storage.deleteContact(req.params.id, req.user!.tenantId);
@@ -321,7 +295,6 @@ export async function registerRoutes(
   
   // ==================== DEAL ROUTES ====================
   
-  // Get all deals for tenant
   app.get("/api/deals", requireAuth, validateTenant, async (req, res) => {
     try {
       const deals = await storage.getDealsByTenant(req.user!.tenantId);
@@ -332,7 +305,6 @@ export async function registerRoutes(
     }
   });
   
-  // Get single deal
   app.get("/api/deals/:id", requireAuth, validateTenant, async (req, res) => {
     try {
       const deal = await storage.getDealById(req.params.id, req.user!.tenantId);
@@ -346,7 +318,6 @@ export async function registerRoutes(
     }
   });
   
-  // Create deal
   app.post("/api/deals", requireAuth, validateTenant, async (req, res) => {
     try {
       const validatedData = insertDealSchema.parse({
@@ -366,19 +337,12 @@ export async function registerRoutes(
     }
   });
   
-  // Update deal
   app.patch("/api/deals/:id", requireAuth, validateTenant, async (req, res) => {
     try {
-      const deal = await storage.updateDeal(
-        req.params.id,
-        req.user!.tenantId,
-        req.body
-      );
-      
+      const deal = await storage.updateDeal(req.params.id, req.user!.tenantId, req.body);
       if (!deal) {
         return res.status(404).json({ message: "Deal not found" });
       }
-      
       res.json(deal);
     } catch (error) {
       console.error("Update deal error:", error);
@@ -386,7 +350,6 @@ export async function registerRoutes(
     }
   });
   
-  // Delete deal
   app.delete("/api/deals/:id", requireAuth, validateTenant, async (req, res) => {
     try {
       await storage.deleteDeal(req.params.id, req.user!.tenantId);
@@ -399,7 +362,6 @@ export async function registerRoutes(
   
   // ==================== TASK ROUTES ====================
   
-  // Get all tasks for tenant
   app.get("/api/tasks", requireAuth, validateTenant, async (req, res) => {
     try {
       const tasks = await storage.getTasksByTenant(req.user!.tenantId);
@@ -410,7 +372,6 @@ export async function registerRoutes(
     }
   });
   
-  // Get single task
   app.get("/api/tasks/:id", requireAuth, validateTenant, async (req, res) => {
     try {
       const task = await storage.getTaskById(req.params.id, req.user!.tenantId);
@@ -424,7 +385,6 @@ export async function registerRoutes(
     }
   });
   
-  // Create task
   app.post("/api/tasks", requireAuth, validateTenant, async (req, res) => {
     try {
       const validatedData = insertTaskSchema.parse({
@@ -444,19 +404,12 @@ export async function registerRoutes(
     }
   });
   
-  // Update task
   app.patch("/api/tasks/:id", requireAuth, validateTenant, async (req, res) => {
     try {
-      const task = await storage.updateTask(
-        req.params.id,
-        req.user!.tenantId,
-        req.body
-      );
-      
+      const task = await storage.updateTask(req.params.id, req.user!.tenantId, req.body);
       if (!task) {
         return res.status(404).json({ message: "Task not found" });
       }
-      
       res.json(task);
     } catch (error) {
       console.error("Update task error:", error);
@@ -464,7 +417,6 @@ export async function registerRoutes(
     }
   });
   
-  // Delete task
   app.delete("/api/tasks/:id", requireAuth, validateTenant, async (req, res) => {
     try {
       await storage.deleteTask(req.params.id, req.user!.tenantId);
@@ -475,15 +427,479 @@ export async function registerRoutes(
     }
   });
 
+  // ==================== PRODUCT ROUTES ====================
+  
+  app.get("/api/products", requireAuth, validateTenant, async (req, res) => {
+    try {
+      const products = await storage.getProductsByTenant(req.user!.tenantId);
+      res.json(products);
+    } catch (error) {
+      console.error("Get products error:", error);
+      res.status(500).json({ message: "Failed to fetch products" });
+    }
+  });
+  
+  app.get("/api/products/:id", requireAuth, validateTenant, async (req, res) => {
+    try {
+      const product = await storage.getProductById(req.params.id, req.user!.tenantId);
+      if (!product) {
+        return res.status(404).json({ message: "Product not found" });
+      }
+      res.json(product);
+    } catch (error) {
+      console.error("Get product error:", error);
+      res.status(500).json({ message: "Failed to fetch product" });
+    }
+  });
+  
+  app.post("/api/products", requireAuth, validateTenant, async (req, res) => {
+    try {
+      const validatedData = insertProductSchema.parse({
+        ...req.body,
+        tenantId: req.user!.tenantId,
+      });
+      
+      const product = await storage.createProduct(validatedData);
+      res.status(201).json(product);
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ message: "Invalid data", errors: error.errors });
+      }
+      console.error("Create product error:", error);
+      res.status(500).json({ message: "Failed to create product" });
+    }
+  });
+  
+  app.patch("/api/products/:id", requireAuth, validateTenant, async (req, res) => {
+    try {
+      const product = await storage.updateProduct(req.params.id, req.user!.tenantId, req.body);
+      if (!product) {
+        return res.status(404).json({ message: "Product not found" });
+      }
+      res.json(product);
+    } catch (error) {
+      console.error("Update product error:", error);
+      res.status(500).json({ message: "Failed to update product" });
+    }
+  });
+  
+  app.delete("/api/products/:id", requireAuth, validateTenant, async (req, res) => {
+    try {
+      await storage.deleteProduct(req.params.id, req.user!.tenantId);
+      res.json({ message: "Product deleted successfully" });
+    } catch (error) {
+      console.error("Delete product error:", error);
+      res.status(500).json({ message: "Failed to delete product" });
+    }
+  });
+
+  // ==================== CUSTOMER ROUTES ====================
+  
+  app.get("/api/customers", requireAuth, validateTenant, async (req, res) => {
+    try {
+      const customers = await storage.getCustomersByTenant(req.user!.tenantId);
+      res.json(customers);
+    } catch (error) {
+      console.error("Get customers error:", error);
+      res.status(500).json({ message: "Failed to fetch customers" });
+    }
+  });
+  
+  app.get("/api/customers/:id", requireAuth, validateTenant, async (req, res) => {
+    try {
+      const customer = await storage.getCustomerById(req.params.id, req.user!.tenantId);
+      if (!customer) {
+        return res.status(404).json({ message: "Customer not found" });
+      }
+      res.json(customer);
+    } catch (error) {
+      console.error("Get customer error:", error);
+      res.status(500).json({ message: "Failed to fetch customer" });
+    }
+  });
+  
+  app.post("/api/customers", requireAuth, validateTenant, async (req, res) => {
+    try {
+      const validatedData = insertCustomerSchema.parse({
+        ...req.body,
+        tenantId: req.user!.tenantId,
+        ownerId: req.user!.userId,
+      });
+      
+      const customer = await storage.createCustomer(validatedData);
+      res.status(201).json(customer);
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ message: "Invalid data", errors: error.errors });
+      }
+      console.error("Create customer error:", error);
+      res.status(500).json({ message: "Failed to create customer" });
+    }
+  });
+  
+  app.patch("/api/customers/:id", requireAuth, validateTenant, async (req, res) => {
+    try {
+      const customer = await storage.updateCustomer(req.params.id, req.user!.tenantId, req.body);
+      if (!customer) {
+        return res.status(404).json({ message: "Customer not found" });
+      }
+      res.json(customer);
+    } catch (error) {
+      console.error("Update customer error:", error);
+      res.status(500).json({ message: "Failed to update customer" });
+    }
+  });
+  
+  app.delete("/api/customers/:id", requireAuth, validateTenant, async (req, res) => {
+    try {
+      await storage.deleteCustomer(req.params.id, req.user!.tenantId);
+      res.json({ message: "Customer deleted successfully" });
+    } catch (error) {
+      console.error("Delete customer error:", error);
+      res.status(500).json({ message: "Failed to delete customer" });
+    }
+  });
+
+  // ==================== QUOTATION ROUTES ====================
+  
+  app.get("/api/quotations", requireAuth, validateTenant, async (req, res) => {
+    try {
+      const quotations = await storage.getQuotationsByTenant(req.user!.tenantId);
+      res.json(quotations);
+    } catch (error) {
+      console.error("Get quotations error:", error);
+      res.status(500).json({ message: "Failed to fetch quotations" });
+    }
+  });
+  
+  app.get("/api/quotations/:id", requireAuth, validateTenant, async (req, res) => {
+    try {
+      const quotation = await storage.getQuotationById(req.params.id, req.user!.tenantId);
+      if (!quotation) {
+        return res.status(404).json({ message: "Quotation not found" });
+      }
+      const items = await storage.getQuotationItems(quotation.id);
+      res.json({ ...quotation, items });
+    } catch (error) {
+      console.error("Get quotation error:", error);
+      res.status(500).json({ message: "Failed to fetch quotation" });
+    }
+  });
+  
+  app.post("/api/quotations", requireAuth, validateTenant, async (req, res) => {
+    try {
+      const quoteNumber = await storage.getNextQuoteNumber(req.user!.tenantId);
+      const validatedData = insertQuotationSchema.parse({
+        ...req.body,
+        tenantId: req.user!.tenantId,
+        createdBy: req.user!.userId,
+        quoteNumber,
+      });
+      
+      const quotation = await storage.createQuotation(validatedData);
+      
+      if (req.body.items && Array.isArray(req.body.items)) {
+        for (const item of req.body.items) {
+          await storage.createQuotationItem({
+            ...item,
+            quotationId: quotation.id,
+          });
+        }
+      }
+      
+      const items = await storage.getQuotationItems(quotation.id);
+      res.status(201).json({ ...quotation, items });
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ message: "Invalid data", errors: error.errors });
+      }
+      console.error("Create quotation error:", error);
+      res.status(500).json({ message: "Failed to create quotation" });
+    }
+  });
+  
+  app.patch("/api/quotations/:id", requireAuth, validateTenant, async (req, res) => {
+    try {
+      const quotation = await storage.updateQuotation(req.params.id, req.user!.tenantId, req.body);
+      if (!quotation) {
+        return res.status(404).json({ message: "Quotation not found" });
+      }
+      
+      if (req.body.items && Array.isArray(req.body.items)) {
+        await storage.deleteQuotationItems(quotation.id);
+        for (const item of req.body.items) {
+          await storage.createQuotationItem({
+            ...item,
+            quotationId: quotation.id,
+          });
+        }
+      }
+      
+      const items = await storage.getQuotationItems(quotation.id);
+      res.json({ ...quotation, items });
+    } catch (error) {
+      console.error("Update quotation error:", error);
+      res.status(500).json({ message: "Failed to update quotation" });
+    }
+  });
+  
+  app.delete("/api/quotations/:id", requireAuth, validateTenant, async (req, res) => {
+    try {
+      await storage.deleteQuotation(req.params.id, req.user!.tenantId);
+      res.json({ message: "Quotation deleted successfully" });
+    } catch (error) {
+      console.error("Delete quotation error:", error);
+      res.status(500).json({ message: "Failed to delete quotation" });
+    }
+  });
+
+  // ==================== INVOICE ROUTES ====================
+  
+  app.get("/api/invoices", requireAuth, validateTenant, async (req, res) => {
+    try {
+      const invoices = await storage.getInvoicesByTenant(req.user!.tenantId);
+      res.json(invoices);
+    } catch (error) {
+      console.error("Get invoices error:", error);
+      res.status(500).json({ message: "Failed to fetch invoices" });
+    }
+  });
+  
+  app.get("/api/invoices/:id", requireAuth, validateTenant, async (req, res) => {
+    try {
+      const invoice = await storage.getInvoiceById(req.params.id, req.user!.tenantId);
+      if (!invoice) {
+        return res.status(404).json({ message: "Invoice not found" });
+      }
+      const items = await storage.getInvoiceItems(invoice.id);
+      const payments = await storage.getPaymentsByInvoice(invoice.id);
+      res.json({ ...invoice, items, payments });
+    } catch (error) {
+      console.error("Get invoice error:", error);
+      res.status(500).json({ message: "Failed to fetch invoice" });
+    }
+  });
+  
+  app.post("/api/invoices", requireAuth, validateTenant, async (req, res) => {
+    try {
+      const invoiceNumber = await storage.getNextInvoiceNumber(req.user!.tenantId);
+      const validatedData = insertInvoiceSchema.parse({
+        ...req.body,
+        tenantId: req.user!.tenantId,
+        createdBy: req.user!.userId,
+        invoiceNumber,
+      });
+      
+      const invoice = await storage.createInvoice(validatedData);
+      
+      if (req.body.items && Array.isArray(req.body.items)) {
+        for (const item of req.body.items) {
+          await storage.createInvoiceItem({
+            ...item,
+            invoiceId: invoice.id,
+          });
+        }
+      }
+      
+      const items = await storage.getInvoiceItems(invoice.id);
+      res.status(201).json({ ...invoice, items });
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ message: "Invalid data", errors: error.errors });
+      }
+      console.error("Create invoice error:", error);
+      res.status(500).json({ message: "Failed to create invoice" });
+    }
+  });
+  
+  app.patch("/api/invoices/:id", requireAuth, validateTenant, async (req, res) => {
+    try {
+      const invoice = await storage.updateInvoice(req.params.id, req.user!.tenantId, req.body);
+      if (!invoice) {
+        return res.status(404).json({ message: "Invoice not found" });
+      }
+      
+      if (req.body.items && Array.isArray(req.body.items)) {
+        await storage.deleteInvoiceItems(invoice.id);
+        for (const item of req.body.items) {
+          await storage.createInvoiceItem({
+            ...item,
+            invoiceId: invoice.id,
+          });
+        }
+      }
+      
+      const items = await storage.getInvoiceItems(invoice.id);
+      res.json({ ...invoice, items });
+    } catch (error) {
+      console.error("Update invoice error:", error);
+      res.status(500).json({ message: "Failed to update invoice" });
+    }
+  });
+  
+  app.delete("/api/invoices/:id", requireAuth, validateTenant, async (req, res) => {
+    try {
+      await storage.deleteInvoice(req.params.id, req.user!.tenantId);
+      res.json({ message: "Invoice deleted successfully" });
+    } catch (error) {
+      console.error("Delete invoice error:", error);
+      res.status(500).json({ message: "Failed to delete invoice" });
+    }
+  });
+
+  // ==================== PAYMENT ROUTES ====================
+  
+  app.post("/api/invoices/:invoiceId/payments", requireAuth, validateTenant, async (req, res) => {
+    try {
+      const invoice = await storage.getInvoiceById(req.params.invoiceId, req.user!.tenantId);
+      if (!invoice) {
+        return res.status(404).json({ message: "Invoice not found" });
+      }
+      
+      const validatedData = insertPaymentSchema.parse({
+        ...req.body,
+        tenantId: req.user!.tenantId,
+        invoiceId: invoice.id,
+      });
+      
+      const payment = await storage.createPayment(validatedData);
+      
+      const payments = await storage.getPaymentsByInvoice(invoice.id);
+      const totalPaid = payments.reduce((sum, p) => sum + Number(p.amount), 0);
+      const balanceDue = Number(invoice.totalAmount) - totalPaid;
+      
+      let status = invoice.status;
+      if (balanceDue <= 0) {
+        status = "paid";
+      } else if (totalPaid > 0) {
+        status = "partial";
+      }
+      
+      await storage.updateInvoice(invoice.id, req.user!.tenantId, {
+        paidAmount: String(totalPaid),
+        balanceDue: String(balanceDue),
+        status,
+      } as any);
+      
+      res.status(201).json(payment);
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ message: "Invalid data", errors: error.errors });
+      }
+      console.error("Create payment error:", error);
+      res.status(500).json({ message: "Failed to create payment" });
+    }
+  });
+
+  // ==================== ACTIVITY ROUTES ====================
+  
+  app.get("/api/activities", requireAuth, validateTenant, async (req, res) => {
+    try {
+      const { customerId } = req.query;
+      let activities;
+      if (customerId && typeof customerId === 'string') {
+        activities = await storage.getActivitiesByCustomer(customerId, req.user!.tenantId);
+      } else {
+        activities = await storage.getActivitiesByTenant(req.user!.tenantId);
+      }
+      res.json(activities);
+    } catch (error) {
+      console.error("Get activities error:", error);
+      res.status(500).json({ message: "Failed to fetch activities" });
+    }
+  });
+  
+  app.get("/api/activities/:id", requireAuth, validateTenant, async (req, res) => {
+    try {
+      const activity = await storage.getActivityById(req.params.id, req.user!.tenantId);
+      if (!activity) {
+        return res.status(404).json({ message: "Activity not found" });
+      }
+      res.json(activity);
+    } catch (error) {
+      console.error("Get activity error:", error);
+      res.status(500).json({ message: "Failed to fetch activity" });
+    }
+  });
+  
+  app.post("/api/activities", requireAuth, validateTenant, async (req, res) => {
+    try {
+      const validatedData = insertActivitySchema.parse({
+        ...req.body,
+        tenantId: req.user!.tenantId,
+        userId: req.user!.userId,
+      });
+      
+      const activity = await storage.createActivity(validatedData);
+      res.status(201).json(activity);
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ message: "Invalid data", errors: error.errors });
+      }
+      console.error("Create activity error:", error);
+      res.status(500).json({ message: "Failed to create activity" });
+    }
+  });
+  
+  app.patch("/api/activities/:id", requireAuth, validateTenant, async (req, res) => {
+    try {
+      const activity = await storage.updateActivity(req.params.id, req.user!.tenantId, req.body);
+      if (!activity) {
+        return res.status(404).json({ message: "Activity not found" });
+      }
+      res.json(activity);
+    } catch (error) {
+      console.error("Update activity error:", error);
+      res.status(500).json({ message: "Failed to update activity" });
+    }
+  });
+  
+  app.delete("/api/activities/:id", requireAuth, validateTenant, async (req, res) => {
+    try {
+      await storage.deleteActivity(req.params.id, req.user!.tenantId);
+      res.json({ message: "Activity deleted successfully" });
+    } catch (error) {
+      console.error("Delete activity error:", error);
+      res.status(500).json({ message: "Failed to delete activity" });
+    }
+  });
+
+  // ==================== REPORTS ROUTES ====================
+  
+  app.get("/api/reports/dashboard", requireAuth, validateTenant, async (req, res) => {
+    try {
+      const stats = await storage.getDashboardStats(req.user!.tenantId);
+      res.json(stats);
+    } catch (error) {
+      console.error("Get dashboard stats error:", error);
+      res.status(500).json({ message: "Failed to fetch dashboard stats" });
+    }
+  });
+  
+  app.get("/api/reports/sales", requireAuth, validateTenant, async (req, res) => {
+    try {
+      const deals = await storage.getSalesReport(req.user!.tenantId);
+      res.json(deals);
+    } catch (error) {
+      console.error("Get sales report error:", error);
+      res.status(500).json({ message: "Failed to fetch sales report" });
+    }
+  });
+
   return httpServer;
 }
 
-// Initialize default CRM modules
 async function initializeModules() {
   const defaultModules = [
-    { name: "contacts", displayName: "Contacts", description: "Manage your contacts and leads", icon: "users", isCore: true },
+    { name: "contacts", displayName: "Contacts", description: "Manage your contacts", icon: "users", isCore: true },
+    { name: "customers", displayName: "Customers", description: "Manage customers and accounts", icon: "building", isCore: true },
     { name: "deals", displayName: "Deals", description: "Track sales opportunities", icon: "briefcase", isCore: true },
     { name: "tasks", displayName: "Tasks", description: "Manage tasks and activities", icon: "check-square", isCore: true },
+    { name: "products", displayName: "Products", description: "Product and service catalog", icon: "package", isCore: true },
+    { name: "quotations", displayName: "Quotations", description: "Create and manage quotes", icon: "file-text", isCore: true },
+    { name: "invoices", displayName: "Invoices", description: "Billing and invoicing", icon: "receipt", isCore: true },
+    { name: "activities", displayName: "Activities", description: "Track calls, meetings, and notes", icon: "activity", isCore: true },
+    { name: "reports", displayName: "Reports", description: "Analytics and reporting", icon: "bar-chart", isCore: true },
   ];
   
   for (const module of defaultModules) {

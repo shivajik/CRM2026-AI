@@ -49,7 +49,6 @@ export async function apiRequest<T = any>(
     headers,
   });
 
-  // If unauthorized, try to refresh token
   if (response.status === 401 && token) {
     const newToken = await refreshAccessToken();
     if (newToken) {
@@ -121,6 +120,58 @@ export const tasksApi = {
   create: (data: any) => apiRequest("/tasks", { method: "POST", body: JSON.stringify(data) }),
   update: (id: string, data: any) => apiRequest(`/tasks/${id}`, { method: "PATCH", body: JSON.stringify(data) }),
   delete: (id: string) => apiRequest(`/tasks/${id}`, { method: "DELETE" }),
+};
+
+// Products API
+export const productsApi = {
+  getAll: () => apiRequest("/products"),
+  getById: (id: string) => apiRequest(`/products/${id}`),
+  create: (data: any) => apiRequest("/products", { method: "POST", body: JSON.stringify(data) }),
+  update: (id: string, data: any) => apiRequest(`/products/${id}`, { method: "PATCH", body: JSON.stringify(data) }),
+  delete: (id: string) => apiRequest(`/products/${id}`, { method: "DELETE" }),
+};
+
+// Customers API
+export const customersApi = {
+  getAll: () => apiRequest("/customers"),
+  getById: (id: string) => apiRequest(`/customers/${id}`),
+  create: (data: any) => apiRequest("/customers", { method: "POST", body: JSON.stringify(data) }),
+  update: (id: string, data: any) => apiRequest(`/customers/${id}`, { method: "PATCH", body: JSON.stringify(data) }),
+  delete: (id: string) => apiRequest(`/customers/${id}`, { method: "DELETE" }),
+};
+
+// Quotations API
+export const quotationsApi = {
+  getAll: () => apiRequest("/quotations"),
+  getById: (id: string) => apiRequest(`/quotations/${id}`),
+  create: (data: any) => apiRequest("/quotations", { method: "POST", body: JSON.stringify(data) }),
+  update: (id: string, data: any) => apiRequest(`/quotations/${id}`, { method: "PATCH", body: JSON.stringify(data) }),
+  delete: (id: string) => apiRequest(`/quotations/${id}`, { method: "DELETE" }),
+};
+
+// Invoices API
+export const invoicesApi = {
+  getAll: () => apiRequest("/invoices"),
+  getById: (id: string) => apiRequest(`/invoices/${id}`),
+  create: (data: any) => apiRequest("/invoices", { method: "POST", body: JSON.stringify(data) }),
+  update: (id: string, data: any) => apiRequest(`/invoices/${id}`, { method: "PATCH", body: JSON.stringify(data) }),
+  delete: (id: string) => apiRequest(`/invoices/${id}`, { method: "DELETE" }),
+  addPayment: (invoiceId: string, data: any) => apiRequest(`/invoices/${invoiceId}/payments`, { method: "POST", body: JSON.stringify(data) }),
+};
+
+// Activities API
+export const activitiesApi = {
+  getAll: (customerId?: string) => apiRequest(`/activities${customerId ? `?customerId=${customerId}` : ''}`),
+  getById: (id: string) => apiRequest(`/activities/${id}`),
+  create: (data: any) => apiRequest("/activities", { method: "POST", body: JSON.stringify(data) }),
+  update: (id: string, data: any) => apiRequest(`/activities/${id}`, { method: "PATCH", body: JSON.stringify(data) }),
+  delete: (id: string) => apiRequest(`/activities/${id}`, { method: "DELETE" }),
+};
+
+// Reports API
+export const reportsApi = {
+  getDashboardStats: () => apiRequest("/reports/dashboard"),
+  getSalesReport: () => apiRequest("/reports/sales"),
 };
 
 // Tenant API

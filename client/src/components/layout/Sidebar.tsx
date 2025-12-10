@@ -1,15 +1,24 @@
 import { Link, useLocation } from "wouter";
 import { cn } from "@/lib/utils";
-import { LayoutDashboard, Users, Briefcase, CheckSquare, Settings, LogOut } from "lucide-react";
+import { 
+  LayoutDashboard, Users, Briefcase, CheckSquare, Settings, LogOut,
+  Package, Building2, FileText, Receipt, Activity, BarChart3 
+} from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { getUser, clearAuth } from "@/lib/auth";
 import { authApi } from "@/lib/api";
 
 const sidebarItems = [
   { icon: LayoutDashboard, label: "Dashboard", href: "/" },
+  { icon: Building2, label: "Customers", href: "/customers" },
   { icon: Users, label: "Contacts", href: "/contacts" },
   { icon: Briefcase, label: "Deals", href: "/deals" },
+  { icon: Package, label: "Products", href: "/products" },
+  { icon: FileText, label: "Quotations", href: "/quotations" },
+  { icon: Receipt, label: "Invoices", href: "/invoices" },
   { icon: CheckSquare, label: "Tasks", href: "/tasks" },
+  { icon: Activity, label: "Activities", href: "/activities" },
+  { icon: BarChart3, label: "Reports", href: "/reports" },
   { icon: Settings, label: "Settings", href: "/settings" },
 ];
 
@@ -41,7 +50,7 @@ export function Sidebar() {
         </div>
       </div>
 
-      <nav className="flex-1 px-4 py-4 space-y-1">
+      <nav className="flex-1 px-4 py-4 space-y-1 overflow-y-auto">
         {sidebarItems.map((item) => {
           const isActive = location === item.href;
           return (

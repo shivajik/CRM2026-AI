@@ -1,5 +1,5 @@
 import { db } from "./db";
-import { eq, and, sql } from "drizzle-orm";
+import { eq, and, desc, gte, lte, sql } from "drizzle-orm";
 import * as schema from "@shared/schema";
 import type {
   InsertTenant, Tenant,
@@ -11,6 +11,14 @@ import type {
   InsertContact, Contact,
   InsertDeal, Deal,
   InsertTask, Task,
+  InsertProduct, Product,
+  InsertCustomer, Customer,
+  InsertQuotation, Quotation,
+  InsertQuotationItem, QuotationItem,
+  InsertInvoice, Invoice,
+  InsertInvoiceItem, InvoiceItem,
+  InsertPayment, Payment,
+  InsertActivity, Activity,
 } from "@shared/schema";
 
 export interface IStorage {
@@ -63,6 +71,75 @@ export interface IStorage {
   getTaskById(id: string, tenantId: string): Promise<Task | undefined>;
   updateTask(id: string, tenantId: string, updates: Partial<InsertTask>): Promise<Task | undefined>;
   deleteTask(id: string, tenantId: string): Promise<void>;
+
+  // Product operations
+  createProduct(product: InsertProduct): Promise<Product>;
+  getProductsByTenant(tenantId: string): Promise<Product[]>;
+  getProductById(id: string, tenantId: string): Promise<Product | undefined>;
+  updateProduct(id: string, tenantId: string, updates: Partial<InsertProduct>): Promise<Product | undefined>;
+  deleteProduct(id: string, tenantId: string): Promise<void>;
+
+  // Customer operations
+  createCustomer(customer: InsertCustomer): Promise<Customer>;
+  getCustomersByTenant(tenantId: string): Promise<Customer[]>;
+  getCustomerById(id: string, tenantId: string): Promise<Customer | undefined>;
+  updateCustomer(id: string, tenantId: string, updates: Partial<InsertCustomer>): Promise<Customer | undefined>;
+  deleteCustomer(id: string, tenantId: string): Promise<void>;
+
+  // Quotation operations
+  createQuotation(quotation: InsertQuotation): Promise<Quotation>;
+  getQuotationsByTenant(tenantId: string): Promise<Quotation[]>;
+  getQuotationById(id: string, tenantId: string): Promise<Quotation | undefined>;
+  updateQuotation(id: string, tenantId: string, updates: Partial<InsertQuotation>): Promise<Quotation | undefined>;
+  deleteQuotation(id: string, tenantId: string): Promise<void>;
+  getNextQuoteNumber(tenantId: string): Promise<string>;
+
+  // Quotation item operations
+  createQuotationItem(item: InsertQuotationItem): Promise<QuotationItem>;
+  getQuotationItems(quotationId: string): Promise<QuotationItem[]>;
+  updateQuotationItem(id: string, updates: Partial<InsertQuotationItem>): Promise<QuotationItem | undefined>;
+  deleteQuotationItem(id: string): Promise<void>;
+  deleteQuotationItems(quotationId: string): Promise<void>;
+
+  // Invoice operations
+  createInvoice(invoice: InsertInvoice): Promise<Invoice>;
+  getInvoicesByTenant(tenantId: string): Promise<Invoice[]>;
+  getInvoiceById(id: string, tenantId: string): Promise<Invoice | undefined>;
+  updateInvoice(id: string, tenantId: string, updates: Partial<InsertInvoice>): Promise<Invoice | undefined>;
+  deleteInvoice(id: string, tenantId: string): Promise<void>;
+  getNextInvoiceNumber(tenantId: string): Promise<string>;
+
+  // Invoice item operations
+  createInvoiceItem(item: InsertInvoiceItem): Promise<InvoiceItem>;
+  getInvoiceItems(invoiceId: string): Promise<InvoiceItem[]>;
+  updateInvoiceItem(id: string, updates: Partial<InsertInvoiceItem>): Promise<InvoiceItem | undefined>;
+  deleteInvoiceItem(id: string): Promise<void>;
+  deleteInvoiceItems(invoiceId: string): Promise<void>;
+
+  // Payment operations
+  createPayment(payment: InsertPayment): Promise<Payment>;
+  getPaymentsByInvoice(invoiceId: string): Promise<Payment[]>;
+  getPaymentsByTenant(tenantId: string): Promise<Payment[]>;
+  deletePayment(id: string): Promise<void>;
+
+  // Activity operations
+  createActivity(activity: InsertActivity): Promise<Activity>;
+  getActivitiesByTenant(tenantId: string): Promise<Activity[]>;
+  getActivitiesByCustomer(customerId: string, tenantId: string): Promise<Activity[]>;
+  getActivityById(id: string, tenantId: string): Promise<Activity | undefined>;
+  updateActivity(id: string, tenantId: string, updates: Partial<InsertActivity>): Promise<Activity | undefined>;
+  deleteActivity(id: string, tenantId: string): Promise<void>;
+
+  // Reports
+  getDashboardStats(tenantId: string): Promise<{
+    totalRevenue: number;
+    activeDeals: number;
+    totalCustomers: number;
+    pendingTasks: number;
+    pendingInvoices: number;
+    overdueInvoices: number;
+  }>;
+  getSalesReport(tenantId: string, startDate?: Date, endDate?: Date): Promise<any[]>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -248,6 +325,278 @@ export class DatabaseStorage implements IStorage {
   async deleteTask(id: string, tenantId: string): Promise<void> {
     await db.delete(schema.tasks)
       .where(and(eq(schema.tasks.id, id), eq(schema.tasks.tenantId, tenantId)));
+  }
+
+  // Product operations
+  async createProduct(insertProduct: InsertProduct): Promise<Product> {
+    const [product] = await db.insert(schema.products).values(insertProduct).returning();
+    return product;
+  }
+
+  async getProductsByTenant(tenantId: string): Promise<Product[]> {
+    return db.select().from(schema.products).where(eq(schema.products.tenantId, tenantId)).orderBy(desc(schema.products.createdAt));
+  }
+
+  async getProductById(id: string, tenantId: string): Promise<Product | undefined> {
+    const [product] = await db.select().from(schema.products)
+      .where(and(eq(schema.products.id, id), eq(schema.products.tenantId, tenantId)));
+    return product;
+  }
+
+  async updateProduct(id: string, tenantId: string, updates: Partial<InsertProduct>): Promise<Product | undefined> {
+    const [product] = await db.update(schema.products)
+      .set({ ...updates, updatedAt: new Date() })
+      .where(and(eq(schema.products.id, id), eq(schema.products.tenantId, tenantId)))
+      .returning();
+    return product;
+  }
+
+  async deleteProduct(id: string, tenantId: string): Promise<void> {
+    await db.delete(schema.products)
+      .where(and(eq(schema.products.id, id), eq(schema.products.tenantId, tenantId)));
+  }
+
+  // Customer operations
+  async createCustomer(insertCustomer: InsertCustomer): Promise<Customer> {
+    const [customer] = await db.insert(schema.customers).values(insertCustomer).returning();
+    return customer;
+  }
+
+  async getCustomersByTenant(tenantId: string): Promise<Customer[]> {
+    return db.select().from(schema.customers).where(eq(schema.customers.tenantId, tenantId)).orderBy(desc(schema.customers.createdAt));
+  }
+
+  async getCustomerById(id: string, tenantId: string): Promise<Customer | undefined> {
+    const [customer] = await db.select().from(schema.customers)
+      .where(and(eq(schema.customers.id, id), eq(schema.customers.tenantId, tenantId)));
+    return customer;
+  }
+
+  async updateCustomer(id: string, tenantId: string, updates: Partial<InsertCustomer>): Promise<Customer | undefined> {
+    const [customer] = await db.update(schema.customers)
+      .set({ ...updates, updatedAt: new Date() })
+      .where(and(eq(schema.customers.id, id), eq(schema.customers.tenantId, tenantId)))
+      .returning();
+    return customer;
+  }
+
+  async deleteCustomer(id: string, tenantId: string): Promise<void> {
+    await db.delete(schema.customers)
+      .where(and(eq(schema.customers.id, id), eq(schema.customers.tenantId, tenantId)));
+  }
+
+  // Quotation operations
+  async createQuotation(insertQuotation: InsertQuotation): Promise<Quotation> {
+    const [quotation] = await db.insert(schema.quotations).values(insertQuotation).returning();
+    return quotation;
+  }
+
+  async getQuotationsByTenant(tenantId: string): Promise<Quotation[]> {
+    return db.select().from(schema.quotations).where(eq(schema.quotations.tenantId, tenantId)).orderBy(desc(schema.quotations.createdAt));
+  }
+
+  async getQuotationById(id: string, tenantId: string): Promise<Quotation | undefined> {
+    const [quotation] = await db.select().from(schema.quotations)
+      .where(and(eq(schema.quotations.id, id), eq(schema.quotations.tenantId, tenantId)));
+    return quotation;
+  }
+
+  async updateQuotation(id: string, tenantId: string, updates: Partial<InsertQuotation>): Promise<Quotation | undefined> {
+    const [quotation] = await db.update(schema.quotations)
+      .set({ ...updates, updatedAt: new Date() })
+      .where(and(eq(schema.quotations.id, id), eq(schema.quotations.tenantId, tenantId)))
+      .returning();
+    return quotation;
+  }
+
+  async deleteQuotation(id: string, tenantId: string): Promise<void> {
+    await db.delete(schema.quotations)
+      .where(and(eq(schema.quotations.id, id), eq(schema.quotations.tenantId, tenantId)));
+  }
+
+  async getNextQuoteNumber(tenantId: string): Promise<string> {
+    const result = await db.select({ count: sql<number>`count(*)` })
+      .from(schema.quotations)
+      .where(eq(schema.quotations.tenantId, tenantId));
+    const count = Number(result[0]?.count || 0) + 1;
+    return `QT-${String(count).padStart(5, '0')}`;
+  }
+
+  // Quotation item operations
+  async createQuotationItem(item: InsertQuotationItem): Promise<QuotationItem> {
+    const [quotationItem] = await db.insert(schema.quotationItems).values(item).returning();
+    return quotationItem;
+  }
+
+  async getQuotationItems(quotationId: string): Promise<QuotationItem[]> {
+    return db.select().from(schema.quotationItems).where(eq(schema.quotationItems.quotationId, quotationId));
+  }
+
+  async updateQuotationItem(id: string, updates: Partial<InsertQuotationItem>): Promise<QuotationItem | undefined> {
+    const [item] = await db.update(schema.quotationItems)
+      .set(updates)
+      .where(eq(schema.quotationItems.id, id))
+      .returning();
+    return item;
+  }
+
+  async deleteQuotationItem(id: string): Promise<void> {
+    await db.delete(schema.quotationItems).where(eq(schema.quotationItems.id, id));
+  }
+
+  async deleteQuotationItems(quotationId: string): Promise<void> {
+    await db.delete(schema.quotationItems).where(eq(schema.quotationItems.quotationId, quotationId));
+  }
+
+  // Invoice operations
+  async createInvoice(insertInvoice: InsertInvoice): Promise<Invoice> {
+    const [invoice] = await db.insert(schema.invoices).values(insertInvoice as any).returning();
+    return invoice;
+  }
+
+  async getInvoicesByTenant(tenantId: string): Promise<Invoice[]> {
+    return db.select().from(schema.invoices).where(eq(schema.invoices.tenantId, tenantId)).orderBy(desc(schema.invoices.createdAt));
+  }
+
+  async getInvoiceById(id: string, tenantId: string): Promise<Invoice | undefined> {
+    const [invoice] = await db.select().from(schema.invoices)
+      .where(and(eq(schema.invoices.id, id), eq(schema.invoices.tenantId, tenantId)));
+    return invoice;
+  }
+
+  async updateInvoice(id: string, tenantId: string, updates: Partial<InsertInvoice>): Promise<Invoice | undefined> {
+    const [invoice] = await db.update(schema.invoices)
+      .set({ ...updates, updatedAt: new Date() } as any)
+      .where(and(eq(schema.invoices.id, id), eq(schema.invoices.tenantId, tenantId)))
+      .returning();
+    return invoice;
+  }
+
+  async deleteInvoice(id: string, tenantId: string): Promise<void> {
+    await db.delete(schema.invoices)
+      .where(and(eq(schema.invoices.id, id), eq(schema.invoices.tenantId, tenantId)));
+  }
+
+  async getNextInvoiceNumber(tenantId: string): Promise<string> {
+    const result = await db.select({ count: sql<number>`count(*)` })
+      .from(schema.invoices)
+      .where(eq(schema.invoices.tenantId, tenantId));
+    const count = Number(result[0]?.count || 0) + 1;
+    return `INV-${String(count).padStart(5, '0')}`;
+  }
+
+  // Invoice item operations
+  async createInvoiceItem(item: InsertInvoiceItem): Promise<InvoiceItem> {
+    const [invoiceItem] = await db.insert(schema.invoiceItems).values(item).returning();
+    return invoiceItem;
+  }
+
+  async getInvoiceItems(invoiceId: string): Promise<InvoiceItem[]> {
+    return db.select().from(schema.invoiceItems).where(eq(schema.invoiceItems.invoiceId, invoiceId));
+  }
+
+  async updateInvoiceItem(id: string, updates: Partial<InsertInvoiceItem>): Promise<InvoiceItem | undefined> {
+    const [item] = await db.update(schema.invoiceItems)
+      .set(updates)
+      .where(eq(schema.invoiceItems.id, id))
+      .returning();
+    return item;
+  }
+
+  async deleteInvoiceItem(id: string): Promise<void> {
+    await db.delete(schema.invoiceItems).where(eq(schema.invoiceItems.id, id));
+  }
+
+  async deleteInvoiceItems(invoiceId: string): Promise<void> {
+    await db.delete(schema.invoiceItems).where(eq(schema.invoiceItems.invoiceId, invoiceId));
+  }
+
+  // Payment operations
+  async createPayment(insertPayment: InsertPayment): Promise<Payment> {
+    const [payment] = await db.insert(schema.payments).values(insertPayment as any).returning();
+    return payment;
+  }
+
+  async getPaymentsByInvoice(invoiceId: string): Promise<Payment[]> {
+    return db.select().from(schema.payments).where(eq(schema.payments.invoiceId, invoiceId));
+  }
+
+  async getPaymentsByTenant(tenantId: string): Promise<Payment[]> {
+    return db.select().from(schema.payments).where(eq(schema.payments.tenantId, tenantId)).orderBy(desc(schema.payments.createdAt));
+  }
+
+  async deletePayment(id: string): Promise<void> {
+    await db.delete(schema.payments).where(eq(schema.payments.id, id));
+  }
+
+  // Activity operations
+  async createActivity(insertActivity: InsertActivity): Promise<Activity> {
+    const [activity] = await db.insert(schema.activities).values(insertActivity).returning();
+    return activity;
+  }
+
+  async getActivitiesByTenant(tenantId: string): Promise<Activity[]> {
+    return db.select().from(schema.activities).where(eq(schema.activities.tenantId, tenantId)).orderBy(desc(schema.activities.createdAt));
+  }
+
+  async getActivitiesByCustomer(customerId: string, tenantId: string): Promise<Activity[]> {
+    return db.select().from(schema.activities)
+      .where(and(eq(schema.activities.customerId, customerId), eq(schema.activities.tenantId, tenantId)))
+      .orderBy(desc(schema.activities.createdAt));
+  }
+
+  async getActivityById(id: string, tenantId: string): Promise<Activity | undefined> {
+    const [activity] = await db.select().from(schema.activities)
+      .where(and(eq(schema.activities.id, id), eq(schema.activities.tenantId, tenantId)));
+    return activity;
+  }
+
+  async updateActivity(id: string, tenantId: string, updates: Partial<InsertActivity>): Promise<Activity | undefined> {
+    const [activity] = await db.update(schema.activities)
+      .set({ ...updates, updatedAt: new Date() })
+      .where(and(eq(schema.activities.id, id), eq(schema.activities.tenantId, tenantId)))
+      .returning();
+    return activity;
+  }
+
+  async deleteActivity(id: string, tenantId: string): Promise<void> {
+    await db.delete(schema.activities)
+      .where(and(eq(schema.activities.id, id), eq(schema.activities.tenantId, tenantId)));
+  }
+
+  // Reports
+  async getDashboardStats(tenantId: string): Promise<{
+    totalRevenue: number;
+    activeDeals: number;
+    totalCustomers: number;
+    pendingTasks: number;
+    pendingInvoices: number;
+    overdueInvoices: number;
+  }> {
+    const deals = await db.select().from(schema.deals).where(eq(schema.deals.tenantId, tenantId));
+    const customers = await db.select().from(schema.customers).where(eq(schema.customers.tenantId, tenantId));
+    const tasks = await db.select().from(schema.tasks).where(eq(schema.tasks.tenantId, tenantId));
+    const invoices = await db.select().from(schema.invoices).where(eq(schema.invoices.tenantId, tenantId));
+
+    const totalRevenue = deals.reduce((sum, d) => sum + Number(d.value), 0);
+    const activeDeals = deals.filter(d => !['won', 'lost'].includes(d.stage)).length;
+    const pendingTasks = tasks.filter(t => t.status !== 'done').length;
+    const pendingInvoices = invoices.filter(i => ['draft', 'sent'].includes(i.status)).length;
+    const overdueInvoices = invoices.filter(i => i.status === 'overdue').length;
+
+    return {
+      totalRevenue,
+      activeDeals,
+      totalCustomers: customers.length,
+      pendingTasks,
+      pendingInvoices,
+      overdueInvoices,
+    };
+  }
+
+  async getSalesReport(tenantId: string, startDate?: Date, endDate?: Date): Promise<any[]> {
+    let query = db.select().from(schema.deals).where(eq(schema.deals.tenantId, tenantId));
+    return query.orderBy(desc(schema.deals.createdAt));
   }
 }
 
