@@ -62,7 +62,7 @@ export default function Login() {
         description: `Good to see you again, ${response.user.firstName}!`,
       });
       
-      setLocation("/");
+      setLocation("/app");
     } catch (error: any) {
       toast({
         title: "Login failed",

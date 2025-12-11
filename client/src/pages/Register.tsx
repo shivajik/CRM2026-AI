@@ -99,7 +99,7 @@ export default function Register() {
         description: `Welcome to Nexus CRM, ${response.user.firstName}! Let's get started.`,
       });
       
-      setLocation("/");
+      setLocation("/app");
     } catch (error: any) {
       toast({
         title: "Registration failed",
