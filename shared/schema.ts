@@ -53,6 +53,10 @@ export const users = pgTable("users", {
   userType: text("user_type").notNull().default("team_member"), // saas_admin, agency_admin, team_member, customer
   isAdmin: boolean("is_admin").default(false).notNull(),
   isActive: boolean("is_active").default(true).notNull(),
+  employeeCode: text("employee_code"),
+  address: text("address"),
+  designation: text("designation"),
+  department: text("department"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });

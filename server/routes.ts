@@ -263,7 +263,7 @@ export async function registerRoutes(
   app.post("/api/team/members", requireAuth, validateTenant, requireAgencyAdmin, async (req, res) => {
     try {
       
-      const { email, password, firstName, lastName, roleId, permissions } = req.body;
+      const { email, password, firstName, lastName, roleId, permissions, phone, employeeCode, address, designation, department } = req.body;
       
       if (!email || !password || !firstName || !lastName) {
         return res.status(400).json({ message: "Email, password, first name and last name are required" });
@@ -293,6 +293,11 @@ export async function registerRoutes(
         passwordHash,
         firstName,
         lastName,
+        phone: phone || null,
+        employeeCode: employeeCode || null,
+        address: address || null,
+        designation: designation || null,
+        department: department || null,
         roleId: userRoleId || null,
         isAdmin: false,
         isActive: true,
@@ -328,13 +333,18 @@ export async function registerRoutes(
         return res.status(403).json({ message: "Only admins can update team members" });
       }
       
-      const { firstName, lastName, email, roleId, permissions, isActive } = req.body;
+      const { firstName, lastName, email, roleId, permissions, isActive, phone, employeeCode, address, designation, department } = req.body;
       
       const updates: any = {};
       if (firstName) updates.firstName = firstName;
       if (lastName) updates.lastName = lastName;
       if (email) updates.email = email;
       if (typeof isActive === 'boolean') updates.isActive = isActive;
+      if (phone !== undefined) updates.phone = phone;
+      if (employeeCode !== undefined) updates.employeeCode = employeeCode;
+      if (address !== undefined) updates.address = address;
+      if (designation !== undefined) updates.designation = designation;
+      if (department !== undefined) updates.department = department;
       
       // Update role permissions if provided
       if (permissions && permissions.length > 0) {
