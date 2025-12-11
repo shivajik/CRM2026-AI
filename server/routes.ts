@@ -1669,6 +1669,169 @@ export async function registerRoutes(
     }
   });
 
+  // ==================== PACKAGES MANAGEMENT ROUTES (SaaS Admin) ====================
+  
+  app.get("/api/saas-admin/packages", requireAuth, requireSaasAdmin, async (req, res) => {
+    try {
+      const packages = await storage.getAllPackagesWithModules();
+      res.json(packages);
+    } catch (error) {
+      console.error("Get packages error:", error);
+      res.status(500).json({ message: "Failed to fetch packages" });
+    }
+  });
+
+  app.get("/api/saas-admin/packages/:id", requireAuth, requireSaasAdmin, async (req, res) => {
+    try {
+      const pkg = await storage.getPackageWithModules(req.params.id);
+      if (!pkg) {
+        return res.status(404).json({ message: "Package not found" });
+      }
+      res.json(pkg);
+    } catch (error) {
+      console.error("Get package error:", error);
+      res.status(500).json({ message: "Failed to fetch package" });
+    }
+  });
+
+  app.post("/api/saas-admin/packages", requireAuth, requireSaasAdmin, async (req, res) => {
+    try {
+      const { name, displayName, description, price, billingCycle, isActive, isPopular, sortOrder, features, moduleIds } = req.body;
+      
+      if (!name || !displayName) {
+        return res.status(400).json({ message: "Name and display name are required" });
+      }
+
+      const pkg = await storage.createPackage({
+        name,
+        displayName,
+        description,
+        price: price || "0",
+        billingCycle: billingCycle || "monthly",
+        isActive: isActive !== undefined ? isActive : true,
+        isPopular: isPopular || false,
+        sortOrder: sortOrder || 0,
+        features: features || [],
+      });
+
+      if (moduleIds && moduleIds.length > 0) {
+        await storage.setPackageModules(pkg.id, moduleIds);
+      }
+
+      const fullPackage = await storage.getPackageWithModules(pkg.id);
+
+      await storage.createPlatformActivityLog({
+        actorId: req.user!.userId,
+        actorType: 'user',
+        targetType: 'package',
+        targetId: pkg.id,
+        action: 'create_package',
+        description: `Created package: ${pkg.displayName}`,
+      });
+
+      res.status(201).json(fullPackage);
+    } catch (error) {
+      console.error("Create package error:", error);
+      res.status(500).json({ message: "Failed to create package" });
+    }
+  });
+
+  app.patch("/api/saas-admin/packages/:id", requireAuth, requireSaasAdmin, async (req, res) => {
+    try {
+      const { name, displayName, description, price, billingCycle, isActive, isPopular, sortOrder, features, moduleIds } = req.body;
+
+      const existingPkg = await storage.getPackageById(req.params.id);
+      if (!existingPkg) {
+        return res.status(404).json({ message: "Package not found" });
+      }
+
+      const updates: any = {};
+      if (name !== undefined) updates.name = name;
+      if (displayName !== undefined) updates.displayName = displayName;
+      if (description !== undefined) updates.description = description;
+      if (price !== undefined) updates.price = price;
+      if (billingCycle !== undefined) updates.billingCycle = billingCycle;
+      if (isActive !== undefined) updates.isActive = isActive;
+      if (isPopular !== undefined) updates.isPopular = isPopular;
+      if (sortOrder !== undefined) updates.sortOrder = sortOrder;
+      if (features !== undefined) updates.features = features;
+
+      const pkg = await storage.updatePackage(req.params.id, updates);
+
+      if (moduleIds !== undefined) {
+        await storage.setPackageModules(req.params.id, moduleIds);
+      }
+
+      const fullPackage = await storage.getPackageWithModules(req.params.id);
+
+      await storage.createPlatformActivityLog({
+        actorId: req.user!.userId,
+        actorType: 'user',
+        targetType: 'package',
+        targetId: req.params.id,
+        action: 'update_package',
+        description: `Updated package: ${pkg?.displayName}`,
+      });
+
+      res.json(fullPackage);
+    } catch (error) {
+      console.error("Update package error:", error);
+      res.status(500).json({ message: "Failed to update package" });
+    }
+  });
+
+  app.delete("/api/saas-admin/packages/:id", requireAuth, requireSaasAdmin, async (req, res) => {
+    try {
+      const pkg = await storage.getPackageById(req.params.id);
+      if (!pkg) {
+        return res.status(404).json({ message: "Package not found" });
+      }
+
+      await storage.deletePackage(req.params.id);
+
+      await storage.createPlatformActivityLog({
+        actorId: req.user!.userId,
+        actorType: 'user',
+        targetType: 'package',
+        targetId: req.params.id,
+        action: 'delete_package',
+        description: `Deleted package: ${pkg.displayName}`,
+      });
+
+      res.json({ message: "Package deleted successfully" });
+    } catch (error) {
+      console.error("Delete package error:", error);
+      res.status(500).json({ message: "Failed to delete package" });
+    }
+  });
+
+  app.get("/api/saas-admin/modules", requireAuth, requireSaasAdmin, async (req, res) => {
+    try {
+      const modules = await storage.getAllModules();
+      res.json(modules);
+    } catch (error) {
+      console.error("Get modules error:", error);
+      res.status(500).json({ message: "Failed to fetch modules" });
+    }
+  });
+
+  // Public packages endpoint (for frontend pricing page)
+  app.get("/api/packages", async (req, res) => {
+    try {
+      const packages = await storage.getActivePackages();
+      const packagesWithModules = await Promise.all(
+        packages.map(async (pkg) => {
+          const pkgWithModules = await storage.getPackageWithModules(pkg.id);
+          return pkgWithModules;
+        })
+      );
+      res.json(packagesWithModules.filter(p => p !== undefined));
+    } catch (error) {
+      console.error("Get public packages error:", error);
+      res.status(500).json({ message: "Failed to fetch packages" });
+    }
+  });
+
   // ==================== CUSTOMER PORTAL ROUTES ====================
   
   app.get("/api/customer-portal/quotations", requireAuth, async (req, res) => {
