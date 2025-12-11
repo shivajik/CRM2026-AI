@@ -21,6 +21,7 @@ import type {
   InsertActivity, Activity,
   InsertPlatformSetting, PlatformSetting,
   InsertPlatformActivityLog, PlatformActivityLog,
+  InsertCompanyProfile, CompanyProfile,
 } from "@shared/schema";
 
 export interface IStorage {
@@ -228,6 +229,10 @@ export interface IStorage {
 
   // Update super admin profile
   updateSuperAdminProfile(userId: string, updates: { firstName?: string; lastName?: string; email?: string }): Promise<User | undefined>;
+
+  // Company Profile operations
+  getCompanyProfile(tenantId: string): Promise<CompanyProfile | undefined>;
+  upsertCompanyProfile(tenantId: string, data: Partial<InsertCompanyProfile>): Promise<CompanyProfile>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -1145,6 +1150,35 @@ export class DatabaseStorage implements IStorage {
       .where(eq(schema.users.id, userId))
       .returning();
     return user;
+  }
+
+  // Company Profile operations
+  async getCompanyProfile(tenantId: string): Promise<CompanyProfile | undefined> {
+    const [profile] = await db.select().from(schema.companyProfiles)
+      .where(eq(schema.companyProfiles.tenantId, tenantId));
+    return profile;
+  }
+
+  async upsertCompanyProfile(tenantId: string, data: Partial<InsertCompanyProfile>): Promise<CompanyProfile> {
+    const existingProfile = await this.getCompanyProfile(tenantId);
+    
+    if (existingProfile) {
+      const [updated] = await db.update(schema.companyProfiles)
+        .set({ ...data, updatedAt: new Date() })
+        .where(eq(schema.companyProfiles.tenantId, tenantId))
+        .returning();
+      return updated;
+    } else {
+      const tenant = await this.getTenant(tenantId);
+      const [created] = await db.insert(schema.companyProfiles)
+        .values({
+          tenantId,
+          companyName: data.companyName || tenant?.name || 'My Company',
+          ...data,
+        })
+        .returning();
+      return created;
+    }
   }
 }
 
