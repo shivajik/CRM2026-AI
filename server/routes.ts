@@ -12,6 +12,8 @@ export async function registerRoutes(
 ): Promise<Server> {
   
   await initializeModules();
+  await initializeDefaultPackages();
+  await initializeSuperAdmin();
   
   // ==================== AUTH ROUTES ====================
   
@@ -1950,4 +1952,125 @@ async function initializeModules() {
       await storage.createModule(module);
     }
   }
+}
+
+async function initializeDefaultPackages() {
+  const existingPackages = await storage.getAllPackages();
+  if (existingPackages.length > 0) {
+    return;
+  }
+
+  const modules = await storage.getAllModules();
+  const moduleMap = new Map(modules.map(m => [m.name, m.id]));
+
+  const starterModules = ['contacts', 'deals', 'tasks'];
+  const professionalModules = ['contacts', 'customers', 'deals', 'tasks', 'products', 'quotations', 'activities'];
+  const enterpriseModules = ['contacts', 'customers', 'deals', 'tasks', 'products', 'quotations', 'invoices', 'activities', 'reports'];
+
+  const defaultPackages = [
+    {
+      name: 'starter',
+      displayName: 'Starter',
+      description: 'Perfect for small teams just getting started with CRM',
+      price: '29.00',
+      billingCycle: 'monthly',
+      isActive: true,
+      isPopular: false,
+      sortOrder: 1,
+      features: [
+        'Up to 5 team members',
+        '1,000 contacts',
+        'Basic pipeline management',
+        'Email support',
+        'Mobile app access'
+      ],
+      moduleNames: starterModules
+    },
+    {
+      name: 'professional',
+      displayName: 'Professional',
+      description: 'For growing teams that need more power and flexibility',
+      price: '79.00',
+      billingCycle: 'monthly',
+      isActive: true,
+      isPopular: true,
+      sortOrder: 2,
+      features: [
+        'Up to 25 team members',
+        '10,000 contacts',
+        'Advanced pipeline & forecasting',
+        'Customer management',
+        'Quotation management',
+        'Activity tracking',
+        'Priority email support',
+        'API access'
+      ],
+      moduleNames: professionalModules
+    },
+    {
+      name: 'enterprise',
+      displayName: 'Enterprise',
+      description: 'For large organizations with advanced needs',
+      price: '199.00',
+      billingCycle: 'monthly',
+      isActive: true,
+      isPopular: false,
+      sortOrder: 3,
+      features: [
+        'Unlimited team members',
+        'Unlimited contacts',
+        'All CRM modules included',
+        'Advanced reporting & analytics',
+        'Invoice management',
+        'Custom integrations',
+        'Dedicated account manager',
+        '24/7 phone support',
+        'SLA guarantees'
+      ],
+      moduleNames: enterpriseModules
+    }
+  ];
+
+  for (const pkgData of defaultPackages) {
+    const { moduleNames, ...packageData } = pkgData;
+    const pkg = await storage.createPackage(packageData);
+    
+    const moduleIds = moduleNames
+      .map(name => moduleMap.get(name))
+      .filter((id): id is string => id !== undefined);
+    
+    if (moduleIds.length > 0) {
+      await storage.setPackageModules(pkg.id, moduleIds);
+    }
+  }
+  
+  console.log('Default packages initialized successfully');
+}
+
+async function initializeSuperAdmin() {
+  const existingAdmin = await storage.getUserByEmail('superadmin@nexuscrm.com');
+  if (existingAdmin) {
+    return;
+  }
+
+  let platformTenant = await storage.getTenant('platform-tenant');
+  if (!platformTenant) {
+    const tenant = await storage.createTenant({ name: 'Nexus CRM Platform' });
+    platformTenant = tenant;
+  }
+
+  const passwordHash = await hashPassword('Admin123!');
+  
+  await storage.createUser({
+    tenantId: platformTenant.id,
+    email: 'superadmin@nexuscrm.com',
+    passwordHash,
+    firstName: 'Super',
+    lastName: 'Admin',
+    userType: 'saas_admin',
+    isAdmin: true,
+    isActive: true,
+  });
+  
+  console.log('Super admin initialized: superadmin@nexuscrm.com / Admin123!');
 }
