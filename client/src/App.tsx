@@ -119,7 +119,7 @@ function Router() {
         
         {/* Protected routes */}
         <Route path="/app" component={RoleBasedRedirect} />
-        <Route path="/agency-dashboard">{() => <ProtectedPage component={Dashboard} />}</Route>
+        <Route path="/agency-dashboard">{() => <AdminPage component={Dashboard} />}</Route>
         <Route path="/customers">{() => <ProtectedPage component={Customers} />}</Route>
         <Route path="/customers/:id">{() => <ProtectedPage component={CustomerDetail} />}</Route>
         <Route path="/contacts">{() => <ProtectedPage component={Contacts} />}</Route>
@@ -133,12 +133,12 @@ function Router() {
         <Route path="/email">{() => <ProtectedPage component={EmailModule} />}</Route>
         <Route path="/tasks">{() => <ProtectedPage component={Tasks} />}</Route>
         <Route path="/activities">{() => <ProtectedPage component={Activities} />}</Route>
-        <Route path="/reports">{() => <ProtectedPage component={Reports} />}</Route>
+        <Route path="/reports">{() => <AdminPage component={Reports} />}</Route>
         <Route path="/settings">{() => <AdminPage component={Settings} />}</Route>
         <Route path="/profile">{() => <ProtectedPage component={Profile} />}</Route>
         <Route path="/billing">{() => <AdminPage component={Billing} />}</Route>
-        <Route path="/team">{() => <ProtectedPage component={TeamManagement} />}</Route>
-        <Route path="/team/:id">{() => <ProtectedPage component={TeamMemberDetail} />}</Route>
+        <Route path="/team">{() => <AdminPage component={TeamManagement} />}</Route>
+        <Route path="/team/:id">{() => <AdminPage component={TeamMemberDetail} />}</Route>
         <Route path="/team-dashboard">{() => <ProtectedPage component={TeamDashboard} />}</Route>
         <Route path="/saas-admin">{() => <ProtectedPage component={SaasAdminDashboard} />}</Route>
         <Route path="/customer-portal">{() => <ProtectedPage component={CustomerPortal} />}</Route>

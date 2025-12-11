@@ -23,6 +23,8 @@ import {
 } from "lucide-react";
 import { testimonials, features, pricingPlans, faqs, trustBadges, stats } from "@/lib/marketingData";
 
+import dashboardImage from "@assets/generated_images/crm_dashboard_analytics_interface.png";
+
 function HeroSection() {
   return (
     <section className="relative overflow-hidden bg-gradient-to-b from-primary/5 via-background to-background">
@@ -81,18 +83,16 @@ function HeroSection() {
 
         <div className="mt-16 relative mx-auto max-w-5xl">
           <div className="rounded-xl border bg-card shadow-2xl overflow-hidden">
-            <div className="aspect-video bg-gradient-to-br from-primary/20 to-primary/5 flex items-center justify-center relative">
-              <div className="absolute inset-0 bg-gradient-to-t from-background/50 to-transparent" />
-              <Button
-                size="lg"
-                variant="secondary"
-                className="relative z-10 h-16 w-16 rounded-full shadow-lg"
-                data-testid="button-video-play"
-              >
-                <Play className="h-8 w-8 ml-1" />
-              </Button>
-              <p className="absolute bottom-4 left-4 text-sm text-muted-foreground">
-                1-minute product overview
+            <div className="aspect-video relative">
+              <img 
+                src={dashboardImage} 
+                alt="Nexus CRM Dashboard - Sales analytics and business overview"
+                className="w-full h-full object-cover"
+                data-testid="img-hero-dashboard"
+              />
+              <div className="absolute inset-0 bg-gradient-to-t from-background/30 to-transparent" />
+              <p className="absolute bottom-4 left-4 text-sm text-muted-foreground bg-background/80 px-2 py-1 rounded">
+                Nexus CRM Dashboard
               </p>
             </div>
           </div>

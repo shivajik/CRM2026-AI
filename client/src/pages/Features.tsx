@@ -22,6 +22,19 @@ import {
   Shield
 } from "lucide-react";
 
+import dashboardImage from "@assets/generated_images/crm_dashboard_analytics_interface.png";
+import invoiceImage from "@assets/generated_images/invoice_management_interface.png";
+import pipelineImage from "@assets/generated_images/sales_pipeline_kanban_board.png";
+import teamImage from "@assets/generated_images/team_management_dashboard.png";
+
+const featureImages: Record<string, string> = {
+  invoices: invoiceImage,
+  dashboard: dashboardImage,
+  deals: pipelineImage,
+  team: teamImage,
+  reports: dashboardImage,
+};
+
 const detailedFeatures = [
   {
     id: "invoices",
@@ -187,18 +200,18 @@ Update your profile anytime and changes reflect immediately on new documents.`,
     id: "team",
     title: "Team Management",
     icon: UserCircle,
-    shortCopy: "Invite team members and manage roles for collaborative business management.",
-    longCopy: `Work as a team with role-based access. Invite team members to collaborate on customer management, deal tracking, and invoicing.
+    shortCopy: "Invite team members with role-based access control. Team members manage their own profiles while admins control billing and settings.",
+    longCopy: `Work as a team with secure role-based access control. Invite team members to collaborate on customer management, deal tracking, and invoicing.
 
-Assign different roles to control what each team member can see and do. Administrators have full access while other roles can be limited to specific functions.
+Team members get their own dashboard and can manage their personal profile. They focus on what matters - closing deals and serving customers - without access to sensitive billing or company settings.
 
-Everyone works from the same data, ensuring your team is always aligned.`,
+Administrators maintain full control over billing, company settings, reports, and team management. This separation ensures security while enabling productive collaboration.`,
     benefits: [
-      "Team member invitations",
-      "Role-based access",
-      "Collaborative workflows",
-      "Shared customer data",
-      "Admin controls",
+      "Secure role-based access control",
+      "Team members manage their own profiles only",
+      "Admin-only billing and settings access",
+      "Protected reports and team management",
+      "Collaborative workflows with proper permissions",
     ],
   },
   {
@@ -308,9 +321,20 @@ function FeatureDetailSection() {
               </div>
               
               <div className={index % 2 === 1 ? "lg:order-1" : ""}>
-                <Card className="aspect-video bg-gradient-to-br from-primary/10 to-primary/5 flex items-center justify-center">
-                  <feature.icon className="h-24 w-24 text-primary/30" />
-                </Card>
+                {featureImages[feature.id] ? (
+                  <Card className="aspect-video overflow-hidden">
+                    <img 
+                      src={featureImages[feature.id]} 
+                      alt={`${feature.title} interface preview`}
+                      className="w-full h-full object-cover"
+                      data-testid={`img-feature-${feature.id}`}
+                    />
+                  </Card>
+                ) : (
+                  <Card className="aspect-video bg-gradient-to-br from-primary/10 to-primary/5 flex items-center justify-center">
+                    <feature.icon className="h-24 w-24 text-primary/30" />
+                  </Card>
+                )}
               </div>
             </div>
           ))}
