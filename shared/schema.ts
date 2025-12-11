@@ -505,3 +505,38 @@ export const insertPlatformActivityLogSchema = createInsertSchema(platformActivi
 });
 export type InsertPlatformActivityLog = z.infer<typeof insertPlatformActivityLogSchema>;
 export type PlatformActivityLog = typeof platformActivityLogs.$inferSelect;
+
+// ==================== PACKAGES (SaaS Admin) ====================
+export const packages = pgTable("packages", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  name: text("name").notNull(),
+  displayName: text("display_name").notNull(),
+  description: text("description"),
+  price: decimal("price", { precision: 12, scale: 2 }).notNull().default("0"),
+  billingCycle: text("billing_cycle").notNull().default("monthly"), // monthly, yearly, one_time
+  isActive: boolean("is_active").default(true).notNull(),
+  isPopular: boolean("is_popular").default(false).notNull(),
+  sortOrder: integer("sort_order").default(0),
+  features: text("features").array().default(sql`'{}'::text[]`),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+export const insertPackageSchema = createInsertSchema(packages).omit({ 
+  id: true, 
+  createdAt: true, 
+  updatedAt: true 
+});
+export type InsertPackage = z.infer<typeof insertPackageSchema>;
+export type Package = typeof packages.$inferSelect;
+
+// Package Modules - links packages to modules
+export const packageModules = pgTable("package_modules", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  packageId: varchar("package_id").references(() => packages.id, { onDelete: "cascade" }).notNull(),
+  moduleId: varchar("module_id").references(() => modules.id, { onDelete: "cascade" }).notNull(),
+});
+
+export const insertPackageModuleSchema = createInsertSchema(packageModules).omit({ id: true });
+export type InsertPackageModule = z.infer<typeof insertPackageModuleSchema>;
+export type PackageModule = typeof packageModules.$inferSelect;
