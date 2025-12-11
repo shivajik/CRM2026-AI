@@ -22,6 +22,8 @@ import type {
   InsertPlatformSetting, PlatformSetting,
   InsertPlatformActivityLog, PlatformActivityLog,
   InsertCompanyProfile, CompanyProfile,
+  InsertPackage, Package,
+  InsertPackageModule, PackageModule,
 } from "@shared/schema";
 
 export interface IStorage {
@@ -233,6 +235,22 @@ export interface IStorage {
   // Company Profile operations
   getCompanyProfile(tenantId: string): Promise<CompanyProfile | undefined>;
   upsertCompanyProfile(tenantId: string, data: Partial<InsertCompanyProfile>): Promise<CompanyProfile>;
+
+  // Package operations (SaaS Admin)
+  createPackage(pkg: InsertPackage): Promise<Package>;
+  getAllPackages(): Promise<Package[]>;
+  getActivePackages(): Promise<Package[]>;
+  getPackageById(id: string): Promise<Package | undefined>;
+  updatePackage(id: string, updates: Partial<InsertPackage>): Promise<Package | undefined>;
+  deletePackage(id: string): Promise<void>;
+
+  // Package Module operations
+  addModuleToPackage(packageModule: InsertPackageModule): Promise<PackageModule>;
+  removeModuleFromPackage(packageId: string, moduleId: string): Promise<void>;
+  getPackageModules(packageId: string): Promise<(PackageModule & { module: Module })[]>;
+  setPackageModules(packageId: string, moduleIds: string[]): Promise<void>;
+  getPackageWithModules(packageId: string): Promise<(Package & { modules: Module[] }) | undefined>;
+  getAllPackagesWithModules(): Promise<(Package & { modules: Module[] })[]>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -1179,6 +1197,94 @@ export class DatabaseStorage implements IStorage {
         .returning();
       return created;
     }
+  }
+
+  // Package operations
+  async createPackage(insertPackage: InsertPackage): Promise<Package> {
+    const [pkg] = await db.insert(schema.packages).values(insertPackage).returning();
+    return pkg;
+  }
+
+  async getAllPackages(): Promise<Package[]> {
+    return db.select().from(schema.packages).orderBy(schema.packages.sortOrder);
+  }
+
+  async getActivePackages(): Promise<Package[]> {
+    return db.select().from(schema.packages)
+      .where(eq(schema.packages.isActive, true))
+      .orderBy(schema.packages.sortOrder);
+  }
+
+  async getPackageById(id: string): Promise<Package | undefined> {
+    const [pkg] = await db.select().from(schema.packages).where(eq(schema.packages.id, id));
+    return pkg;
+  }
+
+  async updatePackage(id: string, updates: Partial<InsertPackage>): Promise<Package | undefined> {
+    const [pkg] = await db.update(schema.packages)
+      .set({ ...updates, updatedAt: new Date() })
+      .where(eq(schema.packages.id, id))
+      .returning();
+    return pkg;
+  }
+
+  async deletePackage(id: string): Promise<void> {
+    await db.delete(schema.packages).where(eq(schema.packages.id, id));
+  }
+
+  // Package Module operations
+  async addModuleToPackage(insertPackageModule: InsertPackageModule): Promise<PackageModule> {
+    const [pm] = await db.insert(schema.packageModules).values(insertPackageModule).returning();
+    return pm;
+  }
+
+  async removeModuleFromPackage(packageId: string, moduleId: string): Promise<void> {
+    await db.delete(schema.packageModules)
+      .where(and(
+        eq(schema.packageModules.packageId, packageId),
+        eq(schema.packageModules.moduleId, moduleId)
+      ));
+  }
+
+  async getPackageModules(packageId: string): Promise<(PackageModule & { module: Module })[]> {
+    const results = await db
+      .select()
+      .from(schema.packageModules)
+      .innerJoin(schema.modules, eq(schema.packageModules.moduleId, schema.modules.id))
+      .where(eq(schema.packageModules.packageId, packageId));
+    
+    return results.map(r => ({ ...r.package_modules, module: r.modules }));
+  }
+
+  async setPackageModules(packageId: string, moduleIds: string[]): Promise<void> {
+    await db.delete(schema.packageModules).where(eq(schema.packageModules.packageId, packageId));
+    
+    if (moduleIds.length > 0) {
+      const values = moduleIds.map(moduleId => ({ packageId, moduleId }));
+      await db.insert(schema.packageModules).values(values);
+    }
+  }
+
+  async getPackageWithModules(packageId: string): Promise<(Package & { modules: Module[] }) | undefined> {
+    const pkg = await this.getPackageById(packageId);
+    if (!pkg) return undefined;
+
+    const packageModules = await this.getPackageModules(packageId);
+    const modules = packageModules.map(pm => pm.module);
+
+    return { ...pkg, modules };
+  }
+
+  async getAllPackagesWithModules(): Promise<(Package & { modules: Module[] })[]> {
+    const packages = await this.getAllPackages();
+    const result = await Promise.all(
+      packages.map(async (pkg) => {
+        const packageModules = await this.getPackageModules(pkg.id);
+        const modules = packageModules.map(pm => pm.module);
+        return { ...pkg, modules };
+      })
+    );
+    return result;
   }
 }
 
