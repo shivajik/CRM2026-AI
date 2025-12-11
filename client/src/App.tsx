@@ -4,6 +4,7 @@ import { QueryClientProvider, useQuery } from "@tanstack/react-query";
 import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { ProtectedRoute } from "@/components/ProtectedRoute";
+import { AdminRoute } from "@/components/AdminRoute";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { LoadingSpinner } from "@/components/LoadingSpinner";
 import { lazy, Suspense } from "react";
@@ -90,6 +91,14 @@ function ProtectedPage({ component: Component }: { component: React.ComponentTyp
   );
 }
 
+function AdminPage({ component: Component }: { component: React.ComponentType }) {
+  return (
+    <AdminRoute>
+      <Component />
+    </AdminRoute>
+  );
+}
+
 function Router() {
   return (
     <Suspense fallback={<LoadingSpinner />}>
@@ -125,9 +134,9 @@ function Router() {
         <Route path="/tasks">{() => <ProtectedPage component={Tasks} />}</Route>
         <Route path="/activities">{() => <ProtectedPage component={Activities} />}</Route>
         <Route path="/reports">{() => <ProtectedPage component={Reports} />}</Route>
-        <Route path="/settings">{() => <ProtectedPage component={Settings} />}</Route>
+        <Route path="/settings">{() => <AdminPage component={Settings} />}</Route>
         <Route path="/profile">{() => <ProtectedPage component={Profile} />}</Route>
-        <Route path="/billing">{() => <ProtectedPage component={Billing} />}</Route>
+        <Route path="/billing">{() => <AdminPage component={Billing} />}</Route>
         <Route path="/team">{() => <ProtectedPage component={TeamManagement} />}</Route>
         <Route path="/team/:id">{() => <ProtectedPage component={TeamMemberDetail} />}</Route>
         <Route path="/team-dashboard">{() => <ProtectedPage component={TeamDashboard} />}</Route>
