@@ -82,9 +82,11 @@ export default function QuotationDetail() {
             ${companyProfile?.address || companyProfile?.city || companyProfile?.country ? `
               <div>${[companyProfile?.address, companyProfile?.city, companyProfile?.state, companyProfile?.postalCode, companyProfile?.country].filter(Boolean).join(", ")}</div>
             ` : ""}
-            ${companyProfile?.phone ? `<div>${companyProfile.phone}</div>` : ""}
-            ${companyProfile?.email ? `<div>${companyProfile.email}</div>` : ""}
-            ${companyProfile?.website ? `<div>${companyProfile.website}</div>` : ""}
+            ${companyProfile?.phone ? `<div>Phone: ${companyProfile.phone}</div>` : ""}
+            ${companyProfile?.email ? `<div>Email: ${companyProfile.email}</div>` : ""}
+            ${companyProfile?.website ? `<div>Website: ${companyProfile.website}</div>` : ""}
+            ${companyProfile?.taxId ? `<div>Tax ID: ${companyProfile.taxId}</div>` : ""}
+            ${companyProfile?.registrationNumber ? `<div>Reg. No: ${companyProfile.registrationNumber}</div>` : ""}
           </div>
           <div class="quote-info">
             <div class="quote-number">${quotation.quoteNumber}</div>
