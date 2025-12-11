@@ -1,5 +1,6 @@
 import { Link } from "wouter";
 import { MarketingLayout } from "@/components/marketing/MarketingLayout";
+import { SEOHead } from "@/components/SEOHead";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -265,6 +266,12 @@ function NewsletterSection() {
 export default function Resources() {
   return (
     <MarketingLayout>
+      <SEOHead
+        title="Resources & Insights | Nexus CRM"
+        description="Learn from sales experts, discover best practices, and get the most out of your CRM with our guides, templates, and tutorials."
+        canonical="https://nexus.com/resources"
+        keywords={["sales tips", "CRM guides", "sales best practices", "CRM tutorials"]}
+      />
       <HeroSection />
       <CategoriesSection />
       <BlogSection />

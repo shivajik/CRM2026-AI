@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { Link, useRoute } from "wouter";
 import { MarketingLayout } from "@/components/marketing/MarketingLayout";
+import { SEOHead } from "@/components/SEOHead";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -37,8 +38,32 @@ export default function GeoLanding({ region = "us" }: GeoLandingProps) {
   const geoData = getGeoData(currentRegion);
   const [activeTestimonial, setActiveTestimonial] = useState(0);
 
+  const seoTitles = {
+    us: "The CRM Built for American Sales Teams | Nexus",
+    uk: "The CRM Built for British Sales Teams | Nexus",
+    in: "The CRM Built for Indian Sales Teams | Nexus",
+  };
+
+  const seoDescriptions = {
+    us: "Join 5,000+ US companies that trust Nexus to grow their revenue. CRM software designed for American sales teams.",
+    uk: "Join 2,000+ UK companies that trust Nexus to grow their revenue. CRM software designed for British sales teams.",
+    in: "Join 3,000+ Indian companies that trust Nexus to grow their revenue. CRM software designed for Indian sales teams.",
+  };
+
   return (
     <MarketingLayout>
+      <SEOHead
+        title={seoTitles[currentRegion]}
+        description={seoDescriptions[currentRegion]}
+        canonical={`https://nexus.com/${currentRegion}`}
+        keywords={["CRM software", geoData.region + " CRM", "sales CRM", "local CRM"]}
+        hreflang={[
+          { lang: "en-US", href: "https://nexus.com/us" },
+          { lang: "en-GB", href: "https://nexus.com/uk" },
+          { lang: "en-IN", href: "https://nexus.com/in" },
+          { lang: "x-default", href: "https://nexus.com/" },
+        ]}
+      />
       <script
         type="application/ld+json"
         dangerouslySetInnerHTML={{

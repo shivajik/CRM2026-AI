@@ -1,4 +1,5 @@
 import { MarketingLayout } from "@/components/marketing/MarketingLayout";
+import { SEOHead } from "@/components/SEOHead";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
@@ -109,6 +110,11 @@ export default function SEOAudit() {
 
   return (
     <MarketingLayout showFloatingCTA={false}>
+      <SEOHead
+        title="SEO & Accessibility Audit | Nexus CRM"
+        description="Comprehensive audit of site performance, accessibility compliance, and SEO optimization based on industry best practices."
+        canonical="https://nexus.com/audit"
+      />
       <div className="py-16">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="text-center mb-12">

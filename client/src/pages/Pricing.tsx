@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { Link } from "wouter";
 import { MarketingLayout } from "@/components/marketing/MarketingLayout";
+import { SEOHead } from "@/components/SEOHead";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Switch } from "@/components/ui/switch";
@@ -340,6 +341,12 @@ function CTASection() {
 export default function Pricing() {
   return (
     <MarketingLayout>
+      <SEOHead
+        title="Simple, Transparent Pricing | Nexus CRM"
+        description="No hidden fees, no surprise charges. Pick the plan that fits your team and start your 14-day free trial today."
+        canonical="https://nexus.com/pricing"
+        keywords={["CRM pricing", "affordable CRM", "CRM cost", "sales software pricing"]}
+      />
       <HeroSection />
       <PricingCardsSection />
       <FeatureComparisonSection />

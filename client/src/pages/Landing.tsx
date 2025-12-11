@@ -2,6 +2,7 @@ import { useState } from "react";
 import { Link } from "wouter";
 import { MarketingLayout } from "@/components/marketing/MarketingLayout";
 import { ExitIntentModal } from "@/components/marketing/ExitIntentModal";
+import { SEOHead } from "@/components/SEOHead";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
@@ -424,6 +425,18 @@ function CTASection() {
 export default function Landing() {
   return (
     <MarketingLayout>
+      <SEOHead
+        title="Nexus CRM - Close More Deals, Spend Less Time on Admin"
+        description="Nexus is the CRM that sales teams actually enjoy using. Beautiful, fast, and packed with features that help you win - starting at just $29/month."
+        canonical="https://nexus.com/"
+        keywords={["CRM software", "sales CRM", "customer relationship management", "pipeline management"]}
+        hreflang={[
+          { lang: "en-US", href: "https://nexus.com/us" },
+          { lang: "en-GB", href: "https://nexus.com/uk" },
+          { lang: "en-IN", href: "https://nexus.com/in" },
+          { lang: "x-default", href: "https://nexus.com/" },
+        ]}
+      />
       <HeroSection />
       <StatsSection />
       <BenefitsSection />

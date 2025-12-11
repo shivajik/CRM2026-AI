@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { Link } from "wouter";
 import { MarketingLayout } from "@/components/marketing/MarketingLayout";
+import { SEOHead } from "@/components/SEOHead";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -380,6 +381,12 @@ function CTASection() {
 export default function Features() {
   return (
     <MarketingLayout>
+      <SEOHead
+        title="Features Built for Modern Sales Teams | Nexus CRM"
+        description="Everything you need to manage your pipeline, close more deals, and grow revenue. Powerful enough for enterprise, simple enough for startups."
+        canonical="https://nexus.com/features"
+        keywords={["CRM features", "sales automation", "contact management", "pipeline management"]}
+      />
       <HeroSection />
       <FeatureDetailSection />
       <IntegrationsSection />

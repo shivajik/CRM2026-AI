@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { Link, useLocation } from "wouter";
 import { MarketingLayout } from "@/components/marketing/MarketingLayout";
+import { SEOHead } from "@/components/SEOHead";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -73,6 +74,11 @@ export default function Checkout() {
   if (step === "success") {
     return (
       <MarketingLayout showFloatingCTA={false}>
+        <SEOHead
+          title="Welcome to Nexus CRM - Your Trial Has Started"
+          description="Your Nexus CRM account is ready. Start exploring features and close more deals."
+          canonical="https://nexus.com/checkout"
+        />
         <div className="min-h-[80vh] flex items-center justify-center py-20">
           <Card className="max-w-lg w-full mx-4" data-testid="checkout-success">
             <CardContent className="pt-12 pb-8 text-center">
@@ -108,6 +114,11 @@ export default function Checkout() {
   if (step === "error") {
     return (
       <MarketingLayout showFloatingCTA={false}>
+        <SEOHead
+          title="Payment Issue - Nexus CRM"
+          description="There was an issue processing your payment. Please try again or contact support."
+          canonical="https://nexus.com/checkout"
+        />
         <div className="min-h-[80vh] flex items-center justify-center py-20">
           <Card className="max-w-lg w-full mx-4" data-testid="checkout-error">
             <CardContent className="pt-12 pb-8 text-center">
@@ -149,6 +160,12 @@ export default function Checkout() {
 
   return (
     <MarketingLayout showFloatingCTA={false}>
+      <SEOHead
+        title="Start Your Free Trial | Nexus CRM"
+        description="Begin your 14-day free trial of Nexus CRM. No credit card required. Pick your plan and start closing more deals today."
+        canonical="https://nexus.com/checkout"
+        keywords={["CRM free trial", "sales software trial", "try CRM free"]}
+      />
       <div className="py-12 lg:py-20">
         <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex items-center justify-center gap-4 mb-12">
