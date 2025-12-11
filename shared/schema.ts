@@ -447,6 +447,42 @@ export const insertPlatformSettingSchema = createInsertSchema(platformSettings).
 export type InsertPlatformSetting = z.infer<typeof insertPlatformSettingSchema>;
 export type PlatformSetting = typeof platformSettings.$inferSelect;
 
+// ==================== COMPANY PROFILES (Agency/Tenant Extended Profile) ====================
+export const companyProfiles = pgTable("company_profiles", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  tenantId: varchar("tenant_id").references(() => tenants.id, { onDelete: "cascade" }).notNull().unique(),
+  companyName: text("company_name").notNull(),
+  email: text("email"),
+  phone: text("phone"),
+  website: text("website"),
+  address: text("address"),
+  city: text("city"),
+  state: text("state"),
+  country: text("country"),
+  postalCode: text("postal_code"),
+  logoUrl: text("logo_url"),
+  taxId: text("tax_id"),
+  registrationNumber: text("registration_number"),
+  industry: text("industry"),
+  companySize: text("company_size"),
+  currency: text("currency").default("USD"),
+  defaultPaymentTerms: text("default_payment_terms").default("net30"),
+  invoicePrefix: text("invoice_prefix").default("INV"),
+  quotePrefix: text("quote_prefix").default("QT"),
+  invoiceNotes: text("invoice_notes"),
+  quoteNotes: text("quote_notes"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+export const insertCompanyProfileSchema = createInsertSchema(companyProfiles).omit({ 
+  id: true, 
+  createdAt: true, 
+  updatedAt: true 
+});
+export type InsertCompanyProfile = z.infer<typeof insertCompanyProfileSchema>;
+export type CompanyProfile = typeof companyProfiles.$inferSelect;
+
 // ==================== PLATFORM ACTIVITY LOGS (SaaS Admin) ====================
 export const platformActivityLogs = pgTable("platform_activity_logs", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
