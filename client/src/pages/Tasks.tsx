@@ -164,7 +164,7 @@ export default function Tasks() {
 
   const { data: users = [] } = useQuery<User[]>({
     queryKey: ["team-members"],
-    queryFn: () => fetch("/api/users").then(r => r.json()),
+    queryFn: usersApi.getAll,
   });
 
   const createMutation = useMutation({
