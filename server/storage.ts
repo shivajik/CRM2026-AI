@@ -1,5 +1,5 @@
 import { db } from "./db";
-import { eq, and, desc, gte, lte, sql, asc } from "drizzle-orm";
+import { eq, and, desc, gte, lte, sql, asc, or, isNull } from "drizzle-orm";
 import * as schema from "@shared/schema";
 import type {
   InsertTenant, Tenant,
@@ -2419,13 +2419,26 @@ export class DatabaseStorage implements IStorage {
 
   async getProposalTemplatesByTenant(tenantId: string): Promise<ProposalTemplate[]> {
     return db.select().from(schema.proposalTemplates)
-      .where(eq(schema.proposalTemplates.tenantId, tenantId))
-      .orderBy(desc(schema.proposalTemplates.createdAt));
+      .where(
+        or(
+          eq(schema.proposalTemplates.tenantId, tenantId),
+          eq(schema.proposalTemplates.isSystemTemplate, true)
+        )
+      )
+      .orderBy(desc(schema.proposalTemplates.isSystemTemplate), desc(schema.proposalTemplates.createdAt));
   }
 
   async getProposalTemplateById(id: string, tenantId: string): Promise<ProposalTemplate | undefined> {
     const [template] = await db.select().from(schema.proposalTemplates)
-      .where(and(eq(schema.proposalTemplates.id, id), eq(schema.proposalTemplates.tenantId, tenantId)));
+      .where(
+        and(
+          eq(schema.proposalTemplates.id, id),
+          or(
+            eq(schema.proposalTemplates.tenantId, tenantId),
+            eq(schema.proposalTemplates.isSystemTemplate, true)
+          )
+        )
+      );
     return template;
   }
 

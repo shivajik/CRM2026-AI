@@ -1050,13 +1050,14 @@ export type TemplatePurpose = typeof TEMPLATE_PURPOSES[keyof typeof TEMPLATE_PUR
 // Proposal Templates - reusable proposal structures
 export const proposalTemplates = pgTable("proposal_templates", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
-  tenantId: varchar("tenant_id").references(() => tenants.id, { onDelete: "cascade" }).notNull(),
-  createdBy: varchar("created_by").references(() => users.id).notNull(),
+  tenantId: varchar("tenant_id").references(() => tenants.id, { onDelete: "cascade" }),
+  createdBy: varchar("created_by").references(() => users.id),
   name: text("name").notNull(),
   description: text("description"),
   purpose: text("purpose").notNull().default("custom"),
   isActive: boolean("is_active").default(true).notNull(),
   isDefault: boolean("is_default").default(false).notNull(),
+  isSystemTemplate: boolean("is_system_template").default(false).notNull(),
   version: integer("version").default(1).notNull(),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),

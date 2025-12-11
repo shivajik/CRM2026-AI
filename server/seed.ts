@@ -658,14 +658,15 @@ async function seed() {
       },
     ];
 
-    // Insert proposal templates and their sections
+    // Insert proposal templates as SYSTEM templates (available to all users)
     for (const templateData of proposalTemplatesData) {
       const { sections, ...templateInfo } = templateData;
       
       const [template] = await db.insert(schema.proposalTemplates).values({
         ...templateInfo,
-        tenantId: tenant.id,
-        createdBy: adminUser.id,
+        tenantId: null,
+        createdBy: null,
+        isSystemTemplate: true,
       }).returning();
 
       await db.insert(schema.templateSections).values(
@@ -677,7 +678,7 @@ async function seed() {
         }))
       );
     }
-    console.log(`Created ${proposalTemplatesData.length} default proposal templates with sections`);
+    console.log(`Created ${proposalTemplatesData.length} default SYSTEM proposal templates with sections`);
 
     console.log("\n========================================");
     console.log("Database seeded successfully!");
