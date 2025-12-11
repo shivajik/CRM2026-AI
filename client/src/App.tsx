@@ -26,6 +26,13 @@ import TeamLogin from "@/pages/TeamLogin";
 import TeamDashboard from "@/pages/TeamDashboard";
 import SaasAdminDashboard from "@/pages/SaasAdminDashboard";
 import CustomerPortal from "@/pages/CustomerPortal";
+import Landing from "@/pages/Landing";
+import Features from "@/pages/Features";
+import Pricing from "@/pages/Pricing";
+import Checkout from "@/pages/Checkout";
+import Resources from "@/pages/Resources";
+import { USLanding, UKLanding, INLanding } from "@/pages/GeoLanding";
+import SEOAudit from "@/pages/SEOAudit";
 import { isAuthenticated, getUser } from "@/lib/auth";
 import { authApi } from "@/lib/api";
 
@@ -65,7 +72,16 @@ function RoleBasedRedirect() {
 function Router() {
   return (
     <Switch>
-      <Route path="/" component={RoleBasedRedirect} />
+      <Route path="/" component={Landing} />
+      <Route path="/features" component={Features} />
+      <Route path="/pricing" component={Pricing} />
+      <Route path="/checkout" component={Checkout} />
+      <Route path="/resources" component={Resources} />
+      <Route path="/us" component={USLanding} />
+      <Route path="/uk" component={UKLanding} />
+      <Route path="/in" component={INLanding} />
+      <Route path="/audit" component={SEOAudit} />
+      <Route path="/app" component={RoleBasedRedirect} />
       <Route path="/agency-dashboard" component={Dashboard} />
       <Route path="/customers" component={Customers} />
       <Route path="/customers/:id" component={CustomerDetail} />
