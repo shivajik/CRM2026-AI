@@ -1,0 +1,214 @@
+You are a Replit Coding Agent. Build a complete, production-ready “Email Communication Module” inside the CRM. This module will allow the Agency Admin and CRM Users to create, manage, schedule, and send emails for quotations, invoices, reminders, onboarding messages, follow-ups, and custom communication.
+
+Do NOT recommend or mention any technical stack. Simply build the feature using the system’s existing project structure.
+
+-------------------------------------
+PRIMARY OBJECTIVE
+-------------------------------------
+Create an end-to-end Email Module with:
+
+1. **Email Composer**
+2. **Email Templates Manager**
+3. **Automation Rules**
+4. **Follow-up Engine**
+5. **Email Logs & Delivery Tracking**
+6. **AI Writing Assistant (Context-aware)**
+7. **Merge Fields / Dynamic Variables**
+8. **Permissions & Roles**
+9. **UI + Backend Logic + DB Models + API endpoints**
+10. **Integration with quotation & invoice modules**
+
+-------------------------------------
+FEATURE REQUIREMENTS
+-------------------------------------
+
+### 1. EMAIL COMPOSER
+Build a rich email composer with:
+- Subject
+- From (selectable company email)
+- To, CC, BCC
+- Body (rich text / HTML)
+- Attachments (PDF quotations/invoices auto-attach option)
+- Insert dynamic variables (merge tags):
+  - {{client.name}}
+  - {{invoice.number}}
+  - {{quotation.amount}}
+  - {{agency.name}}
+  - {{due_date}}
+  - etc.
+- Option to choose a template
+- AI Writing Assistant integration (see section below)
+
+### 2. EMAIL TEMPLATE MANAGER
+Agency admin must be able to:
+- Create, edit, delete templates
+- Templates include:
+  - Template name
+  - Purpose (Quotation / Invoice / Follow-up / Meeting / Custom)
+  - Subject template
+  - Body template
+  - Merge fields list
+- Categorize templates by use-case:
+  - Quotation Email
+  - Invoice Email
+  - Payment Reminder
+  - Follow-up 1
+  - Follow-up 2
+  - Renewal Reminder
+  - Feedback Request
+- Preview with sample data
+- Version history (optional but helpful)
+- Mark template “Default for Quotation”, “Default for Invoice”, etc.
+
+### 3. AUTOMATION RULES (Very Important)
+Agency Admin must configure:
+- When a template should be used automatically
+- Examples:
+  - After creating a quotation → send template X
+  - 3 days after sending an invoice → send template Y (payment follow-up)
+  - When client status = “Lead → Client” → send welcome email
+  - When a quotation is not accepted for 5 days → send follow-up
+
+Automation rule fields:
+- Trigger (dropdown)
+- Delay (minutes/hours/days)
+- Template to use
+- Conditions filter (if needed)
+- Enable/Disable toggle
+
+### 4. FOLLOW-UP ENGINE
+Build an engine that:
+- Schedules follow-up emails automatically
+- Tracks sent follow-ups
+- Skips sending if:
+  - Invoice already paid
+  - Quotation already accepted
+  - Client replied recently
+- UI for managing sequences:
+  - Create follow-up sequences
+  - Add steps with timing (Day 1, Day 3, Day 7)
+  - Attach template to each step
+
+### 5. AI WRITING ASSISTANT (Context-Aware)
+Integrate an AI-powered writing assistant with the Email Composer and Template Manager.
+
+AI should:
+- Rewrite email in different tones (formal, friendly, persuasive)
+- Summarize long content
+- Expand short prompts into full email
+- Generate full email drafts using context from CRM records:
+  - Client info
+  - Outstanding invoice status
+  - Quotation details
+  - Follow-up status
+- Provide quick actions:
+  - “Improve tone”
+  - “Shorten”
+  - “Make more persuasive”
+  - “Rewrite professionally”
+  - “Fix grammar”
+  - “Generate subject lines”
+
+AI must respect placeholders (merge tags) and not remove them.
+
+### 6. EMAIL LOGS & TRACKING
+Create Email Logs page with:
+- Status (Sent / Failed / Scheduled / Opened / Clicked)
+- Timestamp
+- Template used
+- Delivered or bounced
+- Attachments sent
+- Preview email content
+
+Add tracking pixel support (optional)
+Add click-tracking link wrapper (optional)
+
+### 7. MERGE FIELD ENGINE
+Build a merge-field interpreter that:
+- Converts {{client.name}} into actual value
+- Supports fallback values:
+  - {{client.name | "Customer"}}
+- Works inside subject & body
+
+Should be reusable by:
+- Templates
+- Automations
+- AI writing preview
+
+### 8. ROLES & PERMISSIONS
+- Only Agency Admin can:
+  - Create/edit templates
+  - Configure automations
+- Users can:
+  - Send emails
+  - Select from admin-created templates
+  - View logs for their clients
+
+### 9. UI/UX REQUIREMENTS
+- Clean enterprise-grade design
+- Sidebar navigation for:
+  - Compose Email
+  - Templates
+  - Automations
+  - Follow-ups
+  - Email Logs
+- Display statuses in color (green/orange/red)
+- Include a left-side merge field selector panel
+- Provide a preview mode
+- Provide test send option to admin email
+
+### 10. DB MODELS & API (Build in project style)
+Create necessary models/entities:
+- EmailTemplate
+- EmailLog
+- AutomationRule
+- FollowUpSequence
+- FollowUpStep
+- ScheduledEmail
+- MergeFieldRegistry (optional)
+
+API endpoints must handle:
+- Creating templates
+- Fetching templates
+- Updating/deleting templates
+- Sending emails
+- Scheduling follow-ups
+- Running automation checks
+- Logging send events
+
+### 11. QUOTATION & INVOICE INTEGRATION
+When a quotation or invoice is created:
+- Show “Send Email” button
+- Auto-fill template
+- Auto-attach PDF
+- Trigger automation rule if activated
+- Save email in logs
+
+-------------------------------------
+FINAL DELIVERABLES
+-------------------------------------
+Deliver:
+
+1. Complete working Email Module
+2. UI + backend logic
+3. Email template system
+4. Automation rules engine
+5. Follow-up scheduler
+6. AI writing assistant integration
+7. Merge fields engine
+8. Email logs UI
+9. Documentation including:
+   - How templates work
+   - How automation works
+   - How to manage follow-ups
+   - How AI writing tools work
+10. Test data + sample templates
+11. A “FINAL_REPORT.md” describing:
+   - How everything works
+   - Assumptions used
+   - API endpoints list
+   - Screenshots or layout description
+
+Begin building now. 
+Document assumptions in “ASSUMPTIONS.md”. 
+Work in incremental steps with clear messages. 
