@@ -1,6 +1,7 @@
 import { Menu, Bell, Search, User, CreditCard, Settings, LogOut } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -59,10 +60,15 @@ export function Header() {
         </Button>
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
-            <Button variant="ghost" className="relative h-8 w-8 rounded-full" data-testid="button-user-menu">
-               <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center text-xs font-bold text-primary">
-                {getInitials()}
-              </div>
+            <Button variant="ghost" className="relative h-8 w-8 rounded-full p-0" data-testid="button-user-menu">
+              <Avatar className="h-8 w-8">
+                {currentUser?.profileImageUrl ? (
+                  <AvatarImage src={currentUser.profileImageUrl} alt="Profile" />
+                ) : null}
+                <AvatarFallback className="bg-primary/10 text-xs font-bold text-primary">
+                  {getInitials()}
+                </AvatarFallback>
+              </Avatar>
             </Button>
           </DropdownMenuTrigger>
           <DropdownMenuContent className="w-56" align="end" forceMount>
