@@ -17,8 +17,12 @@ import {
   Building2, Users, DollarSign, TrendingUp, Shield, 
   Activity, Settings, LogOut, LayoutDashboard, Globe,
   User, FileText, ChevronRight, Save, RefreshCw, Eye,
-  Calendar, Clock, Search, X, Briefcase, Receipt
+  Calendar, Clock, Search, X, Briefcase, Receipt, Package,
+  Plus, Pencil, Trash2, Check
 } from "lucide-react";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Textarea } from "@/components/ui/textarea";
+import { Switch } from "@/components/ui/switch";
 import { format } from "date-fns";
 import { clearAuth } from "@/lib/auth";
 import { Area, AreaChart, ResponsiveContainer, Tooltip, XAxis, YAxis, PieChart, Pie, Cell } from "recharts";
@@ -38,6 +42,21 @@ export default function SaasAdminDashboard() {
   const [profileForm, setProfileForm] = useState({ firstName: "", lastName: "", email: "" });
   const [settingForm, setSettingForm] = useState({ key: "", value: "", category: "general", description: "" });
   const [activityFilters, setActivityFilters] = useState({ action: "", targetType: "", limit: 50 });
+  const [showPackageDialog, setShowPackageDialog] = useState(false);
+  const [editingPackage, setEditingPackage] = useState<any>(null);
+  const [packageForm, setPackageForm] = useState({
+    name: "",
+    displayName: "",
+    description: "",
+    price: "0",
+    billingCycle: "monthly",
+    isActive: true,
+    isPopular: false,
+    sortOrder: 0,
+    features: [] as string[],
+    moduleIds: [] as string[],
+  });
+  const [newFeature, setNewFeature] = useState("");
   
   const { data: currentUser } = useQuery({
     queryKey: ["currentUser"],
@@ -72,6 +91,18 @@ export default function SaasAdminDashboard() {
     queryKey: ["activityLogs", activityFilters],
     queryFn: () => saasAdminApi.getActivityLogs(activityFilters),
     enabled: currentUser?.userType === "saas_admin" && showActivityLogs,
+  });
+
+  const { data: packages = [] } = useQuery({
+    queryKey: ["saasAdminPackages"],
+    queryFn: saasAdminApi.getPackages,
+    enabled: currentUser?.userType === "saas_admin",
+  });
+
+  const { data: modules = [] } = useQuery({
+    queryKey: ["saasAdminModules"],
+    queryFn: saasAdminApi.getModules,
+    enabled: currentUser?.userType === "saas_admin",
   });
 
   const { data: tenantDetails, isLoading: loadingTenant } = useQuery({
@@ -109,6 +140,130 @@ export default function SaasAdminDashboard() {
       toast.error("Failed to save setting");
     },
   });
+
+  const createPackageMutation = useMutation({
+    mutationFn: saasAdminApi.createPackage,
+    onSuccess: () => {
+      toast.success("Package created successfully");
+      queryClient.invalidateQueries({ queryKey: ["saasAdminPackages"] });
+      setShowPackageDialog(false);
+      resetPackageForm();
+    },
+    onError: () => {
+      toast.error("Failed to create package");
+    },
+  });
+
+  const updatePackageMutation = useMutation({
+    mutationFn: ({ id, data }: { id: string; data: any }) => saasAdminApi.updatePackage(id, data),
+    onSuccess: () => {
+      toast.success("Package updated successfully");
+      queryClient.invalidateQueries({ queryKey: ["saasAdminPackages"] });
+      setShowPackageDialog(false);
+      setEditingPackage(null);
+      resetPackageForm();
+    },
+    onError: () => {
+      toast.error("Failed to update package");
+    },
+  });
+
+  const deletePackageMutation = useMutation({
+    mutationFn: saasAdminApi.deletePackage,
+    onSuccess: () => {
+      toast.success("Package deleted successfully");
+      queryClient.invalidateQueries({ queryKey: ["saasAdminPackages"] });
+    },
+    onError: () => {
+      toast.error("Failed to delete package");
+    },
+  });
+
+  const resetPackageForm = () => {
+    setPackageForm({
+      name: "",
+      displayName: "",
+      description: "",
+      price: "0",
+      billingCycle: "monthly",
+      isActive: true,
+      isPopular: false,
+      sortOrder: 0,
+      features: [],
+      moduleIds: [],
+    });
+    setNewFeature("");
+  };
+
+  const openCreatePackageDialog = () => {
+    resetPackageForm();
+    setEditingPackage(null);
+    setShowPackageDialog(true);
+  };
+
+  const openEditPackageDialog = (pkg: any) => {
+    setEditingPackage(pkg);
+    setPackageForm({
+      name: pkg.name,
+      displayName: pkg.displayName,
+      description: pkg.description || "",
+      price: pkg.price || "0",
+      billingCycle: pkg.billingCycle || "monthly",
+      isActive: pkg.isActive ?? true,
+      isPopular: pkg.isPopular ?? false,
+      sortOrder: pkg.sortOrder || 0,
+      features: pkg.features || [],
+      moduleIds: pkg.modules?.map((m: any) => m.id) || [],
+    });
+    setShowPackageDialog(true);
+  };
+
+  const handleSavePackage = () => {
+    if (!packageForm.name || !packageForm.displayName) {
+      toast.error("Name and display name are required");
+      return;
+    }
+
+    if (editingPackage) {
+      updatePackageMutation.mutate({
+        id: editingPackage.id,
+        data: packageForm,
+      });
+    } else {
+      createPackageMutation.mutate(packageForm);
+    }
+  };
+
+  const addFeature = () => {
+    if (newFeature.trim()) {
+      setPackageForm({
+        ...packageForm,
+        features: [...packageForm.features, newFeature.trim()],
+      });
+      setNewFeature("");
+    }
+  };
+
+  const removeFeature = (index: number) => {
+    setPackageForm({
+      ...packageForm,
+      features: packageForm.features.filter((_, i) => i !== index),
+    });
+  };
+
+  const toggleModule = (moduleId: string) => {
+    if (packageForm.moduleIds.includes(moduleId)) {
+      setPackageForm({
+        ...packageForm,
+        moduleIds: packageForm.moduleIds.filter(id => id !== moduleId),
+      });
+    } else {
+      setPackageForm({
+        ...packageForm,
+        moduleIds: [...packageForm.moduleIds, moduleId],
+      });
+    }
+  };
 
   const handleLogout = async () => {
     try {
@@ -199,6 +354,14 @@ export default function SaasAdminDashboard() {
               >
                 <DollarSign className="w-4 h-4" />
                 Revenue
+              </button>
+              <button 
+                onClick={() => setActiveTab("packages")}
+                className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-md text-sm font-medium ${activeTab === "packages" ? "bg-primary text-white" : "text-slate-300 hover:bg-slate-800"}`}
+                data-testid="link-saas-packages"
+              >
+                <Package className="w-4 h-4" />
+                Packages
               </button>
               
               <div className="px-3 py-2 text-xs uppercase text-slate-400 font-semibold mt-4">
@@ -610,6 +773,116 @@ export default function SaasAdminDashboard() {
                         No revenue data available yet
                       </div>
                     )}
+                  </CardContent>
+                </Card>
+              )}
+
+              {activeTab === "packages" && (
+                <Card>
+                  <CardHeader>
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <CardTitle>Packages Management</CardTitle>
+                        <CardDescription>Create and manage subscription packages with modular features</CardDescription>
+                      </div>
+                      <Button onClick={openCreatePackageDialog} data-testid="button-create-package">
+                        <Plus className="w-4 h-4 mr-2" />
+                        Create Package
+                      </Button>
+                    </div>
+                  </CardHeader>
+                  <CardContent>
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead>Package Name</TableHead>
+                          <TableHead>Price</TableHead>
+                          <TableHead>Billing</TableHead>
+                          <TableHead>Modules</TableHead>
+                          <TableHead>Status</TableHead>
+                          <TableHead className="w-[100px]">Actions</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {packages.length === 0 ? (
+                          <TableRow>
+                            <TableCell colSpan={6} className="text-center text-muted-foreground py-8">
+                              No packages created yet. Click "Create Package" to get started.
+                            </TableCell>
+                          </TableRow>
+                        ) : (
+                          packages.map((pkg: any) => (
+                            <TableRow key={pkg.id} data-testid={`row-package-${pkg.id}`}>
+                              <TableCell>
+                                <div>
+                                  <p className="font-medium">{pkg.displayName}</p>
+                                  <p className="text-xs text-muted-foreground">{pkg.name}</p>
+                                </div>
+                              </TableCell>
+                              <TableCell className="font-medium">
+                                ${parseFloat(pkg.price || 0).toFixed(2)}
+                              </TableCell>
+                              <TableCell>
+                                <Badge variant="outline">
+                                  {pkg.billingCycle === "monthly" ? "Monthly" : 
+                                   pkg.billingCycle === "yearly" ? "Yearly" : "One-time"}
+                                </Badge>
+                              </TableCell>
+                              <TableCell>
+                                <div className="flex flex-wrap gap-1">
+                                  {pkg.modules?.slice(0, 3).map((m: any) => (
+                                    <Badge key={m.id} variant="secondary" className="text-xs">
+                                      {m.displayName}
+                                    </Badge>
+                                  ))}
+                                  {pkg.modules?.length > 3 && (
+                                    <Badge variant="secondary" className="text-xs">
+                                      +{pkg.modules.length - 3} more
+                                    </Badge>
+                                  )}
+                                </div>
+                              </TableCell>
+                              <TableCell>
+                                <div className="flex items-center gap-2">
+                                  <Badge variant={pkg.isActive ? "default" : "secondary"}>
+                                    {pkg.isActive ? "Active" : "Inactive"}
+                                  </Badge>
+                                  {pkg.isPopular && (
+                                    <Badge className="bg-yellow-500/10 text-yellow-600 border-yellow-500/20">
+                                      Popular
+                                    </Badge>
+                                  )}
+                                </div>
+                              </TableCell>
+                              <TableCell>
+                                <div className="flex items-center gap-2">
+                                  <Button 
+                                    variant="ghost" 
+                                    size="icon"
+                                    onClick={() => openEditPackageDialog(pkg)}
+                                    data-testid={`button-edit-package-${pkg.id}`}
+                                  >
+                                    <Pencil className="w-4 h-4" />
+                                  </Button>
+                                  <Button 
+                                    variant="ghost" 
+                                    size="icon"
+                                    onClick={() => {
+                                      if (confirm("Are you sure you want to delete this package?")) {
+                                        deletePackageMutation.mutate(pkg.id);
+                                      }
+                                    }}
+                                    data-testid={`button-delete-package-${pkg.id}`}
+                                  >
+                                    <Trash2 className="w-4 h-4 text-destructive" />
+                                  </Button>
+                                </div>
+                              </TableCell>
+                            </TableRow>
+                          ))
+                        )}
+                      </TableBody>
+                    </Table>
                   </CardContent>
                 </Card>
               )}
@@ -1073,6 +1346,202 @@ export default function SaasAdminDashboard() {
                 </Button>
               </div>
             </form>
+          </DialogContent>
+        </Dialog>
+
+        {/* Package Create/Edit Dialog */}
+        <Dialog open={showPackageDialog} onOpenChange={setShowPackageDialog}>
+          <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+            <DialogHeader>
+              <DialogTitle className="flex items-center gap-2">
+                <Package className="w-5 h-5" />
+                {editingPackage ? "Edit Package" : "Create Package"}
+              </DialogTitle>
+              <DialogDescription>
+                {editingPackage ? "Update package details and included modules" : "Create a new subscription package with modular features"}
+              </DialogDescription>
+            </DialogHeader>
+            <div className="space-y-6 py-4">
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label htmlFor="packageName">Internal Name</Label>
+                  <Input
+                    id="packageName"
+                    value={packageForm.name}
+                    onChange={(e) => setPackageForm({...packageForm, name: e.target.value})}
+                    placeholder="starter"
+                    data-testid="input-package-name"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="displayName">Display Name</Label>
+                  <Input
+                    id="displayName"
+                    value={packageForm.displayName}
+                    onChange={(e) => setPackageForm({...packageForm, displayName: e.target.value})}
+                    placeholder="Starter Plan"
+                    data-testid="input-package-display-name"
+                  />
+                </div>
+              </div>
+              
+              <div className="space-y-2">
+                <Label htmlFor="description">Description</Label>
+                <Textarea
+                  id="description"
+                  value={packageForm.description}
+                  onChange={(e) => setPackageForm({...packageForm, description: e.target.value})}
+                  placeholder="Perfect for small teams getting started..."
+                  rows={2}
+                  data-testid="input-package-description"
+                />
+              </div>
+
+              <div className="grid grid-cols-3 gap-4">
+                <div className="space-y-2">
+                  <Label htmlFor="price">Price ($)</Label>
+                  <Input
+                    id="price"
+                    type="number"
+                    step="0.01"
+                    value={packageForm.price}
+                    onChange={(e) => setPackageForm({...packageForm, price: e.target.value})}
+                    data-testid="input-package-price"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="billingCycle">Billing Cycle</Label>
+                  <Select
+                    value={packageForm.billingCycle}
+                    onValueChange={(v) => setPackageForm({...packageForm, billingCycle: v})}
+                  >
+                    <SelectTrigger data-testid="select-package-billing">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="monthly">Monthly</SelectItem>
+                      <SelectItem value="yearly">Yearly</SelectItem>
+                      <SelectItem value="one_time">One-time</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="sortOrder">Sort Order</Label>
+                  <Input
+                    id="sortOrder"
+                    type="number"
+                    value={packageForm.sortOrder}
+                    onChange={(e) => setPackageForm({...packageForm, sortOrder: parseInt(e.target.value) || 0})}
+                    data-testid="input-package-sort-order"
+                  />
+                </div>
+              </div>
+
+              <div className="flex items-center gap-6">
+                <div className="flex items-center gap-2">
+                  <Switch
+                    id="isActive"
+                    checked={packageForm.isActive}
+                    onCheckedChange={(checked) => setPackageForm({...packageForm, isActive: checked})}
+                    data-testid="switch-package-active"
+                  />
+                  <Label htmlFor="isActive">Active</Label>
+                </div>
+                <div className="flex items-center gap-2">
+                  <Switch
+                    id="isPopular"
+                    checked={packageForm.isPopular}
+                    onCheckedChange={(checked) => setPackageForm({...packageForm, isPopular: checked})}
+                    data-testid="switch-package-popular"
+                  />
+                  <Label htmlFor="isPopular">Mark as Popular</Label>
+                </div>
+              </div>
+
+              <div className="space-y-3">
+                <Label>Included Modules</Label>
+                <div className="grid grid-cols-2 gap-2">
+                  {modules.map((module: any) => (
+                    <div
+                      key={module.id}
+                      className={`flex items-center gap-3 p-3 rounded-lg border cursor-pointer transition-colors ${
+                        packageForm.moduleIds.includes(module.id)
+                          ? "border-primary bg-primary/5"
+                          : "border-border hover:border-primary/50"
+                      }`}
+                      onClick={() => toggleModule(module.id)}
+                      data-testid={`module-${module.name}`}
+                    >
+                      <Checkbox
+                        checked={packageForm.moduleIds.includes(module.id)}
+                        onCheckedChange={() => toggleModule(module.id)}
+                      />
+                      <div>
+                        <p className="font-medium text-sm">{module.displayName}</p>
+                        <p className="text-xs text-muted-foreground">{module.description}</p>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              <div className="space-y-3">
+                <Label>Custom Features</Label>
+                <div className="flex gap-2">
+                  <Input
+                    value={newFeature}
+                    onChange={(e) => setNewFeature(e.target.value)}
+                    placeholder="Add a feature..."
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter") {
+                        e.preventDefault();
+                        addFeature();
+                      }
+                    }}
+                    data-testid="input-new-feature"
+                  />
+                  <Button type="button" variant="secondary" onClick={addFeature} data-testid="button-add-feature">
+                    <Plus className="w-4 h-4" />
+                  </Button>
+                </div>
+                {packageForm.features.length > 0 && (
+                  <div className="flex flex-wrap gap-2">
+                    {packageForm.features.map((feature, index) => (
+                      <Badge
+                        key={index}
+                        variant="secondary"
+                        className="flex items-center gap-1 pr-1"
+                      >
+                        <Check className="w-3 h-3" />
+                        {feature}
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="icon"
+                          className="h-4 w-4 ml-1"
+                          onClick={() => removeFeature(index)}
+                        >
+                          <X className="w-3 h-3" />
+                        </Button>
+                      </Badge>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </div>
+            <div className="flex justify-end gap-2">
+              <Button type="button" variant="outline" onClick={() => setShowPackageDialog(false)}>
+                Cancel
+              </Button>
+              <Button
+                onClick={handleSavePackage}
+                disabled={createPackageMutation.isPending || updatePackageMutation.isPending}
+                data-testid="button-save-package"
+              >
+                <Save className="w-4 h-4 mr-2" />
+                {editingPackage ? "Update Package" : "Create Package"}
+              </Button>
+            </div>
           </DialogContent>
         </Dialog>
 
