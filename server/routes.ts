@@ -209,6 +209,29 @@ export async function registerRoutes(
     }
   });
 
+  // ==================== USER LIST FOR ASSIGNMENTS ====================
+  
+  // Get all users in tenant (for task assignments, etc.)
+  app.get("/api/users", requireAuth, validateTenant, async (req, res) => {
+    try {
+      const users = await storage.getUsersByTenant(req.user!.tenantId);
+      
+      // Return minimal user info (no sensitive data)
+      const userList = users.map(user => ({
+        id: user.id,
+        firstName: user.firstName,
+        lastName: user.lastName,
+        email: user.email,
+        profileImageUrl: user.profileImageUrl,
+      }));
+      
+      res.json(userList);
+    } catch (error) {
+      console.error("Get users error:", error);
+      res.status(500).json({ message: "Failed to fetch users" });
+    }
+  });
+
   // ==================== TEAM MANAGEMENT ROUTES ====================
   
   // Get all team members (admin only)
