@@ -103,6 +103,11 @@ export default function TeamManagement() {
         firstName: formData.get("firstName") as string,
         lastName: formData.get("lastName") as string,
         email: formData.get("email") as string,
+        phone: formData.get("phone") as string || null,
+        employeeCode: formData.get("employeeCode") as string || null,
+        address: formData.get("address") as string || null,
+        designation: formData.get("designation") as string || null,
+        department: formData.get("department") as string || null,
         permissions: selectedPermissions,
       };
       updateMutation.mutate({ id: editingMember.id, data });
@@ -112,6 +117,11 @@ export default function TeamManagement() {
         lastName: formData.get("lastName") as string,
         email: formData.get("email") as string,
         password: formData.get("password") as string,
+        phone: formData.get("phone") as string || null,
+        employeeCode: formData.get("employeeCode") as string || null,
+        address: formData.get("address") as string || null,
+        designation: formData.get("designation") as string || null,
+        department: formData.get("department") as string || null,
         permissions: selectedPermissions,
       };
       createMutation.mutate(data);
@@ -198,7 +208,30 @@ export default function TeamManagement() {
                 <form onSubmit={handleSubmit} className="space-y-4">
                   <div className="grid grid-cols-2 gap-4">
                     <div className="space-y-2">
-                      <Label htmlFor="firstName">First Name</Label>
+                      <Label htmlFor="employeeCode">Employee Code</Label>
+                      <Input 
+                        id="employeeCode" 
+                        name="employeeCode" 
+                        defaultValue={editingMember?.employeeCode} 
+                        placeholder="EMP001"
+                        data-testid="input-member-employeecode"
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="email">Email *</Label>
+                      <Input 
+                        id="email" 
+                        name="email" 
+                        type="email" 
+                        defaultValue={editingMember?.email} 
+                        required 
+                        data-testid="input-member-email"
+                      />
+                    </div>
+                  </div>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <Label htmlFor="firstName">First Name *</Label>
                       <Input 
                         id="firstName" 
                         name="firstName" 
@@ -208,7 +241,7 @@ export default function TeamManagement() {
                       />
                     </div>
                     <div className="space-y-2">
-                      <Label htmlFor="lastName">Last Name</Label>
+                      <Label htmlFor="lastName">Last Name *</Label>
                       <Input 
                         id="lastName" 
                         name="lastName" 
@@ -218,29 +251,64 @@ export default function TeamManagement() {
                       />
                     </div>
                   </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="email">Email</Label>
-                    <Input 
-                      id="email" 
-                      name="email" 
-                      type="email" 
-                      defaultValue={editingMember?.email} 
-                      required 
-                      data-testid="input-member-email"
-                    />
-                  </div>
-                  {!editingMember && (
+                  <div className="grid grid-cols-2 gap-4">
                     <div className="space-y-2">
-                      <Label htmlFor="password">Password</Label>
+                      <Label htmlFor="phone">Phone</Label>
                       <Input 
-                        id="password" 
-                        name="password" 
-                        type="password" 
-                        required 
-                        data-testid="input-member-password"
+                        id="phone" 
+                        name="phone" 
+                        type="tel" 
+                        defaultValue={editingMember?.phone} 
+                        placeholder="+1 234 567 8900"
+                        data-testid="input-member-phone"
                       />
                     </div>
-                  )}
+                    {!editingMember && (
+                      <div className="space-y-2">
+                        <Label htmlFor="password">Password *</Label>
+                        <Input 
+                          id="password" 
+                          name="password" 
+                          type="password" 
+                          required 
+                          data-testid="input-member-password"
+                        />
+                      </div>
+                    )}
+                    {editingMember && <div />}
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="address">Address</Label>
+                    <Input 
+                      id="address" 
+                      name="address" 
+                      defaultValue={editingMember?.address} 
+                      placeholder="123 Main St, City, Country"
+                      data-testid="input-member-address"
+                    />
+                  </div>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <Label htmlFor="designation">Designation</Label>
+                      <Input 
+                        id="designation" 
+                        name="designation" 
+                        defaultValue={editingMember?.designation} 
+                        placeholder="Sales Manager"
+                        data-testid="input-member-designation"
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="department">Department</Label>
+                      <Input 
+                        id="department" 
+                        name="department" 
+                        defaultValue={editingMember?.department} 
+                        placeholder="Sales"
+                        data-testid="input-member-department"
+                      />
+                    </div>
+                  </div>
                   
                   <div className="space-y-3">
                     <Label>Permissions</Label>

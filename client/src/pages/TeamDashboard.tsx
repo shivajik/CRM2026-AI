@@ -14,7 +14,7 @@ import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useToast } from "@/hooks/use-toast";
 import { authApi, customersApi, dealsApi, tasksApi, activitiesApi } from "@/lib/api";
-import { Plus, Pencil, Trash2, Users, Target, CheckSquare, Activity, TrendingUp } from "lucide-react";
+import { Plus, Pencil, Trash2, Users, Target, CheckSquare, Activity, TrendingUp, User, Mail, Phone, MapPin, Briefcase, Building2 } from "lucide-react";
 import { format } from "date-fns";
 
 const customerTypeColors: Record<string, string> = {
@@ -130,6 +130,74 @@ export default function TeamDashboard() {
               </p>
             </div>
           </div>
+
+          <Card className="mb-6" data-testid="card-profile">
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <User className="h-5 w-5" />
+                My Profile
+              </CardTitle>
+              <CardDescription>Your employee information</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+                <div className="flex items-center gap-3">
+                  <div className="p-2 bg-primary/10 rounded-lg">
+                    <User className="h-4 w-4 text-primary" />
+                  </div>
+                  <div>
+                    <p className="text-xs text-muted-foreground">Employee Code</p>
+                    <p className="font-medium" data-testid="text-employee-code">{currentUser?.employeeCode || "Not assigned"}</p>
+                  </div>
+                </div>
+                <div className="flex items-center gap-3">
+                  <div className="p-2 bg-primary/10 rounded-lg">
+                    <Mail className="h-4 w-4 text-primary" />
+                  </div>
+                  <div>
+                    <p className="text-xs text-muted-foreground">Email</p>
+                    <p className="font-medium" data-testid="text-email">{currentUser?.email}</p>
+                  </div>
+                </div>
+                <div className="flex items-center gap-3">
+                  <div className="p-2 bg-primary/10 rounded-lg">
+                    <Phone className="h-4 w-4 text-primary" />
+                  </div>
+                  <div>
+                    <p className="text-xs text-muted-foreground">Phone</p>
+                    <p className="font-medium" data-testid="text-phone">{currentUser?.phone || "Not provided"}</p>
+                  </div>
+                </div>
+                <div className="flex items-center gap-3">
+                  <div className="p-2 bg-primary/10 rounded-lg">
+                    <MapPin className="h-4 w-4 text-primary" />
+                  </div>
+                  <div>
+                    <p className="text-xs text-muted-foreground">Address</p>
+                    <p className="font-medium" data-testid="text-address">{currentUser?.address || "Not provided"}</p>
+                  </div>
+                </div>
+                <div className="flex items-center gap-3">
+                  <div className="p-2 bg-blue-500/10 rounded-lg">
+                    <Briefcase className="h-4 w-4 text-blue-500" />
+                  </div>
+                  <div>
+                    <p className="text-xs text-muted-foreground">Designation</p>
+                    <p className="font-medium text-blue-600 dark:text-blue-400" data-testid="text-designation">{currentUser?.designation || "Not assigned"}</p>
+                  </div>
+                </div>
+                <div className="flex items-center gap-3">
+                  <div className="p-2 bg-purple-500/10 rounded-lg">
+                    <Building2 className="h-4 w-4 text-purple-500" />
+                  </div>
+                  <div>
+                    <p className="text-xs text-muted-foreground">Department</p>
+                    <p className="font-medium text-purple-600 dark:text-purple-400" data-testid="text-department">{currentUser?.department || "Not assigned"}</p>
+                  </div>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
 
           <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
             <Card>
