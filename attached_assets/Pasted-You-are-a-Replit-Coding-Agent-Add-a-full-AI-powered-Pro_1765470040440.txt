@@ -1,0 +1,271 @@
+You are a Replit Coding Agent. Add a full AI-powered “Proposal Builder Module” inside the CRM. This must allow agency users to create complete proposals with templates, pricing tables, drag-drop sections, client e-signature, AI writing assistance, version tracking, and integration with existing CRM features (projects, clients, quotations, tasks). Do NOT recommend or mention any technical stack. Build everything within the current CRM architecture.
+
+======================================================
+PRIMARY OBJECTIVE
+======================================================
+Create a modern, enterprise-grade Proposal Builder that includes:
+
+1. Proposal Templates Library  
+2. Drag-and-Drop Section Builder  
+3. Dynamic Pricing Tables  
+4. AI Content Writer for proposals  
+5. Proposal Sharing + E-Signature  
+6. Proposal Status Tracking  
+7. PDF Export  
+8. Versioning & Collaboration  
+9. Integration with CRM Clients, Projects, Quotes, Tasks  
+
+======================================================
+FEATURE REQUIREMENTS
+======================================================
+
+------------------------------------------------------
+1. PROPOSAL DASHBOARD
+------------------------------------------------------
+Create a dashboard where users can:
+- View all proposals
+- Filter by status (Draft, Sent, Viewed, Accepted, Rejected, Expired)
+- Search by client, project, or proposal title
+- Create new proposal (from blank or template)
+
+Each listing should show:
+- Client Name
+- Amount
+- Last Updated
+- Proposal Owner
+- Status Badge
+- View Metrics (Views, Time Spent, Actions Taken)
+
+------------------------------------------------------
+2. PROPOSAL BUILDER (MAIN FEATURE)
+------------------------------------------------------
+Create a full proposal editor with:
+- Drag-and-drop blocks  
+- Real-time autosave  
+- Live preview  
+- Section templates  
+- Pricing tables  
+- Image / video embedding  
+- Rich text editor  
+
+Sections supported:
+- Cover page
+- Introduction
+- About Us
+- Scope of Work
+- Deliverables
+- Timeline
+- Pricing Table
+- Terms & Conditions
+- Signature Section
+- Attachments
+
+Add a sidebar showing these blocks for drag-drop usage.
+
+------------------------------------------------------
+3. PROPOSAL TEMPLATES MANAGER
+------------------------------------------------------
+Agency Admin can:
+- Create templates  
+- Edit templates  
+- Duplicate templates  
+- Lock sections (non-editable for users)  
+- Assign template purpose (Web Design, SEO, Maintenance, Branding, Custom)  
+- Add placeholders / merge tags  
+
+Supported merge tags:
+- {{client.name}}
+- {{client.company}}
+- {{project.name}}
+- {{quote.total}}
+- {{agency.name}}
+- {{start_date}}
+- {{deliverable.count}}
+- {{proposal.date}}
+
+Template version control:
+- Store template revisions
+- Allow rollback
+
+------------------------------------------------------
+4. PRICING TABLE & CALCULATION ENGINE
+------------------------------------------------------
+Pricing table features:
+- Items with Name, Description, Unit Price, Quantity  
+- Subtotals, Taxes, Discounts, Final Total  
+- Optional recurring pricing (Monthly, Yearly)  
+- Packages (Basic / Standard / Premium)  
+- Toggle visibility: client can choose a package
+
+Pricing engine should:
+- Auto-calc totals  
+- Support currency selection  
+- Allow formula-based fields (e.g., % discount)  
+
+------------------------------------------------------
+5. AI WRITING ASSISTANT (IMPORTANT)
+------------------------------------------------------
+AI must assist users everywhere inside the builder.
+
+Tools to include:
+- “Generate full proposal based on client info + project type”
+- “Write introduction section”
+- “Write scope of work”
+- “Write timeline”
+- “Improve tone”
+- “Make more formal”
+- “Make more persuasive”
+- “Rewrite professionally”
+- “Shorten content”
+- “Expand content”
+- “Summarize section”
+- “Auto-fill pricing descriptions”
+
+AI must be context-aware using:
+- Client info  
+- Quotation details  
+- Services selected  
+- Deliverables  
+- Timeline  
+- Pricing table  
+
+AI output must preserve merge tags.
+
+------------------------------------------------------
+6. CLIENT VIEW + E-SIGNATURE
+------------------------------------------------------
+Create a dedicated proposal-sharing page (public link with secure token) where client can:
+
+- View proposal (responsive layout)
+- Download PDF
+- Approve / Reject proposal
+- Add comments
+- Provide e-signature (typed or drawn)
+- Accept selected pricing package (if applicable)
+
+Once accepted:
+- Mark proposal as “Accepted”
+- Trigger automation rule (Example: convert to project or task)
+- Notify agency team
+- Save signed PDF with signature history
+
+------------------------------------------------------
+7. PROPOSAL STATUS TRACKING
+------------------------------------------------------
+Track:
+- Sent time
+- First view time
+- Total views
+- Device (desktop/mobile)
+- Time spent on each section (optional)
+- Accepted / Rejected timestamp
+
+Proposal status stages:
+- Draft
+- Sent
+- Viewed
+- Accepted
+- Rejected
+- Expired
+
+------------------------------------------------------
+8. VERSIONING & COLLABORATION
+------------------------------------------------------
+Add:
+- Proposal version history
+- Who made which change
+- Restore previous version
+- Commenting inside sections (internal notes)
+- Activity log:
+  - Section added
+  - Section removed
+  - Pricing updated
+  - AI-generated content added
+  - Status changed
+
+------------------------------------------------------
+9. PDF EXPORT & STYLING
+------------------------------------------------------
+Proposal must export as a professional PDF with:
+- Header/footer
+- Page numbers
+- Clean formatting
+- Agency branding (logo, colors)
+- Digital signature block
+- Pricing table formatting
+
+------------------------------------------------------
+10. AUTOMATIONS & NOTIFICATIONS
+------------------------------------------------------
+Notifications triggered when:
+- Proposal created
+- Proposal sent to client
+- Client viewed proposal
+- Client commented
+- Client selected a package
+- Proposal accepted
+- Proposal rejected
+- Proposal expired
+
+Notification channels:
+- In-app notifications
+- Email notifications
+
+Automation examples:
+- After proposal accepted → Create Project automatically  
+- After proposal accepted → Assign tasks automatically  
+- After proposal rejected → Notify sales team  
+
+------------------------------------------------------
+11. DATABASE ENTITIES
+------------------------------------------------------
+Create/update entities for:
+- Proposal
+- ProposalTemplate
+- ProposalSection
+- ProposalPricingItem
+- ProposalVersion
+- ProposalActivityLog
+- ProposalSignature
+- ProposalViewLog
+- ProposalStatusHistory
+
+------------------------------------------------------
+12. USER PERMISSIONS
+------------------------------------------------------
+Permissions:
+- Admin: manage templates, see all proposals  
+- Team member: create proposals, edit their proposals  
+- Viewer role: view but cannot edit  
+- Client: view public proposal + sign  
+
+------------------------------------------------------
+13. INTEGRATION WITH EXISTING CRM MODULES
+------------------------------------------------------
+Proposal module should integrate with:
+- Clients → auto-fill merge tags
+- Projects → convert accepted proposals
+- Quotations → import pricing automatically
+- Tasks → auto-create task list based on deliverables
+- Email Module → send proposal via email
+
+------------------------------------------------------
+14. FINAL DELIVERABLES
+------------------------------------------------------
+Deliver:
+1. Full Proposal Builder Module  
+2. Templates System  
+3. Pricing Engine  
+4. AI Content Assistant  
+5. PDF Export  
+6. E-Signature Integration  
+7. Notifications + Automations  
+8. Database models + APIs  
+9. Documentation:  
+   - How to build proposals  
+   - How templates work  
+   - How AI assistant works  
+   - How signatures + approvals work  
+10. FINAL_REPORT.md explaining architecture, endpoints, assumptions, and flows  
+
+Start implementation now. Document assumptions in “ASSUMPTIONS.md”. Use clean and incremental commits.
