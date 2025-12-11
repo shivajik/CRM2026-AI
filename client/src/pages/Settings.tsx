@@ -178,6 +178,17 @@ export default function Settings() {
       const previousProfileUrl = profileImageUrl;
       const previousLogoUrl = companyData.logoUrl;
       
+      const getUploadErrorMessage = (error: any): string => {
+        const errorMessage = error?.message?.toLowerCase() || '';
+        if (errorMessage.includes('entity too large') || errorMessage.includes('too large') || errorMessage.includes('payload too large')) {
+          return "The file is too large. Please select an image smaller than 2MB.";
+        }
+        if (errorMessage.includes('timeout')) {
+          return "Upload timed out. Please try with a smaller image.";
+        }
+        return error.message || "Failed to upload. Please try again.";
+      };
+
       if (type === 'profile') {
         setProfileImageUrl(base64);
         try {
@@ -190,7 +201,7 @@ export default function Settings() {
         } catch (error: any) {
           toast({
             title: "Upload failed",
-            description: error.message || "Failed to upload image. Please try again.",
+            description: getUploadErrorMessage(error),
             variant: "destructive",
           });
           setProfileImageUrl(previousProfileUrl);
@@ -209,7 +220,7 @@ export default function Settings() {
         } catch (error: any) {
           toast({
             title: "Upload failed",
-            description: error.message || "Failed to upload logo. Please try again.",
+            description: getUploadErrorMessage(error),
             variant: "destructive",
           });
           setCompanyData({ ...companyData, logoUrl: previousLogoUrl });
@@ -300,7 +311,14 @@ export default function Settings() {
                         Profile Information
                       </CardTitle>
                       <CardDescription>Update your personal details and email settings.</CardDescription>
-                      <p className="text-xs text-muted-foreground mt-1">Hover over the avatar to upload a new photo</p>
+                      <div className="mt-2 p-2 bg-muted/50 rounded-md">
+                        <p className="text-xs text-muted-foreground">
+                          <strong>Photo upload:</strong> Hover over avatar and click to upload
+                        </p>
+                        <p className="text-xs text-muted-foreground mt-1">
+                          Supported formats: PNG, JPG, GIF. Max size: 2MB
+                        </p>
+                      </div>
                     </div>
                   </div>
                 </CardHeader>
@@ -428,12 +446,14 @@ export default function Settings() {
                           />
                         </div>
                         <div className="flex-1">
-                          <p className="text-sm text-muted-foreground">
-                            Upload your company logo. This will appear on invoices, quotes, and other documents.
-                          </p>
-                          <p className="text-xs text-muted-foreground mt-1">
-                            Recommended size: 200x200px. Max file size: 2MB
-                          </p>
+                          <div className="p-2 bg-muted/50 rounded-md">
+                            <p className="text-sm text-muted-foreground">
+                              Upload your company logo. This will appear on invoices, quotes, and other documents.
+                            </p>
+                            <p className="text-xs text-muted-foreground mt-2">
+                              <strong>Requirements:</strong> PNG, JPG, or GIF format. Max size: 2MB. Recommended: 200x200px square image for best results.
+                            </p>
+                          </div>
                           <Button 
                             type="button" 
                             variant="outline" 
