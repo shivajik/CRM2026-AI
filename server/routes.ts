@@ -204,6 +204,10 @@ export async function registerRoutes(
         profileImageUrl: user.profileImageUrl,
         phone: user.phone,
         jobTitle: user.jobTitle,
+        employeeCode: user.employeeCode,
+        address: user.address,
+        designation: user.designation,
+        department: user.department,
       });
     } catch (error) {
       console.error("Get user error:", error);
