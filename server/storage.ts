@@ -122,7 +122,7 @@ export interface IStorage {
 
   // Customer operations
   createCustomer(customer: InsertCustomer): Promise<Customer>;
-  getCustomersByTenant(tenantId: string): Promise<Customer[]>;
+  getCustomersByTenant(tenantId: string, ownerId?: string): Promise<Customer[]>;
   getCustomerById(id: string, tenantId: string): Promise<Customer | undefined>;
   updateCustomer(id: string, tenantId: string, updates: Partial<InsertCustomer>): Promise<Customer | undefined>;
   deleteCustomer(id: string, tenantId: string): Promise<void>;
@@ -767,8 +767,12 @@ export class DatabaseStorage implements IStorage {
     return customer;
   }
 
-  async getCustomersByTenant(tenantId: string): Promise<Customer[]> {
-    return db.select().from(schema.customers).where(eq(schema.customers.tenantId, tenantId)).orderBy(desc(schema.customers.createdAt));
+  async getCustomersByTenant(tenantId: string, ownerId?: string): Promise<Customer[]> {
+    const conditions = [eq(schema.customers.tenantId, tenantId)];
+    if (ownerId) {
+      conditions.push(eq(schema.customers.ownerId, ownerId));
+    }
+    return db.select().from(schema.customers).where(and(...conditions)).orderBy(desc(schema.customers.createdAt));
   }
 
   async getCustomerById(id: string, tenantId: string): Promise<Customer | undefined> {
