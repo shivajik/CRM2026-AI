@@ -8,6 +8,7 @@ export interface User {
   firstName: string;
   lastName: string;
   tenantId: string;
+  profileImageUrl?: string;
 }
 
 export function getToken(): string | null {

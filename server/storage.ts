@@ -36,7 +36,7 @@ export interface IStorage {
   getUserById(id: string): Promise<User | undefined>;
   getUserByEmail(email: string): Promise<User | undefined>;
   getUsersByTenant(tenantId: string): Promise<User[]>;
-  updateUser(id: string, updates: { firstName?: string; lastName?: string; email?: string }): Promise<User | undefined>;
+  updateUser(id: string, updates: { firstName?: string; lastName?: string; email?: string; profileImageUrl?: string }): Promise<User | undefined>;
   
   // Role operations
   createRole(role: InsertRole): Promise<Role>;
@@ -285,13 +285,14 @@ export class DatabaseStorage implements IStorage {
     return db.select().from(schema.users).where(eq(schema.users.tenantId, tenantId));
   }
   
-  async updateUser(id: string, updates: { firstName?: string; lastName?: string; email?: string }): Promise<User | undefined> {
-    const updateData: { firstName?: string; lastName?: string; email?: string; updatedAt: Date } = {
+  async updateUser(id: string, updates: { firstName?: string; lastName?: string; email?: string; profileImageUrl?: string }): Promise<User | undefined> {
+    const updateData: { firstName?: string; lastName?: string; email?: string; profileImageUrl?: string; updatedAt: Date } = {
       updatedAt: new Date(),
     };
     if (updates.firstName) updateData.firstName = updates.firstName;
     if (updates.lastName) updateData.lastName = updates.lastName;
     if (updates.email) updateData.email = updates.email;
+    if (updates.profileImageUrl !== undefined) updateData.profileImageUrl = updates.profileImageUrl;
     
     const [user] = await db.update(schema.users)
       .set(updateData)

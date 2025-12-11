@@ -10,17 +10,22 @@ import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { getUser, setUser } from "@/lib/auth";
 import { usersApi, companyProfileApi } from "@/lib/api";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useToast } from "@/hooks/use-toast";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Avatar, AvatarFallback } from "@/components/ui/avatar";
-import { User, Mail, Shield, Building2, Globe, Phone, MapPin, FileText, DollarSign } from "lucide-react";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { User, Mail, Shield, Building2, Globe, Phone, MapPin, FileText, DollarSign, Upload, Camera, ImageIcon } from "lucide-react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 export default function Settings() {
   const user = getUser();
   const { toast } = useToast();
   const queryClient = useQueryClient();
+  const profileInputRef = useRef<HTMLInputElement>(null);
+  const logoInputRef = useRef<HTMLInputElement>(null);
+  const [profileImageUrl, setProfileImageUrl] = useState<string>(user?.profileImageUrl || "");
+  const [isUploadingProfile, setIsUploadingProfile] = useState(false);
+  const [isUploadingLogo, setIsUploadingLogo] = useState(false);
   const [formData, setFormData] = useState({
     firstName: user?.firstName || "",
     lastName: user?.lastName || "",
@@ -134,6 +139,110 @@ export default function Settings() {
     return (first + last).toUpperCase() || "U";
   };
 
+  const handleImageUpload = async (
+    file: File,
+    type: 'profile' | 'logo'
+  ) => {
+    if (!file) return;
+    
+    if (type === 'profile' && isUploadingProfile) return;
+    if (type === 'logo' && isUploadingLogo) return;
+    
+    if (!file.type.startsWith('image/')) {
+      toast({
+        title: "Invalid file type",
+        description: "Please select an image file (PNG, JPG, etc.)",
+        variant: "destructive",
+      });
+      return;
+    }
+    
+    if (file.size > 2 * 1024 * 1024) {
+      toast({
+        title: "File too large",
+        description: "Please select an image smaller than 2MB",
+        variant: "destructive",
+      });
+      return;
+    }
+    
+    if (type === 'profile') {
+      setIsUploadingProfile(true);
+    } else {
+      setIsUploadingLogo(true);
+    }
+    
+    const reader = new FileReader();
+    reader.onload = async (e) => {
+      const base64 = e.target?.result as string;
+      const previousProfileUrl = profileImageUrl;
+      const previousLogoUrl = companyData.logoUrl;
+      
+      if (type === 'profile') {
+        setProfileImageUrl(base64);
+        try {
+          const updatedUser = await usersApi.updateProfile({ profileImageUrl: base64 });
+          setUser(updatedUser);
+          toast({
+            title: "Profile image updated",
+            description: "Your profile picture has been updated successfully.",
+          });
+        } catch (error: any) {
+          toast({
+            title: "Upload failed",
+            description: error.message || "Failed to upload image. Please try again.",
+            variant: "destructive",
+          });
+          setProfileImageUrl(previousProfileUrl);
+        } finally {
+          setIsUploadingProfile(false);
+        }
+      } else {
+        setCompanyData({ ...companyData, logoUrl: base64 });
+        try {
+          await companyProfileApi.update({ logoUrl: base64 });
+          queryClient.invalidateQueries({ queryKey: ["company-profile"] });
+          toast({
+            title: "Company logo updated",
+            description: "Your company logo has been updated successfully.",
+          });
+        } catch (error: any) {
+          toast({
+            title: "Upload failed",
+            description: error.message || "Failed to upload logo. Please try again.",
+            variant: "destructive",
+          });
+          setCompanyData({ ...companyData, logoUrl: previousLogoUrl });
+        } finally {
+          setIsUploadingLogo(false);
+        }
+      }
+    };
+    reader.onerror = () => {
+      toast({
+        title: "Read failed",
+        description: "Failed to read the image file. Please try again.",
+        variant: "destructive",
+      });
+      if (type === 'profile') {
+        setIsUploadingProfile(false);
+      } else {
+        setIsUploadingLogo(false);
+      }
+    };
+    reader.readAsDataURL(file);
+  };
+
+  const handleProfileImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) handleImageUpload(file, 'profile');
+  };
+
+  const handleLogoChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) handleImageUpload(file, 'logo');
+  };
+
   return (
     <ProtectedRoute>
       <Layout>
@@ -154,17 +263,44 @@ export default function Settings() {
               <Card>
                 <CardHeader>
                   <div className="flex items-center gap-4">
-                    <Avatar className="h-16 w-16">
-                      <AvatarFallback className="text-xl bg-primary text-primary-foreground">
-                        {getInitials()}
-                      </AvatarFallback>
-                    </Avatar>
+                    <div className="relative group">
+                      <Avatar className="h-16 w-16">
+                        {profileImageUrl ? (
+                          <AvatarImage src={profileImageUrl} alt="Profile" />
+                        ) : null}
+                        <AvatarFallback className="text-xl bg-primary text-primary-foreground">
+                          {getInitials()}
+                        </AvatarFallback>
+                      </Avatar>
+                      <button
+                        type="button"
+                        onClick={() => !isUploadingProfile && profileInputRef.current?.click()}
+                        className={`absolute inset-0 flex items-center justify-center bg-black/50 rounded-full transition-opacity cursor-pointer ${isUploadingProfile ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'}`}
+                        disabled={isUploadingProfile}
+                        data-testid="button-upload-profile-image"
+                      >
+                        {isUploadingProfile ? (
+                          <div className="h-5 w-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                        ) : (
+                          <Camera className="h-5 w-5 text-white" />
+                        )}
+                      </button>
+                      <input
+                        ref={profileInputRef}
+                        type="file"
+                        accept="image/*"
+                        onChange={handleProfileImageChange}
+                        className="hidden"
+                        data-testid="input-profile-image"
+                      />
+                    </div>
                     <div>
                       <CardTitle className="flex items-center gap-2">
                         <User className="h-5 w-5" />
                         Profile Information
                       </CardTitle>
                       <CardDescription>Update your personal details and email settings.</CardDescription>
+                      <p className="text-xs text-muted-foreground mt-1">Hover over the avatar to upload a new photo</p>
                     </div>
                   </div>
                 </CardHeader>
@@ -251,6 +387,80 @@ export default function Settings() {
                     </CardDescription>
                   </CardHeader>
                   <CardContent className="space-y-6">
+                    <div className="space-y-4">
+                      <Label className="flex items-center gap-2">
+                        <ImageIcon className="h-4 w-4" />
+                        Company Logo
+                      </Label>
+                      <div className="flex items-center gap-6">
+                        <div className="relative group">
+                          <div className="h-20 w-20 rounded-lg border-2 border-dashed border-muted-foreground/25 flex items-center justify-center bg-muted/50 overflow-hidden">
+                            {companyData.logoUrl ? (
+                              <img 
+                                src={companyData.logoUrl} 
+                                alt="Company Logo" 
+                                className="h-full w-full object-contain"
+                              />
+                            ) : (
+                              <Building2 className="h-8 w-8 text-muted-foreground/50" />
+                            )}
+                          </div>
+                          <button
+                            type="button"
+                            onClick={() => !isUploadingLogo && logoInputRef.current?.click()}
+                            className={`absolute inset-0 flex items-center justify-center bg-black/50 rounded-lg transition-opacity cursor-pointer ${isUploadingLogo ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'}`}
+                            disabled={isUploadingLogo}
+                            data-testid="button-upload-company-logo"
+                          >
+                            {isUploadingLogo ? (
+                              <div className="h-5 w-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                            ) : (
+                              <Upload className="h-5 w-5 text-white" />
+                            )}
+                          </button>
+                          <input
+                            ref={logoInputRef}
+                            type="file"
+                            accept="image/*"
+                            onChange={handleLogoChange}
+                            className="hidden"
+                            data-testid="input-company-logo"
+                          />
+                        </div>
+                        <div className="flex-1">
+                          <p className="text-sm text-muted-foreground">
+                            Upload your company logo. This will appear on invoices, quotes, and other documents.
+                          </p>
+                          <p className="text-xs text-muted-foreground mt-1">
+                            Recommended size: 200x200px. Max file size: 2MB
+                          </p>
+                          <Button 
+                            type="button" 
+                            variant="outline" 
+                            size="sm" 
+                            className="mt-2"
+                            onClick={() => logoInputRef.current?.click()}
+                            disabled={isUploadingLogo}
+                            data-testid="button-change-logo"
+                          >
+                            {isUploadingLogo ? (
+                              <>
+                                <div className="h-4 w-4 mr-2 border-2 border-current border-t-transparent rounded-full animate-spin" />
+                                Uploading...
+                              </>
+                            ) : (
+                              <>
+                                <Upload className="h-4 w-4 mr-2" />
+                                {companyData.logoUrl ? "Change Logo" : "Upload Logo"}
+                              </>
+                            )}
+                          </Button>
+                        </div>
+                      </div>
+                    </div>
+
+                    <Separator />
+
                     <div className="grid grid-cols-2 gap-4">
                       <div className="space-y-2 col-span-2">
                         <Label htmlFor="companyName">Company Name *</Label>

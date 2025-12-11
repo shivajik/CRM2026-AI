@@ -426,13 +426,13 @@ export async function registerRoutes(
   
   app.patch("/api/users/profile", requireAuth, async (req, res) => {
     try {
-      const { firstName, lastName, email } = req.body;
+      const { firstName, lastName, email, profileImageUrl } = req.body;
       
-      if (!firstName && !lastName && !email) {
+      if (!firstName && !lastName && !email && profileImageUrl === undefined) {
         return res.status(400).json({ message: "No valid fields provided for update" });
       }
       
-      const updates: { firstName?: string; lastName?: string; email?: string } = {};
+      const updates: { firstName?: string; lastName?: string; email?: string; profileImageUrl?: string } = {};
       
       if (firstName && typeof firstName === 'string') {
         updates.firstName = firstName.trim();
@@ -447,6 +447,9 @@ export async function registerRoutes(
           return res.status(400).json({ message: "Email already in use" });
         }
         updates.email = trimmedEmail;
+      }
+      if (profileImageUrl !== undefined) {
+        updates.profileImageUrl = profileImageUrl;
       }
       
       if (Object.keys(updates).length === 0) {
@@ -464,6 +467,7 @@ export async function registerRoutes(
         firstName: updatedUser.firstName,
         lastName: updatedUser.lastName,
         tenantId: updatedUser.tenantId,
+        profileImageUrl: updatedUser.profileImageUrl,
       });
     } catch (error) {
       console.error("Update profile error:", error);

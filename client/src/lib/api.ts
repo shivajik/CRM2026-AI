@@ -116,7 +116,7 @@ export const dealsApi = {
 
 // Users API
 export const usersApi = {
-  updateProfile: (data: { firstName?: string; lastName?: string; email?: string }) =>
+  updateProfile: (data: { firstName?: string; lastName?: string; email?: string; profileImageUrl?: string }) =>
     apiRequest("/users/profile", { method: "PATCH", body: JSON.stringify(data) }),
 };
 
