@@ -46,6 +46,7 @@ export async function registerRoutes(
         firstName,
         lastName,
         roleId: adminRole.id,
+        userType: 'agency_admin',
         isAdmin: true,
         isActive: true,
       });
