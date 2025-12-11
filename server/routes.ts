@@ -571,6 +571,49 @@ export async function registerRoutes(
     }
   });
 
+  // Profile image upload (accepts base64 data URL)
+  app.post("/api/users/profile/upload-image", requireAuth, async (req, res) => {
+    try {
+      const { imageData } = req.body;
+      
+      if (!imageData) {
+        return res.status(400).json({ message: "Image data is required" });
+      }
+      
+      // Validate base64 image data
+      const dataUrlPattern = /^data:image\/(png|jpeg|jpg|gif|webp);base64,/;
+      if (!dataUrlPattern.test(imageData)) {
+        return res.status(400).json({ message: "Invalid image format. Please upload a valid image." });
+      }
+      
+      // Check image size (limit to ~2MB after base64 encoding)
+      const base64Data = imageData.replace(/^data:image\/\w+;base64,/, '');
+      const sizeInBytes = Buffer.from(base64Data, 'base64').length;
+      const maxSize = 2 * 1024 * 1024; // 2MB
+      
+      if (sizeInBytes > maxSize) {
+        return res.status(400).json({ message: "Image size too large. Maximum size is 2MB." });
+      }
+      
+      // Store the base64 data URL directly
+      const updatedUser = await storage.updateUser(req.user!.userId, { 
+        profileImageUrl: imageData 
+      });
+      
+      if (!updatedUser) {
+        return res.status(404).json({ message: "User not found" });
+      }
+      
+      res.json({
+        profileImageUrl: updatedUser.profileImageUrl,
+        message: "Profile image uploaded successfully",
+      });
+    } catch (error) {
+      console.error("Upload profile image error:", error);
+      res.status(500).json({ message: "Failed to upload profile image" });
+    }
+  });
+
   // ==================== COMPANY PROFILE ROUTES ====================
   
   app.get("/api/company-profile", requireAuth, validateTenant, async (req, res) => {

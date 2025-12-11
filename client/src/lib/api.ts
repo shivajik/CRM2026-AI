@@ -117,8 +117,10 @@ export const dealsApi = {
 // Users API
 export const usersApi = {
   getAll: () => apiRequest("/users"),
-  updateProfile: (data: { firstName?: string; lastName?: string; email?: string; profileImageUrl?: string }) =>
+  updateProfile: (data: { firstName?: string; lastName?: string; email?: string; profileImageUrl?: string; phone?: string; jobTitle?: string }) =>
     apiRequest("/users/profile", { method: "PATCH", body: JSON.stringify(data) }),
+  uploadProfileImage: (imageData: string) =>
+    apiRequest("/users/profile/upload-image", { method: "POST", body: JSON.stringify({ imageData }) }),
 };
 
 // Company Profile API
