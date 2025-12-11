@@ -9,199 +9,214 @@ import { Badge } from "@/components/ui/badge";
 import { 
   ArrowRight, 
   Check, 
-  Zap, 
   BarChart3, 
   Users, 
-  Puzzle, 
-  Smartphone,
-  Mail,
-  Calendar,
-  Target,
-  RefreshCw,
+  Receipt,
   FileText,
-  Lock
+  Package,
+  Activity,
+  Building2,
+  UserCircle,
+  LayoutDashboard,
+  Settings,
+  Shield
 } from "lucide-react";
-import { features } from "@/lib/marketingData";
 
 const detailedFeatures = [
   {
-    id: "pipeline",
-    title: "Visual Pipeline Management",
-    icon: Target,
-    shortCopy: "Drag-and-drop deals through your sales stages with our intuitive kanban board.",
-    longCopy: `Our visual pipeline gives you complete control over your sales process. Drag deals between stages, customize pipeline views for different teams or products, and spot bottlenecks before they kill your quota.
+    id: "invoices",
+    title: "Invoice Management",
+    icon: Receipt,
+    shortCopy: "Create, send, and track professional invoices with payment recording and status management.",
+    longCopy: `Our comprehensive invoice management system helps you get paid faster. Create professional invoices in seconds, track payment status in real-time, and record partial or full payments as they come in.
 
-Most teams find deals worth $50,000+ hiding in their pipeline within the first week - opportunities that fell through the cracks with their old system. The visual format means nothing gets forgotten.
+Generate invoices with line items, taxes, and discounts. Set due dates and payment terms. Track which invoices are paid, pending, or overdue at a glance.
 
-Set up deal rotting alerts so you know when opportunities have been sitting too long. Add custom fields for the metrics that matter to your business. Filter and sort by any criteria to focus on what matters most right now.`,
+Your company logo and details appear automatically on every invoice, giving your business a professional look. Export invoices to PDF for easy sharing with customers.`,
     benefits: [
-      "Customizable deal stages",
-      "Drag-and-drop interface",
-      "Deal rotting alerts",
-      "Multiple pipeline views",
-      "Custom fields & filters",
+      "Professional invoice templates",
+      "Payment tracking & recording",
+      "Tax & discount calculations",
+      "PDF export with company logo",
+      "Status tracking (draft, sent, paid, overdue)",
     ],
   },
   {
-    id: "automation",
-    title: "Smart Automation",
-    icon: Zap,
-    shortCopy: "Let workflows handle the repetitive stuff so your team can focus on selling.",
-    longCopy: `Every minute your reps spend on data entry is a minute they're not spending with prospects. Our automation engine handles the busywork - automatically.
-
-Set up workflows that trigger based on any action: when a deal moves stages, when a task is overdue, when a contact opens an email. Automatically assign tasks, send follow-ups, update fields, and notify team members.
-
-The average team saves 12+ hours per rep each week. That's time they can spend on what actually closes deals: building relationships with prospects.`,
-    benefits: [
-      "Trigger-based workflows",
-      "Automated task creation",
-      "Email sequences",
-      "Field updates",
-      "Team notifications",
-    ],
-  },
-  {
-    id: "analytics",
-    title: "Revenue Analytics",
-    icon: BarChart3,
-    shortCopy: "Real-time dashboards that show you exactly what's working and what's not.",
-    longCopy: `Stop guessing about your pipeline. Our analytics dashboards update in real-time, giving you visibility into every metric that matters: conversion rates, average deal size, sales velocity, and team performance.
-
-Build custom reports for your specific needs. Track trends over time. Compare performance across reps, teams, and time periods. Forecast revenue with confidence based on historical data.
-
-The managers who love Nexus most are the ones who used to spend hours each week building reports in spreadsheets. Now they just open a dashboard.`,
-    benefits: [
-      "Real-time updates",
-      "Custom report builder",
-      "Revenue forecasting",
-      "Team leaderboards",
-      "Trend analysis",
-    ],
-  },
-  {
-    id: "contacts",
-    title: "Contact Intelligence",
-    icon: Users,
-    shortCopy: "Everything you need to know about your prospects, automatically organized.",
-    longCopy: `Every email, call, and meeting is automatically logged to the right contact record. No more manual data entry, no more forgotten follow-ups, no more walking into calls unprepared.
-
-Our enrichment features pull in company data, social profiles, and recent news so you always have context. See the complete history of any relationship in seconds - who spoke to them, what was discussed, and what's next.
-
-Smart de-duplication means you won't have five records for the same person. Activity timelines mean you can pick up any conversation where it left off, even if you're not the one who started it.`,
-    benefits: [
-      "Auto-logged activities",
-      "Data enrichment",
-      "Relationship timeline",
-      "Duplicate detection",
-      "Social profiles",
-    ],
-  },
-  {
-    id: "integrations",
-    title: "Seamless Integrations",
-    icon: Puzzle,
-    shortCopy: "Connect with 200+ tools you already use. Two-way sync means no more copy-paste.",
-    longCopy: `Your CRM should work with your tools, not against them. We integrate with 200+ apps including Gmail, Outlook, Slack, Zoom, and the rest of your tech stack.
-
-Two-way sync means changes flow automatically between systems. Update a contact in your email? It's updated in Nexus. Close a deal in Nexus? It syncs to your billing system. No more copying and pasting between tabs.
-
-Most integrations set up in minutes, not days. Our API is fully documented for custom integrations, and our team helps Enterprise customers build exactly what they need.`,
-    benefits: [
-      "200+ integrations",
-      "Two-way sync",
-      "Gmail & Outlook",
-      "Slack notifications",
-      "REST API access",
-    ],
-  },
-  {
-    id: "mobile",
-    title: "Mobile CRM",
-    icon: Smartphone,
-    shortCopy: "Full CRM functionality in your pocket. Update deals, prep for meetings, stay in sync.",
-    longCopy: `Your work doesn't stop when you leave your desk. Our mobile apps give you full CRM access from anywhere - update deals on the go, prep for meetings during your commute, and get notifications when prospects engage.
-
-The mobile apps aren't watered-down versions of the desktop experience. You can do everything on mobile that you can on desktop: manage deals, log activities, run reports, and even record voice notes that automatically transcribe.
-
-Offline mode means you can work without internet and sync when you're back online. Perfect for trade shows, field sales, or anywhere with spotty WiFi.`,
-    benefits: [
-      "iOS & Android apps",
-      "Full functionality",
-      "Offline mode",
-      "Voice notes",
-      "Push notifications",
-    ],
-  },
-  {
-    id: "email",
-    title: "Email Integration",
-    icon: Mail,
-    shortCopy: "Sync your inbox, track opens, and send sequences - all from within the CRM.",
-    longCopy: `Stop switching between your inbox and your CRM. Our email integration brings your sales emails right into Nexus, with tracking that shows you exactly when prospects engage.
-
-Set up email sequences that automatically follow up with prospects on your schedule. Track opens and clicks in real-time so you can reach out at the perfect moment. Use templates to send consistent, professional messages in seconds.
-
-All email activity is automatically logged to the right contact record. No more BCC tricks or manual logging. Just write emails and let Nexus handle the rest.`,
-    benefits: [
-      "Inbox sync",
-      "Open & click tracking",
-      "Email sequences",
-      "Templates library",
-      "Auto-logging",
-    ],
-  },
-  {
-    id: "calendar",
-    title: "Calendar Sync",
-    icon: Calendar,
-    shortCopy: "Meetings automatically logged. Scheduling made simple. No more double-booking.",
-    longCopy: `Connect your Google or Outlook calendar and watch meetings automatically appear in your CRM. No more manual logging, no more forgotten follow-ups after calls.
-
-Share your availability with prospects and let them book directly into your calendar. Nexus automatically creates the meeting record, sends reminders, and even suggests prep notes based on the contact's history.
-
-Team calendars show everyone's availability so you can schedule internal meetings without the back-and-forth. See at a glance who's available when.`,
-    benefits: [
-      "Auto-logged meetings",
-      "Booking links",
-      "Smart reminders",
-      "Team calendars",
-      "Prep suggestions",
-    ],
-  },
-  {
-    id: "documents",
-    title: "Document Management",
+    id: "quotations",
+    title: "Quotation System",
     icon: FileText,
-    shortCopy: "Proposals, contracts, and collateral - organized, tracked, and ready to send.",
-    longCopy: `Store all your sales documents in one place with full visibility into how prospects engage with them. Track when proposals are opened, how long they're viewed, and which sections get the most attention.
+    shortCopy: "Generate professional quotes for customers with line items, terms, and easy conversion to invoices.",
+    longCopy: `Win more business with professional quotations that impress your customers. Create detailed quotes with multiple line items, set validity periods, and include your terms and conditions.
 
-Create templates for common documents and personalize them in seconds. Collect e-signatures without leaving Nexus. Automatically attach documents to the right deal records.
+Track quotation status from draft to accepted. When a customer approves your quote, easily convert it to an invoice with a single click - no re-entering data.
 
-Version control means you always know which version of a proposal was sent to which prospect. No more hunting through email to find the latest deck.`,
+Each quotation includes your company branding, making your business look established and trustworthy to potential customers.`,
     benefits: [
-      "Document tracking",
-      "E-signatures",
-      "Templates",
-      "Version control",
-      "Centralized storage",
+      "Professional quote templates",
+      "Line items with pricing",
+      "Terms & conditions",
+      "Validity date tracking",
+      "Company logo on exports",
     ],
   },
   {
-    id: "security",
-    title: "Enterprise Security",
-    icon: Lock,
-    shortCopy: "Bank-level security, SOC 2 certified, GDPR compliant. Your data is safe with us.",
-    longCopy: `We take security seriously because your customer data is your competitive advantage. We use AES-256 encryption for data at rest and TLS 1.3 for data in transit - the same standards banks use.
+    id: "customers",
+    title: "Customer Management",
+    icon: Users,
+    shortCopy: "Keep all your customer information organized with complete contact details and history.",
+    longCopy: `All your customer information in one place. Store contact details, company information, addresses, and custom notes for every customer.
 
-We're SOC 2 Type II certified, GDPR compliant, and undergo regular third-party security audits. Role-based access controls let you decide who sees what. Audit logs track every action for compliance.
+Categorize customers by type - leads, prospects, or active customers. Add industry and segment information for better organization and reporting.
 
-Enterprise plans include SSO integration with your identity provider, custom data retention policies, and dedicated security reviews.`,
+View the complete customer journey including all quotations, invoices, deals, and activities. Never lose track of a customer relationship again.`,
     benefits: [
-      "AES-256 encryption",
-      "SOC 2 Type II",
-      "GDPR compliant",
-      "SSO support",
-      "Audit logs",
+      "Complete contact profiles",
+      "Customer type categorization",
+      "Industry & segment tracking",
+      "Customer journey timeline",
+      "Notes & history",
+    ],
+  },
+  {
+    id: "deals",
+    title: "Deal Pipeline",
+    icon: Building2,
+    shortCopy: "Track sales opportunities through your pipeline stages and forecast revenue.",
+    longCopy: `Visualize your entire sales pipeline at a glance. Track deals from initial contact through qualification, proposal, negotiation, and close.
+
+Set deal values and probability percentages to forecast revenue accurately. Assign expected close dates to prioritize your time on the most promising opportunities.
+
+Link deals to customers and contacts to maintain a complete picture of every sales relationship.`,
+    benefits: [
+      "Visual pipeline stages",
+      "Deal value tracking",
+      "Probability & forecasting",
+      "Expected close dates",
+      "Customer linking",
+    ],
+  },
+  {
+    id: "activities",
+    title: "Activity Tracking",
+    icon: Activity,
+    shortCopy: "Log calls, emails, meetings, and notes to maintain a complete record of customer interactions.",
+    longCopy: `Never forget a customer interaction. Log every call, email, meeting, and note with dates and descriptions.
+
+Link activities to specific customers to build a comprehensive history. See at a glance when you last contacted someone and what was discussed.
+
+Your team can see the complete activity history, making handoffs smooth and ensuring nothing falls through the cracks.`,
+    benefits: [
+      "Call & email logging",
+      "Meeting records",
+      "Notes & comments",
+      "Customer activity timeline",
+      "Team visibility",
+    ],
+  },
+  {
+    id: "products",
+    title: "Product Catalog",
+    icon: Package,
+    shortCopy: "Manage your products and services with pricing for quick addition to quotes and invoices.",
+    longCopy: `Maintain a catalog of all your products and services with standard pricing. When creating quotes or invoices, quickly add items from your catalog instead of typing details every time.
+
+Set prices, descriptions, and categories for easy organization. Update pricing across your catalog and have changes reflected in new quotes and invoices automatically.`,
+    benefits: [
+      "Product & service listings",
+      "Standard pricing",
+      "Quick add to quotes/invoices",
+      "Categories & organization",
+      "Centralized price management",
+    ],
+  },
+  {
+    id: "dashboard",
+    title: "Business Dashboard",
+    icon: LayoutDashboard,
+    shortCopy: "Get a real-time overview of your business with key metrics and performance indicators.",
+    longCopy: `See how your business is doing at a glance. The dashboard shows total revenue, active deals, customer counts, and pending tasks.
+
+Visualize revenue trends over time with charts. Understand your customer distribution across segments and industries.
+
+Make data-driven decisions with insights that update in real-time as you record sales and payments.`,
+    benefits: [
+      "Revenue overview",
+      "Deal statistics",
+      "Customer metrics",
+      "Visual charts & trends",
+      "Real-time updates",
+    ],
+  },
+  {
+    id: "reports",
+    title: "Reports & Analytics",
+    icon: BarChart3,
+    shortCopy: "Generate detailed reports on sales, customers, invoices, and pipeline performance.",
+    longCopy: `Understand your business performance with comprehensive reports. Analyze sales by time period, track pipeline health, and monitor customer growth.
+
+Generate invoice summaries showing paid, pending, and overdue amounts. Export reports to CSV for further analysis or sharing with stakeholders.
+
+Filter by date ranges to compare performance across different periods and identify trends.`,
+    benefits: [
+      "Sales & pipeline reports",
+      "Customer analytics",
+      "Invoice summaries",
+      "CSV export",
+      "Date range filtering",
+    ],
+  },
+  {
+    id: "company",
+    title: "Company Profile",
+    icon: Settings,
+    shortCopy: "Customize your company information with logo, details, and branding for professional documents.",
+    longCopy: `Set up your company profile once and have it appear on all your invoices and quotations. Upload your logo, add contact details, tax ID, and registration numbers.
+
+Configure default payment terms, invoice prefixes, and notes that appear on every document. Make your business look professional with consistent branding.
+
+Update your profile anytime and changes reflect immediately on new documents.`,
+    benefits: [
+      "Logo upload & branding",
+      "Company details on documents",
+      "Tax ID & registration",
+      "Default payment terms",
+      "Invoice/quote prefixes",
+    ],
+  },
+  {
+    id: "team",
+    title: "Team Management",
+    icon: UserCircle,
+    shortCopy: "Invite team members and manage roles for collaborative business management.",
+    longCopy: `Work as a team with role-based access. Invite team members to collaborate on customer management, deal tracking, and invoicing.
+
+Assign different roles to control what each team member can see and do. Administrators have full access while other roles can be limited to specific functions.
+
+Everyone works from the same data, ensuring your team is always aligned.`,
+    benefits: [
+      "Team member invitations",
+      "Role-based access",
+      "Collaborative workflows",
+      "Shared customer data",
+      "Admin controls",
+    ],
+  },
+  {
+    id: "portal",
+    title: "Customer Portal",
+    icon: Shield,
+    shortCopy: "Give customers access to view their quotations, invoices, and manage their profile.",
+    longCopy: `Provide a professional self-service experience for your customers. They can log in to view their quotations and invoices, check payment status, and update their contact information.
+
+Reduce back-and-forth communication by giving customers direct access to the information they need. They can download invoices and quotes as PDFs anytime.
+
+Strengthen customer relationships with transparency and convenience.`,
+    benefits: [
+      "Customer self-service",
+      "View quotations & invoices",
+      "Download PDF documents",
+      "Profile management",
+      "Professional experience",
     ],
   },
 ];
@@ -211,18 +226,17 @@ function HeroSection() {
     <section className="relative overflow-hidden bg-gradient-to-b from-primary/5 via-background to-background py-16 lg:py-24">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
         <Badge variant="secondary" className="mb-4">
-          <RefreshCw className="w-3 h-3 mr-1" />
-          Updated for 2024
+          Complete Business Solution
         </Badge>
         
         <h1 className="text-4xl sm:text-5xl lg:text-6xl font-heading font-bold tracking-tight mb-6" data-testid="text-features-headline">
-          Features Built for
-          <span className="text-primary block">Modern Sales Teams</span>
+          Everything You Need to
+          <span className="text-primary block">Run Your Business</span>
         </h1>
         
         <p className="text-lg sm:text-xl text-muted-foreground mb-8 max-w-2xl mx-auto">
-          Everything you need to manage your pipeline, close more deals, and grow revenue. 
-          Powerful enough for enterprise, simple enough for startups.
+          From quotations to invoices, customer management to reporting. 
+          All the tools you need in one simple platform.
         </p>
         
         <div className="flex flex-col sm:flex-row items-center justify-center gap-4">
@@ -306,51 +320,44 @@ function FeatureDetailSection() {
   );
 }
 
-function IntegrationsSection() {
-  const integrations = [
-    { name: "Gmail", category: "Email" },
-    { name: "Outlook", category: "Email" },
-    { name: "Slack", category: "Communication" },
-    { name: "Zoom", category: "Meetings" },
-    { name: "Google Calendar", category: "Calendar" },
-    { name: "Stripe", category: "Payments" },
-    { name: "QuickBooks", category: "Accounting" },
-    { name: "Zapier", category: "Automation" },
-    { name: "HubSpot", category: "Marketing" },
-    { name: "Mailchimp", category: "Email Marketing" },
-    { name: "Salesforce", category: "CRM" },
-    { name: "LinkedIn", category: "Social" },
+function FeatureGridSection() {
+  const quickFeatures = [
+    { icon: Receipt, title: "Invoices", desc: "Create & track payments" },
+    { icon: FileText, title: "Quotations", desc: "Professional quotes" },
+    { icon: Users, title: "Customers", desc: "Complete CRM" },
+    { icon: Building2, title: "Deals", desc: "Sales pipeline" },
+    { icon: Activity, title: "Activities", desc: "Interaction logging" },
+    { icon: Package, title: "Products", desc: "Catalog management" },
+    { icon: LayoutDashboard, title: "Dashboard", desc: "Business overview" },
+    { icon: BarChart3, title: "Reports", desc: "Analytics & insights" },
+    { icon: Settings, title: "Settings", desc: "Company branding" },
+    { icon: UserCircle, title: "Team", desc: "Collaboration" },
+    { icon: Shield, title: "Portal", desc: "Customer access" },
+    { icon: FileText, title: "PDF Export", desc: "Professional documents" },
   ];
 
   return (
-    <section className="py-20 bg-muted/30" id="integrations" data-testid="section-integrations">
+    <section className="py-20 bg-muted/30" data-testid="section-feature-grid">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="text-center mb-16">
           <h2 className="text-3xl sm:text-4xl font-heading font-bold mb-4">
-            Integrates With Your Stack
+            All Features at a Glance
           </h2>
           <p className="text-lg text-muted-foreground max-w-2xl mx-auto">
-            200+ integrations with the tools you already use. Two-way sync keeps everything in sync.
+            Everything included in one platform. No add-ons, no hidden fees.
           </p>
         </div>
 
-        <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-4">
-          {integrations.map((integration) => (
-            <Card key={integration.name} className="text-center p-4 hover:shadow-md transition-shadow">
+        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+          {quickFeatures.map((feature) => (
+            <Card key={feature.title} className="text-center p-4 hover:shadow-md transition-shadow">
               <div className="w-12 h-12 bg-primary/10 rounded-lg flex items-center justify-center mx-auto mb-3">
-                <Puzzle className="h-6 w-6 text-primary" />
+                <feature.icon className="h-6 w-6 text-primary" />
               </div>
-              <div className="font-medium text-sm">{integration.name}</div>
-              <div className="text-xs text-muted-foreground">{integration.category}</div>
+              <div className="font-medium text-sm">{feature.title}</div>
+              <div className="text-xs text-muted-foreground">{feature.desc}</div>
             </Card>
           ))}
-        </div>
-
-        <div className="text-center mt-8">
-          <Button variant="outline" data-testid="button-all-integrations">
-            View All 200+ Integrations
-            <ArrowRight className="ml-2 h-4 w-4" />
-          </Button>
         </div>
       </div>
     </section>
@@ -362,7 +369,7 @@ function CTASection() {
     <section className="py-20 bg-primary text-primary-foreground">
       <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
         <h2 className="text-3xl sm:text-4xl font-heading font-bold mb-4">
-          See These Features in Action
+          Ready to Streamline Your Business?
         </h2>
         <p className="text-lg opacity-90 mb-8 max-w-2xl mx-auto">
           Start your free 14-day trial and explore every feature. No credit card required.
@@ -382,14 +389,14 @@ export default function Features() {
   return (
     <MarketingLayout>
       <SEOHead
-        title="Features Built for Modern Sales Teams | Nexus CRM"
-        description="Everything you need to manage your pipeline, close more deals, and grow revenue. Powerful enough for enterprise, simple enough for startups."
+        title="Features - Complete Business Management | Nexus"
+        description="Invoices, quotations, customer management, deal pipeline, reports, and more. All the tools you need to run your business in one platform."
         canonical="https://nexus.com/features"
-        keywords={["CRM features", "sales automation", "contact management", "pipeline management"]}
+        keywords={["invoice software", "quotation system", "customer management", "business management", "CRM"]}
       />
       <HeroSection />
       <FeatureDetailSection />
-      <IntegrationsSection />
+      <FeatureGridSection />
       <CTASection />
     </MarketingLayout>
   );
