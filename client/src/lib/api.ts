@@ -275,4 +275,39 @@ export const saasAdminApi = {
   getProfile: () => apiRequest("/saas-admin/profile"),
   updateProfile: (data: { firstName?: string; lastName?: string; email?: string }) =>
     apiRequest("/saas-admin/profile", { method: "PATCH", body: JSON.stringify(data) }),
+
+  // Packages Management
+  getPackages: () => apiRequest("/saas-admin/packages"),
+  getPackageById: (id: string) => apiRequest(`/saas-admin/packages/${id}`),
+  createPackage: (data: {
+    name: string;
+    displayName: string;
+    description?: string;
+    price?: string;
+    billingCycle?: string;
+    isActive?: boolean;
+    isPopular?: boolean;
+    sortOrder?: number;
+    features?: string[];
+    moduleIds?: string[];
+  }) => apiRequest("/saas-admin/packages", { method: "POST", body: JSON.stringify(data) }),
+  updatePackage: (id: string, data: {
+    name?: string;
+    displayName?: string;
+    description?: string;
+    price?: string;
+    billingCycle?: string;
+    isActive?: boolean;
+    isPopular?: boolean;
+    sortOrder?: number;
+    features?: string[];
+    moduleIds?: string[];
+  }) => apiRequest(`/saas-admin/packages/${id}`, { method: "PATCH", body: JSON.stringify(data) }),
+  deletePackage: (id: string) => apiRequest(`/saas-admin/packages/${id}`, { method: "DELETE" }),
+  getModules: () => apiRequest("/saas-admin/modules"),
+};
+
+// Public Packages API (for pricing page)
+export const packagesApi = {
+  getAll: () => apiRequest("/packages"),
 };
