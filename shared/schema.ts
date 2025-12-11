@@ -401,18 +401,53 @@ export const insertDealSchema = createInsertSchema(deals, {
 export type InsertDeal = z.infer<typeof insertDealSchema>;
 export type Deal = typeof deals.$inferSelect;
 
-// ==================== TASKS ====================
+// ==================== TASKS (Enhanced) ====================
+export const TASK_STATUSES = {
+  NOT_STARTED: 'not_started',
+  IN_PROGRESS: 'in_progress',
+  ON_HOLD: 'on_hold',
+  UNDER_REVIEW: 'under_review',
+  COMPLETED: 'completed',
+  CANCELLED: 'cancelled',
+} as const;
+
+export const TASK_PRIORITIES = {
+  LOW: 'low',
+  MEDIUM: 'medium',
+  HIGH: 'high',
+  URGENT: 'urgent',
+} as const;
+
+export const RELATED_MODULES = {
+  CUSTOMER: 'customer',
+  DEAL: 'deal',
+  QUOTATION: 'quotation',
+  INVOICE: 'invoice',
+  PROJECT: 'project',
+} as const;
+
+export type TaskStatus = typeof TASK_STATUSES[keyof typeof TASK_STATUSES];
+export type TaskPriority = typeof TASK_PRIORITIES[keyof typeof TASK_PRIORITIES];
+export type RelatedModule = typeof RELATED_MODULES[keyof typeof RELATED_MODULES];
+
 export const tasks = pgTable("tasks", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   tenantId: varchar("tenant_id").references(() => tenants.id, { onDelete: "cascade" }).notNull(),
-  assignedTo: varchar("assigned_to").references(() => users.id).notNull(),
+  createdBy: varchar("created_by").references(() => users.id).notNull(),
+  assignedTo: varchar("assigned_to").references(() => users.id),
   customerId: varchar("customer_id").references(() => customers.id, { onDelete: "cascade" }),
   dealId: varchar("deal_id").references(() => deals.id, { onDelete: "cascade" }),
+  quotationId: varchar("quotation_id").references(() => quotations.id, { onDelete: "set null" }),
+  invoiceId: varchar("invoice_id").references(() => invoices.id, { onDelete: "set null" }),
   title: text("title").notNull(),
   description: text("description"),
-  status: text("status").notNull().default("todo"),
+  status: text("status").notNull().default("not_started"),
   priority: text("priority").notNull().default("medium"),
+  tags: text("tags").array().default(sql`'{}'::text[]`),
+  relatedModule: text("related_module"),
   dueDate: timestamp("due_date"),
+  estimatedMinutes: integer("estimated_minutes"),
+  completedAt: timestamp("completed_at"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });
@@ -423,13 +458,202 @@ export const insertTaskSchema = createInsertSchema(tasks, {
     if (val instanceof Date) return val;
     return new Date(val);
   }),
+  tags: z.array(z.string()).optional().default([]),
 }).omit({ 
   id: true, 
   createdAt: true, 
-  updatedAt: true 
+  updatedAt: true,
+  completedAt: true,
 });
 export type InsertTask = z.infer<typeof insertTaskSchema>;
 export type Task = typeof tasks.$inferSelect;
+
+// Task Assignments - supports multiple assignees per task
+export const taskAssignments = pgTable("task_assignments", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  taskId: varchar("task_id").references(() => tasks.id, { onDelete: "cascade" }).notNull(),
+  userId: varchar("user_id").references(() => users.id, { onDelete: "cascade" }).notNull(),
+  role: text("role").default("assignee"),
+  assignedBy: varchar("assigned_by").references(() => users.id).notNull(),
+  assignedAt: timestamp("assigned_at").defaultNow().notNull(),
+});
+
+export const insertTaskAssignmentSchema = createInsertSchema(taskAssignments).omit({ 
+  id: true, 
+  assignedAt: true 
+});
+export type InsertTaskAssignment = z.infer<typeof insertTaskAssignmentSchema>;
+export type TaskAssignment = typeof taskAssignments.$inferSelect;
+
+// Task Comments - threaded comments on tasks
+export const taskComments = pgTable("task_comments", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  taskId: varchar("task_id").references(() => tasks.id, { onDelete: "cascade" }).notNull(),
+  userId: varchar("user_id").references(() => users.id, { onDelete: "cascade" }).notNull(),
+  parentId: varchar("parent_id"),
+  content: text("content").notNull(),
+  isInternal: boolean("is_internal").default(false).notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+export const insertTaskCommentSchema = createInsertSchema(taskComments).omit({ 
+  id: true, 
+  createdAt: true,
+  updatedAt: true,
+});
+export type InsertTaskComment = z.infer<typeof insertTaskCommentSchema>;
+export type TaskComment = typeof taskComments.$inferSelect;
+
+// Task Status History - audit log for status changes
+export const taskStatusHistory = pgTable("task_status_history", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  taskId: varchar("task_id").references(() => tasks.id, { onDelete: "cascade" }).notNull(),
+  changedBy: varchar("changed_by").references(() => users.id, { onDelete: "cascade" }).notNull(),
+  fromStatus: text("from_status"),
+  toStatus: text("to_status").notNull(),
+  notes: text("notes"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+export const insertTaskStatusHistorySchema = createInsertSchema(taskStatusHistory).omit({ 
+  id: true, 
+  createdAt: true 
+});
+export type InsertTaskStatusHistory = z.infer<typeof insertTaskStatusHistorySchema>;
+export type TaskStatusHistory = typeof taskStatusHistory.$inferSelect;
+
+// Task Checklist Items - subtasks/checklist
+export const taskChecklistItems = pgTable("task_checklist_items", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  taskId: varchar("task_id").references(() => tasks.id, { onDelete: "cascade" }).notNull(),
+  title: text("title").notNull(),
+  isCompleted: boolean("is_completed").default(false).notNull(),
+  completedBy: varchar("completed_by").references(() => users.id),
+  completedAt: timestamp("completed_at"),
+  sortOrder: integer("sort_order").default(0),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+export const insertTaskChecklistItemSchema = createInsertSchema(taskChecklistItems).omit({ 
+  id: true, 
+  createdAt: true,
+  completedAt: true,
+});
+export type InsertTaskChecklistItem = z.infer<typeof insertTaskChecklistItemSchema>;
+export type TaskChecklistItem = typeof taskChecklistItems.$inferSelect;
+
+// Task Time Logs - time tracking
+export const taskTimeLogs = pgTable("task_time_logs", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  taskId: varchar("task_id").references(() => tasks.id, { onDelete: "cascade" }).notNull(),
+  userId: varchar("user_id").references(() => users.id, { onDelete: "cascade" }).notNull(),
+  startedAt: timestamp("started_at").notNull(),
+  endedAt: timestamp("ended_at"),
+  durationMinutes: integer("duration_minutes"),
+  description: text("description"),
+  isBillable: boolean("is_billable").default(false).notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+export const insertTaskTimeLogSchema = createInsertSchema(taskTimeLogs, {
+  startedAt: z.union([z.string(), z.date()]).transform(val => {
+    if (val instanceof Date) return val;
+    return new Date(val);
+  }),
+  endedAt: z.union([z.string(), z.date(), z.null()]).optional().transform(val => {
+    if (!val) return null;
+    if (val instanceof Date) return val;
+    return new Date(val);
+  }),
+}).omit({ 
+  id: true, 
+  createdAt: true 
+});
+export type InsertTaskTimeLog = z.infer<typeof insertTaskTimeLogSchema>;
+export type TaskTimeLog = typeof taskTimeLogs.$inferSelect;
+
+// Task Attachments - file attachments
+export const taskAttachments = pgTable("task_attachments", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  taskId: varchar("task_id").references(() => tasks.id, { onDelete: "cascade" }).notNull(),
+  uploadedBy: varchar("uploaded_by").references(() => users.id, { onDelete: "cascade" }).notNull(),
+  fileName: text("file_name").notNull(),
+  fileSize: integer("file_size").notNull(),
+  fileType: text("file_type").notNull(),
+  fileUrl: text("file_url").notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+export const insertTaskAttachmentSchema = createInsertSchema(taskAttachments).omit({ 
+  id: true, 
+  createdAt: true 
+});
+export type InsertTaskAttachment = z.infer<typeof insertTaskAttachmentSchema>;
+export type TaskAttachment = typeof taskAttachments.$inferSelect;
+
+// Task Notifications - in-app notifications
+export const taskNotifications = pgTable("task_notifications", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  tenantId: varchar("tenant_id").references(() => tenants.id, { onDelete: "cascade" }).notNull(),
+  recipientId: varchar("recipient_id").references(() => users.id, { onDelete: "cascade" }).notNull(),
+  taskId: varchar("task_id").references(() => tasks.id, { onDelete: "cascade" }),
+  actorId: varchar("actor_id").references(() => users.id),
+  type: text("type").notNull(),
+  title: text("title").notNull(),
+  message: text("message").notNull(),
+  isRead: boolean("is_read").default(false).notNull(),
+  readAt: timestamp("read_at"),
+  metadata: text("metadata"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+export const insertTaskNotificationSchema = createInsertSchema(taskNotifications).omit({ 
+  id: true, 
+  createdAt: true,
+  readAt: true,
+});
+export type InsertTaskNotification = z.infer<typeof insertTaskNotificationSchema>;
+export type TaskNotification = typeof taskNotifications.$inferSelect;
+
+// Task AI History - tracks AI-generated content
+export const taskAiHistory = pgTable("task_ai_history", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  taskId: varchar("task_id").references(() => tasks.id, { onDelete: "cascade" }).notNull(),
+  userId: varchar("user_id").references(() => users.id, { onDelete: "cascade" }).notNull(),
+  action: text("action").notNull(),
+  prompt: text("prompt").notNull(),
+  response: text("response").notNull(),
+  model: text("model"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+export const insertTaskAiHistorySchema = createInsertSchema(taskAiHistory).omit({ 
+  id: true, 
+  createdAt: true 
+});
+export type InsertTaskAiHistory = z.infer<typeof insertTaskAiHistorySchema>;
+export type TaskAiHistory = typeof taskAiHistory.$inferSelect;
+
+// Task Activity Timeline - comprehensive activity log
+export const taskActivityLog = pgTable("task_activity_log", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  taskId: varchar("task_id").references(() => tasks.id, { onDelete: "cascade" }).notNull(),
+  userId: varchar("user_id").references(() => users.id, { onDelete: "cascade" }).notNull(),
+  action: text("action").notNull(),
+  description: text("description").notNull(),
+  oldValue: text("old_value"),
+  newValue: text("new_value"),
+  metadata: text("metadata"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+export const insertTaskActivityLogSchema = createInsertSchema(taskActivityLog).omit({ 
+  id: true, 
+  createdAt: true 
+});
+export type InsertTaskActivityLog = z.infer<typeof insertTaskActivityLogSchema>;
+export type TaskActivityLog = typeof taskActivityLog.$inferSelect;
 
 // ==================== PLATFORM SETTINGS (SaaS Admin) ====================
 export const platformSettings = pgTable("platform_settings", {

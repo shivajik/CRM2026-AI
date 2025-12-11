@@ -32,6 +32,15 @@ import type {
   InsertScheduledEmail, ScheduledEmail,
   InsertEmailSenderAccount, EmailSenderAccount,
   InsertSmtpSettings, SmtpSettings,
+  InsertTaskAssignment, TaskAssignment,
+  InsertTaskComment, TaskComment,
+  InsertTaskStatusHistory, TaskStatusHistory,
+  InsertTaskChecklistItem, TaskChecklistItem,
+  InsertTaskTimeLog, TaskTimeLog,
+  InsertTaskAttachment, TaskAttachment,
+  InsertTaskNotification, TaskNotification,
+  InsertTaskAiHistory, TaskAiHistory,
+  InsertTaskActivityLog, TaskActivityLog,
 } from "@shared/schema";
 
 export interface IStorage {
@@ -314,6 +323,92 @@ export interface IStorage {
   getSmtpSettings(tenantId: string): Promise<SmtpSettings | undefined>;
   upsertSmtpSettings(tenantId: string, settings: Partial<InsertSmtpSettings>): Promise<SmtpSettings>;
   testSmtpConnection(tenantId: string): Promise<{ success: boolean; message: string }>;
+
+  // Enhanced Task operations
+  getTaskWithDetails(id: string, tenantId: string): Promise<(Task & { 
+    assignments: (TaskAssignment & { user?: User })[];
+    checklists: TaskChecklistItem[];
+    comments: (TaskComment & { user?: User })[];
+    timeLogs: TaskTimeLog[];
+    attachments: TaskAttachment[];
+    statusHistory: (TaskStatusHistory & { user?: User })[];
+    activityLog: (TaskActivityLog & { user?: User })[];
+    creator?: User;
+    assignee?: User;
+  }) | undefined>;
+  getTasksWithFilters(tenantId: string, filters: {
+    assignedTo?: string;
+    status?: string;
+    priority?: string;
+    dueFrom?: Date;
+    dueTo?: Date;
+    customerId?: string;
+    dealId?: string;
+    tags?: string[];
+  }): Promise<Task[]>;
+  updateTaskStatus(id: string, tenantId: string, status: string, changedBy: string, notes?: string): Promise<Task | undefined>;
+  
+  // Task Assignment operations
+  createTaskAssignment(assignment: InsertTaskAssignment): Promise<TaskAssignment>;
+  getTaskAssignments(taskId: string): Promise<(TaskAssignment & { user?: User })[]>;
+  deleteTaskAssignment(taskId: string, userId: string): Promise<void>;
+  getTasksAssignedToUser(userId: string, tenantId: string): Promise<Task[]>;
+  
+  // Task Comment operations
+  createTaskComment(comment: InsertTaskComment): Promise<TaskComment>;
+  getTaskComments(taskId: string): Promise<(TaskComment & { user?: User })[]>;
+  updateTaskComment(id: string, content: string): Promise<TaskComment | undefined>;
+  deleteTaskComment(id: string): Promise<void>;
+  
+  // Task Checklist operations
+  createTaskChecklistItem(item: InsertTaskChecklistItem): Promise<TaskChecklistItem>;
+  getTaskChecklistItems(taskId: string): Promise<TaskChecklistItem[]>;
+  updateTaskChecklistItem(id: string, updates: Partial<InsertTaskChecklistItem>): Promise<TaskChecklistItem | undefined>;
+  toggleTaskChecklistItem(id: string, userId: string): Promise<TaskChecklistItem | undefined>;
+  deleteTaskChecklistItem(id: string): Promise<void>;
+  
+  // Task Time Log operations
+  createTaskTimeLog(timeLog: InsertTaskTimeLog): Promise<TaskTimeLog>;
+  getTaskTimeLogs(taskId: string): Promise<TaskTimeLog[]>;
+  updateTaskTimeLog(id: string, updates: Partial<InsertTaskTimeLog>): Promise<TaskTimeLog | undefined>;
+  deleteTaskTimeLog(id: string): Promise<void>;
+  getActiveTimeLog(userId: string): Promise<TaskTimeLog | undefined>;
+  stopActiveTimeLog(userId: string): Promise<TaskTimeLog | undefined>;
+  
+  // Task Attachment operations
+  createTaskAttachment(attachment: InsertTaskAttachment): Promise<TaskAttachment>;
+  getTaskAttachments(taskId: string): Promise<TaskAttachment[]>;
+  deleteTaskAttachment(id: string): Promise<void>;
+  
+  // Task Notification operations
+  createTaskNotification(notification: InsertTaskNotification): Promise<TaskNotification>;
+  getTaskNotifications(recipientId: string, tenantId: string, unreadOnly?: boolean): Promise<TaskNotification[]>;
+  markNotificationAsRead(id: string): Promise<void>;
+  markAllNotificationsAsRead(recipientId: string, tenantId: string): Promise<void>;
+  getUnreadNotificationCount(recipientId: string, tenantId: string): Promise<number>;
+  
+  // Task AI History operations
+  createTaskAiHistory(history: InsertTaskAiHistory): Promise<TaskAiHistory>;
+  getTaskAiHistory(taskId: string): Promise<TaskAiHistory[]>;
+  
+  // Task Activity Log operations
+  createTaskActivityLog(log: InsertTaskActivityLog): Promise<TaskActivityLog>;
+  getTaskActivityLog(taskId: string): Promise<(TaskActivityLog & { user?: User })[]>;
+  
+  // Task Status History operations
+  getTaskStatusHistory(taskId: string): Promise<(TaskStatusHistory & { user?: User })[]>;
+  
+  // Task Analytics
+  getTaskAnalytics(tenantId: string): Promise<{
+    totalTasks: number;
+    completedThisWeek: number;
+    completedThisMonth: number;
+    overdueTasks: number;
+    avgCompletionTime: number;
+    tasksByStatus: { status: string; count: number }[];
+    tasksByPriority: { priority: string; count: number }[];
+    teamPerformance: { userId: string; userName: string; completed: number; inProgress: number }[];
+  }>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -1619,6 +1714,532 @@ export class DatabaseStorage implements IStorage {
       return { success: true, message: "Default email provider is active" };
     }
     return { success: true, message: "SMTP connection test successful" };
+  }
+
+  // Enhanced Task operations
+  async getTaskWithDetails(id: string, tenantId: string): Promise<(Task & { 
+    assignments: (TaskAssignment & { user?: User })[];
+    checklists: TaskChecklistItem[];
+    comments: (TaskComment & { user?: User })[];
+    timeLogs: TaskTimeLog[];
+    attachments: TaskAttachment[];
+    statusHistory: (TaskStatusHistory & { user?: User })[];
+    activityLog: (TaskActivityLog & { user?: User })[];
+    creator?: User;
+    assignee?: User;
+  }) | undefined> {
+    const [task] = await db.select().from(schema.tasks)
+      .where(and(eq(schema.tasks.id, id), eq(schema.tasks.tenantId, tenantId)));
+    
+    if (!task) return undefined;
+
+    const [assignments, checklists, comments, timeLogs, attachments, statusHistory, activityLog] = await Promise.all([
+      this.getTaskAssignments(id),
+      this.getTaskChecklistItems(id),
+      this.getTaskComments(id),
+      this.getTaskTimeLogs(id),
+      this.getTaskAttachments(id),
+      this.getTaskStatusHistory(id),
+      this.getTaskActivityLog(id),
+    ]);
+
+    let creator: User | undefined;
+    let assignee: User | undefined;
+
+    if (task.createdBy) {
+      creator = await this.getUserById(task.createdBy);
+    }
+    if (task.assignedTo) {
+      assignee = await this.getUserById(task.assignedTo);
+    }
+
+    return {
+      ...task,
+      assignments,
+      checklists,
+      comments,
+      timeLogs,
+      attachments,
+      statusHistory,
+      activityLog,
+      creator,
+      assignee,
+    };
+  }
+
+  async getTasksWithFilters(tenantId: string, filters: {
+    assignedTo?: string;
+    status?: string;
+    priority?: string;
+    dueFrom?: Date;
+    dueTo?: Date;
+    customerId?: string;
+    dealId?: string;
+    tags?: string[];
+  }): Promise<Task[]> {
+    const conditions = [eq(schema.tasks.tenantId, tenantId)];
+    
+    if (filters.assignedTo) {
+      conditions.push(eq(schema.tasks.assignedTo, filters.assignedTo));
+    }
+    if (filters.status) {
+      conditions.push(eq(schema.tasks.status, filters.status));
+    }
+    if (filters.priority) {
+      conditions.push(eq(schema.tasks.priority, filters.priority));
+    }
+    if (filters.dueFrom) {
+      conditions.push(gte(schema.tasks.dueDate, filters.dueFrom));
+    }
+    if (filters.dueTo) {
+      conditions.push(lte(schema.tasks.dueDate, filters.dueTo));
+    }
+    if (filters.customerId) {
+      conditions.push(eq(schema.tasks.customerId, filters.customerId));
+    }
+    if (filters.dealId) {
+      conditions.push(eq(schema.tasks.dealId, filters.dealId));
+    }
+
+    return db.select().from(schema.tasks)
+      .where(and(...conditions))
+      .orderBy(desc(schema.tasks.createdAt));
+  }
+
+  async updateTaskStatus(id: string, tenantId: string, status: string, changedBy: string, notes?: string): Promise<Task | undefined> {
+    const existingTask = await this.getTaskById(id, tenantId);
+    if (!existingTask) return undefined;
+
+    const [task] = await db.update(schema.tasks)
+      .set({ 
+        status, 
+        updatedAt: new Date(),
+        completedAt: status === 'completed' ? new Date() : null,
+      })
+      .where(and(eq(schema.tasks.id, id), eq(schema.tasks.tenantId, tenantId)))
+      .returning();
+
+    await db.insert(schema.taskStatusHistory).values({
+      taskId: id,
+      changedBy,
+      fromStatus: existingTask.status,
+      toStatus: status,
+      notes,
+    });
+
+    await db.insert(schema.taskActivityLog).values({
+      taskId: id,
+      userId: changedBy,
+      action: 'status_change',
+      description: `Status changed from ${existingTask.status} to ${status}`,
+      oldValue: existingTask.status,
+      newValue: status,
+    });
+
+    return task;
+  }
+
+  // Task Assignment operations
+  async createTaskAssignment(insertAssignment: InsertTaskAssignment): Promise<TaskAssignment> {
+    const [assignment] = await db.insert(schema.taskAssignments).values(insertAssignment).returning();
+    
+    await db.insert(schema.taskActivityLog).values({
+      taskId: insertAssignment.taskId,
+      userId: insertAssignment.assignedBy,
+      action: 'assignment_added',
+      description: `Task assigned to team member`,
+      newValue: insertAssignment.userId,
+    });
+
+    return assignment;
+  }
+
+  async getTaskAssignments(taskId: string): Promise<(TaskAssignment & { user?: User })[]> {
+    const assignments = await db.select().from(schema.taskAssignments)
+      .where(eq(schema.taskAssignments.taskId, taskId));
+    
+    const result = await Promise.all(assignments.map(async (assignment) => {
+      const user = await this.getUserById(assignment.userId);
+      return { ...assignment, user };
+    }));
+    
+    return result;
+  }
+
+  async deleteTaskAssignment(taskId: string, userId: string): Promise<void> {
+    await db.delete(schema.taskAssignments)
+      .where(and(
+        eq(schema.taskAssignments.taskId, taskId),
+        eq(schema.taskAssignments.userId, userId)
+      ));
+  }
+
+  async getTasksAssignedToUser(userId: string, tenantId: string): Promise<Task[]> {
+    const assignments = await db.select().from(schema.taskAssignments)
+      .where(eq(schema.taskAssignments.userId, userId));
+    
+    const taskIds = assignments.map(a => a.taskId);
+    if (taskIds.length === 0) return [];
+
+    const tasks = await db.select().from(schema.tasks)
+      .where(and(
+        eq(schema.tasks.tenantId, tenantId),
+        sql`${schema.tasks.id} = ANY(${taskIds})`
+      ));
+    
+    return tasks;
+  }
+
+  // Task Comment operations
+  async createTaskComment(insertComment: InsertTaskComment): Promise<TaskComment> {
+    const [comment] = await db.insert(schema.taskComments).values(insertComment).returning();
+    
+    await db.insert(schema.taskActivityLog).values({
+      taskId: insertComment.taskId,
+      userId: insertComment.userId,
+      action: 'comment_added',
+      description: 'Added a comment',
+    });
+
+    return comment;
+  }
+
+  async getTaskComments(taskId: string): Promise<(TaskComment & { user?: User })[]> {
+    const comments = await db.select().from(schema.taskComments)
+      .where(eq(schema.taskComments.taskId, taskId))
+      .orderBy(schema.taskComments.createdAt);
+    
+    const result = await Promise.all(comments.map(async (comment) => {
+      const user = await this.getUserById(comment.userId);
+      return { ...comment, user };
+    }));
+    
+    return result;
+  }
+
+  async updateTaskComment(id: string, content: string): Promise<TaskComment | undefined> {
+    const [comment] = await db.update(schema.taskComments)
+      .set({ content, updatedAt: new Date() })
+      .where(eq(schema.taskComments.id, id))
+      .returning();
+    return comment;
+  }
+
+  async deleteTaskComment(id: string): Promise<void> {
+    await db.delete(schema.taskComments).where(eq(schema.taskComments.id, id));
+  }
+
+  // Task Checklist operations
+  async createTaskChecklistItem(insertItem: InsertTaskChecklistItem): Promise<TaskChecklistItem> {
+    const [item] = await db.insert(schema.taskChecklistItems).values(insertItem).returning();
+    
+    await db.insert(schema.taskActivityLog).values({
+      taskId: insertItem.taskId,
+      userId: insertItem.completedBy || 'system',
+      action: 'checklist_item_added',
+      description: `Added checklist item: ${insertItem.title}`,
+    });
+
+    return item;
+  }
+
+  async getTaskChecklistItems(taskId: string): Promise<TaskChecklistItem[]> {
+    return db.select().from(schema.taskChecklistItems)
+      .where(eq(schema.taskChecklistItems.taskId, taskId))
+      .orderBy(schema.taskChecklistItems.sortOrder);
+  }
+
+  async updateTaskChecklistItem(id: string, updates: Partial<InsertTaskChecklistItem>): Promise<TaskChecklistItem | undefined> {
+    const [item] = await db.update(schema.taskChecklistItems)
+      .set(updates)
+      .where(eq(schema.taskChecklistItems.id, id))
+      .returning();
+    return item;
+  }
+
+  async toggleTaskChecklistItem(id: string, userId: string): Promise<TaskChecklistItem | undefined> {
+    const [existing] = await db.select().from(schema.taskChecklistItems)
+      .where(eq(schema.taskChecklistItems.id, id));
+    
+    if (!existing) return undefined;
+
+    const [item] = await db.update(schema.taskChecklistItems)
+      .set({ 
+        isCompleted: !existing.isCompleted,
+        completedBy: !existing.isCompleted ? userId : null,
+        completedAt: !existing.isCompleted ? new Date() : null,
+      })
+      .where(eq(schema.taskChecklistItems.id, id))
+      .returning();
+
+    await db.insert(schema.taskActivityLog).values({
+      taskId: existing.taskId,
+      userId,
+      action: item.isCompleted ? 'checklist_item_completed' : 'checklist_item_uncompleted',
+      description: `${item.isCompleted ? 'Completed' : 'Uncompleted'}: ${existing.title}`,
+    });
+
+    return item;
+  }
+
+  async deleteTaskChecklistItem(id: string): Promise<void> {
+    await db.delete(schema.taskChecklistItems).where(eq(schema.taskChecklistItems.id, id));
+  }
+
+  // Task Time Log operations
+  async createTaskTimeLog(insertTimeLog: InsertTaskTimeLog): Promise<TaskTimeLog> {
+    const [timeLog] = await db.insert(schema.taskTimeLogs).values(insertTimeLog).returning();
+    
+    await db.insert(schema.taskActivityLog).values({
+      taskId: insertTimeLog.taskId,
+      userId: insertTimeLog.userId,
+      action: 'time_log_added',
+      description: insertTimeLog.durationMinutes 
+        ? `Logged ${insertTimeLog.durationMinutes} minutes` 
+        : 'Started time tracking',
+    });
+
+    return timeLog;
+  }
+
+  async getTaskTimeLogs(taskId: string): Promise<TaskTimeLog[]> {
+    return db.select().from(schema.taskTimeLogs)
+      .where(eq(schema.taskTimeLogs.taskId, taskId))
+      .orderBy(desc(schema.taskTimeLogs.startedAt));
+  }
+
+  async updateTaskTimeLog(id: string, updates: Partial<InsertTaskTimeLog>): Promise<TaskTimeLog | undefined> {
+    const [timeLog] = await db.update(schema.taskTimeLogs)
+      .set(updates)
+      .where(eq(schema.taskTimeLogs.id, id))
+      .returning();
+    return timeLog;
+  }
+
+  async deleteTaskTimeLog(id: string): Promise<void> {
+    await db.delete(schema.taskTimeLogs).where(eq(schema.taskTimeLogs.id, id));
+  }
+
+  async getActiveTimeLog(userId: string): Promise<TaskTimeLog | undefined> {
+    const [timeLog] = await db.select().from(schema.taskTimeLogs)
+      .where(and(
+        eq(schema.taskTimeLogs.userId, userId),
+        sql`${schema.taskTimeLogs.endedAt} IS NULL`
+      ));
+    return timeLog;
+  }
+
+  async stopActiveTimeLog(userId: string): Promise<TaskTimeLog | undefined> {
+    const activeLog = await this.getActiveTimeLog(userId);
+    if (!activeLog) return undefined;
+
+    const endedAt = new Date();
+    const durationMinutes = Math.round((endedAt.getTime() - activeLog.startedAt.getTime()) / 60000);
+
+    const [timeLog] = await db.update(schema.taskTimeLogs)
+      .set({ endedAt, durationMinutes })
+      .where(eq(schema.taskTimeLogs.id, activeLog.id))
+      .returning();
+
+    await db.insert(schema.taskActivityLog).values({
+      taskId: activeLog.taskId,
+      userId,
+      action: 'time_log_stopped',
+      description: `Stopped time tracking. Total: ${durationMinutes} minutes`,
+    });
+
+    return timeLog;
+  }
+
+  // Task Attachment operations
+  async createTaskAttachment(insertAttachment: InsertTaskAttachment): Promise<TaskAttachment> {
+    const [attachment] = await db.insert(schema.taskAttachments).values(insertAttachment).returning();
+    
+    await db.insert(schema.taskActivityLog).values({
+      taskId: insertAttachment.taskId,
+      userId: insertAttachment.uploadedBy,
+      action: 'attachment_added',
+      description: `Uploaded file: ${insertAttachment.fileName}`,
+    });
+
+    return attachment;
+  }
+
+  async getTaskAttachments(taskId: string): Promise<TaskAttachment[]> {
+    return db.select().from(schema.taskAttachments)
+      .where(eq(schema.taskAttachments.taskId, taskId))
+      .orderBy(desc(schema.taskAttachments.createdAt));
+  }
+
+  async deleteTaskAttachment(id: string): Promise<void> {
+    await db.delete(schema.taskAttachments).where(eq(schema.taskAttachments.id, id));
+  }
+
+  // Task Notification operations
+  async createTaskNotification(insertNotification: InsertTaskNotification): Promise<TaskNotification> {
+    const [notification] = await db.insert(schema.taskNotifications).values(insertNotification).returning();
+    return notification;
+  }
+
+  async getTaskNotifications(recipientId: string, tenantId: string, unreadOnly?: boolean): Promise<TaskNotification[]> {
+    const conditions = [
+      eq(schema.taskNotifications.recipientId, recipientId),
+      eq(schema.taskNotifications.tenantId, tenantId),
+    ];
+    
+    if (unreadOnly) {
+      conditions.push(eq(schema.taskNotifications.isRead, false));
+    }
+
+    return db.select().from(schema.taskNotifications)
+      .where(and(...conditions))
+      .orderBy(desc(schema.taskNotifications.createdAt));
+  }
+
+  async markNotificationAsRead(id: string): Promise<void> {
+    await db.update(schema.taskNotifications)
+      .set({ isRead: true, readAt: new Date() })
+      .where(eq(schema.taskNotifications.id, id));
+  }
+
+  async markAllNotificationsAsRead(recipientId: string, tenantId: string): Promise<void> {
+    await db.update(schema.taskNotifications)
+      .set({ isRead: true, readAt: new Date() })
+      .where(and(
+        eq(schema.taskNotifications.recipientId, recipientId),
+        eq(schema.taskNotifications.tenantId, tenantId),
+        eq(schema.taskNotifications.isRead, false)
+      ));
+  }
+
+  async getUnreadNotificationCount(recipientId: string, tenantId: string): Promise<number> {
+    const result = await db.select({ count: sql<number>`count(*)` })
+      .from(schema.taskNotifications)
+      .where(and(
+        eq(schema.taskNotifications.recipientId, recipientId),
+        eq(schema.taskNotifications.tenantId, tenantId),
+        eq(schema.taskNotifications.isRead, false)
+      ));
+    return result[0]?.count || 0;
+  }
+
+  // Task AI History operations
+  async createTaskAiHistory(insertHistory: InsertTaskAiHistory): Promise<TaskAiHistory> {
+    const [history] = await db.insert(schema.taskAiHistory).values(insertHistory).returning();
+    
+    await db.insert(schema.taskActivityLog).values({
+      taskId: insertHistory.taskId,
+      userId: insertHistory.userId,
+      action: 'ai_assist',
+      description: `AI assisted with: ${insertHistory.action}`,
+    });
+
+    return history;
+  }
+
+  async getTaskAiHistory(taskId: string): Promise<TaskAiHistory[]> {
+    return db.select().from(schema.taskAiHistory)
+      .where(eq(schema.taskAiHistory.taskId, taskId))
+      .orderBy(desc(schema.taskAiHistory.createdAt));
+  }
+
+  // Task Activity Log operations
+  async createTaskActivityLog(insertLog: InsertTaskActivityLog): Promise<TaskActivityLog> {
+    const [log] = await db.insert(schema.taskActivityLog).values(insertLog).returning();
+    return log;
+  }
+
+  async getTaskActivityLog(taskId: string): Promise<(TaskActivityLog & { user?: User })[]> {
+    const logs = await db.select().from(schema.taskActivityLog)
+      .where(eq(schema.taskActivityLog.taskId, taskId))
+      .orderBy(desc(schema.taskActivityLog.createdAt));
+    
+    const result = await Promise.all(logs.map(async (log) => {
+      const user = await this.getUserById(log.userId);
+      return { ...log, user };
+    }));
+    
+    return result;
+  }
+
+  // Task Status History operations
+  async getTaskStatusHistory(taskId: string): Promise<(TaskStatusHistory & { user?: User })[]> {
+    const history = await db.select().from(schema.taskStatusHistory)
+      .where(eq(schema.taskStatusHistory.taskId, taskId))
+      .orderBy(desc(schema.taskStatusHistory.createdAt));
+    
+    const result = await Promise.all(history.map(async (entry) => {
+      const user = await this.getUserById(entry.changedBy);
+      return { ...entry, user };
+    }));
+    
+    return result;
+  }
+
+  // Task Analytics
+  async getTaskAnalytics(tenantId: string): Promise<{
+    totalTasks: number;
+    completedThisWeek: number;
+    completedThisMonth: number;
+    overdueTasks: number;
+    avgCompletionTime: number;
+    tasksByStatus: { status: string; count: number }[];
+    tasksByPriority: { priority: string; count: number }[];
+    teamPerformance: { userId: string; userName: string; completed: number; inProgress: number }[];
+  }> {
+    const now = new Date();
+    const weekAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+    const monthAgo = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
+
+    const allTasks = await db.select().from(schema.tasks)
+      .where(eq(schema.tasks.tenantId, tenantId));
+
+    const totalTasks = allTasks.length;
+    const completedThisWeek = allTasks.filter(t => 
+      t.status === 'completed' && t.completedAt && t.completedAt >= weekAgo
+    ).length;
+    const completedThisMonth = allTasks.filter(t => 
+      t.status === 'completed' && t.completedAt && t.completedAt >= monthAgo
+    ).length;
+    const overdueTasks = allTasks.filter(t => 
+      t.dueDate && t.dueDate < now && t.status !== 'completed' && t.status !== 'cancelled'
+    ).length;
+
+    const completedTasks = allTasks.filter(t => t.status === 'completed' && t.completedAt);
+    const avgCompletionTime = completedTasks.length > 0
+      ? completedTasks.reduce((sum, t) => 
+          sum + (t.completedAt!.getTime() - t.createdAt.getTime()) / (1000 * 60 * 60 * 24), 0
+        ) / completedTasks.length
+      : 0;
+
+    const tasksByStatus = Object.values(schema.TASK_STATUSES).map(status => ({
+      status,
+      count: allTasks.filter(t => t.status === status).length,
+    }));
+
+    const tasksByPriority = Object.values(schema.TASK_PRIORITIES).map(priority => ({
+      priority,
+      count: allTasks.filter(t => t.priority === priority).length,
+    }));
+
+    const users = await this.getUsersByTenant(tenantId);
+    const teamPerformance = users.map(user => ({
+      userId: user.id,
+      userName: `${user.firstName} ${user.lastName}`,
+      completed: allTasks.filter(t => t.assignedTo === user.id && t.status === 'completed').length,
+      inProgress: allTasks.filter(t => t.assignedTo === user.id && t.status === 'in_progress').length,
+    })).filter(u => u.completed > 0 || u.inProgress > 0);
+
+    return {
+      totalTasks,
+      completedThisWeek,
+      completedThisMonth,
+      overdueTasks,
+      avgCompletionTime: Math.round(avgCompletionTime * 10) / 10,
+      tasksByStatus,
+      tasksByPriority,
+      teamPerformance,
+    };
   }
 }
 

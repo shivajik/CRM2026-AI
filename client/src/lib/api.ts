@@ -147,13 +147,76 @@ export const companyProfileApi = {
   }) => apiRequest("/company-profile", { method: "PUT", body: JSON.stringify(data) }),
 };
 
-// Tasks API
+// Tasks API (Enhanced)
 export const tasksApi = {
-  getAll: () => apiRequest("/tasks"),
+  getAll: (filters?: { status?: string; priority?: string; assignedTo?: string; customerId?: string; dealId?: string; dueFrom?: string; dueTo?: string }) => {
+    const params = new URLSearchParams();
+    if (filters) {
+      Object.entries(filters).forEach(([key, value]) => {
+        if (value) params.append(key, value);
+      });
+    }
+    const queryString = params.toString();
+    return apiRequest(`/tasks${queryString ? `?${queryString}` : ''}`);
+  },
   getById: (id: string) => apiRequest(`/tasks/${id}`),
+  getDetails: (id: string) => apiRequest(`/tasks/${id}/details`),
+  getAnalytics: () => apiRequest("/tasks/analytics"),
   create: (data: any) => apiRequest("/tasks", { method: "POST", body: JSON.stringify(data) }),
   update: (id: string, data: any) => apiRequest(`/tasks/${id}`, { method: "PATCH", body: JSON.stringify(data) }),
   delete: (id: string) => apiRequest(`/tasks/${id}`, { method: "DELETE" }),
+  
+  // Assignments
+  getAssignments: (taskId: string) => apiRequest(`/tasks/${taskId}/assignments`),
+  addAssignment: (taskId: string, data: { userId: string; role?: string }) => 
+    apiRequest(`/tasks/${taskId}/assignments`, { method: "POST", body: JSON.stringify(data) }),
+  removeAssignment: (taskId: string, userId: string) => 
+    apiRequest(`/tasks/${taskId}/assignments/${userId}`, { method: "DELETE" }),
+  
+  // Comments
+  getComments: (taskId: string) => apiRequest(`/tasks/${taskId}/comments`),
+  addComment: (taskId: string, data: { content: string; parentId?: string; isInternal?: boolean }) => 
+    apiRequest(`/tasks/${taskId}/comments`, { method: "POST", body: JSON.stringify(data) }),
+  updateComment: (taskId: string, commentId: string, content: string) => 
+    apiRequest(`/tasks/${taskId}/comments/${commentId}`, { method: "PATCH", body: JSON.stringify({ content }) }),
+  deleteComment: (taskId: string, commentId: string) => 
+    apiRequest(`/tasks/${taskId}/comments/${commentId}`, { method: "DELETE" }),
+  
+  // Checklist
+  getChecklist: (taskId: string) => apiRequest(`/tasks/${taskId}/checklist`),
+  addChecklistItem: (taskId: string, data: { title: string; sortOrder?: number }) => 
+    apiRequest(`/tasks/${taskId}/checklist`, { method: "POST", body: JSON.stringify(data) }),
+  updateChecklistItem: (taskId: string, itemId: string, data: any) => 
+    apiRequest(`/tasks/${taskId}/checklist/${itemId}`, { method: "PATCH", body: JSON.stringify(data) }),
+  toggleChecklistItem: (taskId: string, itemId: string) => 
+    apiRequest(`/tasks/${taskId}/checklist/${itemId}/toggle`, { method: "POST" }),
+  deleteChecklistItem: (taskId: string, itemId: string) => 
+    apiRequest(`/tasks/${taskId}/checklist/${itemId}`, { method: "DELETE" }),
+  
+  // Time Logs
+  getTimeLogs: (taskId: string) => apiRequest(`/tasks/${taskId}/timelogs`),
+  addTimeLog: (taskId: string, data: { startedAt?: string; endedAt?: string; durationMinutes?: number; description?: string; isBillable?: boolean }) => 
+    apiRequest(`/tasks/${taskId}/timelogs`, { method: "POST", body: JSON.stringify(data) }),
+  startTimeTracking: (taskId: string, data?: { description?: string; isBillable?: boolean }) => 
+    apiRequest(`/tasks/${taskId}/timelogs/start`, { method: "POST", body: JSON.stringify(data || {}) }),
+  stopTimeTracking: (taskId: string) => 
+    apiRequest(`/tasks/${taskId}/timelogs/stop`, { method: "POST" }),
+  deleteTimeLog: (taskId: string, logId: string) => 
+    apiRequest(`/tasks/${taskId}/timelogs/${logId}`, { method: "DELETE" }),
+  
+  // Activity Log
+  getActivityLog: (taskId: string) => apiRequest(`/tasks/${taskId}/activity`),
+  
+  // Status History
+  getStatusHistory: (taskId: string) => apiRequest(`/tasks/${taskId}/status-history`),
+};
+
+// Notifications API
+export const notificationsApi = {
+  getAll: (unreadOnly?: boolean) => apiRequest(`/notifications${unreadOnly ? '?unreadOnly=true' : ''}`),
+  getUnreadCount: () => apiRequest("/notifications/count"),
+  markAsRead: (id: string) => apiRequest(`/notifications/${id}/read`, { method: "POST" }),
+  markAllAsRead: () => apiRequest("/notifications/read-all", { method: "POST" }),
 };
 
 // Products API
