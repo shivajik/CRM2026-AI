@@ -13,7 +13,8 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Switch } from "@/components/ui/switch";
 import { useToast } from "@/hooks/use-toast";
 import { teamApi, authApi } from "@/lib/api";
-import { Plus, Pencil, Trash2, Users, Shield, Copy, Check } from "lucide-react";
+import { Plus, Pencil, Trash2, Users, Shield, Copy, Check, Eye } from "lucide-react";
+import { Link } from "wouter";
 
 const AVAILABLE_PERMISSIONS = [
   { id: "leads", label: "Leads Management", description: "Add, view, and edit leads" },
@@ -372,6 +373,15 @@ export default function TeamManagement() {
                         </TableCell>
                         <TableCell>
                           <div className="flex gap-2">
+                            <Link href={`/team/${member.id}`}>
+                              <Button 
+                                size="sm" 
+                                variant="ghost"
+                                data-testid={`button-view-member-${member.id}`}
+                              >
+                                <Eye className="w-4 h-4" />
+                              </Button>
+                            </Link>
                             <Button 
                               size="sm" 
                               variant="ghost" 

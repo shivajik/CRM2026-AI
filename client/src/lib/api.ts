@@ -285,6 +285,7 @@ export const tenantApi = {
 // Team API
 export const teamApi = {
   getMembers: () => apiRequest("/team/members"),
+  getMemberDetails: (id: string) => apiRequest(`/team/members/${id}/details`),
   createMember: (data: { email: string; password: string; firstName: string; lastName: string; permissions?: string[] }) =>
     apiRequest("/team/members", { method: "POST", body: JSON.stringify(data) }),
   updateMember: (id: string, data: { firstName?: string; lastName?: string; email?: string; permissions?: string[]; isActive?: boolean }) =>

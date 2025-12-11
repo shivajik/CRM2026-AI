@@ -67,6 +67,15 @@ export interface IStorage {
   updateTeamMember(id: string, tenantId: string, updates: Partial<InsertUser>): Promise<User | undefined>;
   deleteTeamMember(id: string, tenantId: string): Promise<void>;
   getUserWithRole(id: string): Promise<(User & { role?: Role }) | undefined>;
+  getTeamMemberWithDetails(id: string, tenantId: string): Promise<{
+    member: User & { role?: Role };
+    deals: Deal[];
+    quotations: Quotation[];
+    invoices: Invoice[];
+    tasks: Task[];
+    customers: Customer[];
+    activities: Activity[];
+  } | undefined>;
   
   // Auth token operations
   createAuthToken(token: InsertAuthToken): Promise<AuthToken>;
@@ -515,6 +524,61 @@ export class DatabaseStorage implements IStorage {
       return { ...user, role };
     }
     return user;
+  }
+  
+  async getTeamMemberWithDetails(id: string, tenantId: string): Promise<{
+    member: User & { role?: Role };
+    deals: Deal[];
+    quotations: Quotation[];
+    invoices: Invoice[];
+    tasks: Task[];
+    customers: Customer[];
+    activities: Activity[];
+  } | undefined> {
+    const [user] = await db.select().from(schema.users)
+      .where(and(eq(schema.users.id, id), eq(schema.users.tenantId, tenantId)));
+    if (!user) return undefined;
+    
+    let role: Role | undefined;
+    if (user.roleId) {
+      const [r] = await db.select().from(schema.roles).where(eq(schema.roles.id, user.roleId));
+      role = r;
+    }
+    
+    const deals = await db.select().from(schema.deals)
+      .where(and(eq(schema.deals.tenantId, tenantId), eq(schema.deals.ownerId, id)))
+      .orderBy(desc(schema.deals.createdAt));
+    
+    const quotations = await db.select().from(schema.quotations)
+      .where(and(eq(schema.quotations.tenantId, tenantId), eq(schema.quotations.createdBy, id)))
+      .orderBy(desc(schema.quotations.createdAt));
+    
+    const invoices = await db.select().from(schema.invoices)
+      .where(and(eq(schema.invoices.tenantId, tenantId), eq(schema.invoices.createdBy, id)))
+      .orderBy(desc(schema.invoices.createdAt));
+    
+    const tasks = await db.select().from(schema.tasks)
+      .where(and(eq(schema.tasks.tenantId, tenantId), eq(schema.tasks.assignedTo, id)))
+      .orderBy(desc(schema.tasks.createdAt));
+    
+    const customers = await db.select().from(schema.customers)
+      .where(and(eq(schema.customers.tenantId, tenantId), eq(schema.customers.ownerId, id)))
+      .orderBy(desc(schema.customers.createdAt));
+    
+    const activities = await db.select().from(schema.activities)
+      .where(and(eq(schema.activities.tenantId, tenantId), eq(schema.activities.userId, id)))
+      .orderBy(desc(schema.activities.createdAt))
+      .limit(50);
+    
+    return {
+      member: { ...user, role },
+      deals,
+      quotations,
+      invoices,
+      tasks,
+      customers,
+      activities,
+    };
   }
   
   // Auth token operations

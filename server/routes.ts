@@ -375,6 +375,67 @@ export async function registerRoutes(
     }
   });
   
+  // Get team member details with related data
+  app.get("/api/team/members/:id/details", requireAuth, validateTenant, requireAgencyAdmin, async (req, res) => {
+    try {
+      const details = await storage.getTeamMemberWithDetails(req.params.id, req.user!.tenantId);
+      if (!details) {
+        return res.status(404).json({ message: "Team member not found" });
+      }
+      
+      const { passwordHash, ...memberWithoutPassword } = details.member;
+      
+      const totalDealsValue = details.deals.reduce((sum, d) => sum + parseFloat(d.value as string), 0);
+      const wonDeals = details.deals.filter(d => d.stage === 'won');
+      const wonDealsValue = wonDeals.reduce((sum, d) => sum + parseFloat(d.value as string), 0);
+      
+      const totalQuotationsValue = details.quotations.reduce((sum, q) => sum + parseFloat(q.totalAmount as string), 0);
+      const acceptedQuotations = details.quotations.filter(q => q.status === 'accepted');
+      
+      const totalInvoicesValue = details.invoices.reduce((sum, i) => sum + parseFloat(i.totalAmount as string), 0);
+      const paidInvoices = details.invoices.filter(i => i.status === 'paid');
+      const paidInvoicesValue = paidInvoices.reduce((sum, i) => sum + parseFloat(i.totalAmount as string), 0);
+      
+      const completedTasks = details.tasks.filter(t => t.status === 'completed');
+      const pendingTasks = details.tasks.filter(t => t.status !== 'completed' && t.status !== 'cancelled');
+      
+      res.json({
+        member: memberWithoutPassword,
+        deals: details.deals,
+        quotations: details.quotations,
+        invoices: details.invoices,
+        tasks: details.tasks,
+        customers: details.customers,
+        activities: details.activities,
+        performance: {
+          totalDeals: details.deals.length,
+          totalDealsValue,
+          wonDeals: wonDeals.length,
+          wonDealsValue,
+          dealWinRate: details.deals.length > 0 ? ((wonDeals.length / details.deals.length) * 100).toFixed(1) : 0,
+          totalQuotations: details.quotations.length,
+          totalQuotationsValue,
+          acceptedQuotations: acceptedQuotations.length,
+          quotationAcceptRate: details.quotations.length > 0 ? ((acceptedQuotations.length / details.quotations.length) * 100).toFixed(1) : 0,
+          totalInvoices: details.invoices.length,
+          totalInvoicesValue,
+          paidInvoices: paidInvoices.length,
+          paidInvoicesValue,
+          collectionRate: totalInvoicesValue > 0 ? ((paidInvoicesValue / totalInvoicesValue) * 100).toFixed(1) : 0,
+          totalTasks: details.tasks.length,
+          completedTasks: completedTasks.length,
+          pendingTasks: pendingTasks.length,
+          taskCompletionRate: details.tasks.length > 0 ? ((completedTasks.length / details.tasks.length) * 100).toFixed(1) : 0,
+          totalCustomers: details.customers.length,
+          totalActivities: details.activities.length,
+        }
+      });
+    } catch (error) {
+      console.error("Get team member details error:", error);
+      res.status(500).json({ message: "Failed to fetch team member details" });
+    }
+  });
+  
   // Get roles
   app.get("/api/team/roles", requireAuth, validateTenant, async (req, res) => {
     try {

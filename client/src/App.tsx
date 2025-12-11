@@ -31,6 +31,7 @@ const InvoiceDetail = lazy(() => import("@/pages/InvoiceDetail"));
 const Activities = lazy(() => import("@/pages/Activities"));
 const Reports = lazy(() => import("@/pages/Reports"));
 const TeamManagement = lazy(() => import("@/pages/TeamManagement"));
+const TeamMemberDetail = lazy(() => import("@/pages/TeamMemberDetail"));
 const TeamLogin = lazy(() => import("@/pages/TeamLogin"));
 const TeamDashboard = lazy(() => import("@/pages/TeamDashboard"));
 const SaasAdminDashboard = lazy(() => import("@/pages/SaasAdminDashboard"));
@@ -128,6 +129,7 @@ function Router() {
         <Route path="/profile">{() => <ProtectedPage component={Profile} />}</Route>
         <Route path="/billing">{() => <ProtectedPage component={Billing} />}</Route>
         <Route path="/team">{() => <ProtectedPage component={TeamManagement} />}</Route>
+        <Route path="/team/:id">{() => <ProtectedPage component={TeamMemberDetail} />}</Route>
         <Route path="/team-dashboard">{() => <ProtectedPage component={TeamDashboard} />}</Route>
         <Route path="/saas-admin">{() => <ProtectedPage component={SaasAdminDashboard} />}</Route>
         <Route path="/customer-portal">{() => <ProtectedPage component={CustomerPortal} />}</Route>
