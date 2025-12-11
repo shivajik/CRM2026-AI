@@ -1513,8 +1513,8 @@ export async function registerRoutes(
   
   app.get("/api/customers", requireAuth, validateTenant, async (req, res) => {
     try {
-      const currentUser = await storage.getUserById(req.user!.userId);
-      const ownerId = currentUser?.isAdmin ? undefined : req.user!.userId;
+      const userType = req.user!.userType;
+      const ownerId = (userType === 'team_member' || userType === 'customer') ? req.user!.userId : undefined;
       const customers = await storage.getCustomersByTenant(req.user!.tenantId, ownerId);
       res.json(customers);
     } catch (error) {
