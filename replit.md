@@ -35,7 +35,10 @@ Preferred communication style: Simple, everyday language.
 - **ORM**: Drizzle ORM with PostgreSQL dialect
 - **Schema Location**: `shared/schema.ts` contains all table definitions
 - **Migrations**: Managed via `drizzle-kit push` command
-- **Connection**: Uses `pg` Pool with `DATABASE_URL` environment variable
+- **Connection**: Uses `pg` Pool with Supabase PostgreSQL
+- **CRITICAL**: Server uses `SUPABASE_DATABASE_URL` while drizzle-kit CLI defaults to `DATABASE_URL`
+  - When running drizzle-kit commands, always specify: `DATABASE_URL="$SUPABASE_DIRECT_URL" npx drizzle-kit push`
+  - The `SUPABASE_DIRECT_URL` bypasses pgbouncer for DDL operations
 
 ### Core Data Models
 - **Tenants**: Organizations using the CRM
