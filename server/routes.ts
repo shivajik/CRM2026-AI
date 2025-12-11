@@ -126,6 +126,7 @@ export async function registerRoutes(
           tenantId: user.tenantId,
           userType: user.userType,
           isAdmin: user.isAdmin,
+          profileImageUrl: user.profileImageUrl,
         },
       });
     } catch (error) {
@@ -200,6 +201,7 @@ export async function registerRoutes(
         isAdmin: user.isAdmin,
         userType: user.userType,
         permissions: user.role?.permissions || [],
+        profileImageUrl: user.profileImageUrl,
       });
     } catch (error) {
       console.error("Get user error:", error);
