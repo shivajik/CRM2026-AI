@@ -992,7 +992,7 @@ export async function registerRoutes(
             taskId: task.id,
             title: req.body.checklists[i],
             sortOrder: i,
-          });
+          }, req.user!.userId);
         }
       }
 
@@ -1201,7 +1201,7 @@ export async function registerRoutes(
         taskId: req.params.id,
         title: req.body.title,
         sortOrder: req.body.sortOrder || 0,
-      });
+      }, req.user!.userId);
       res.status(201).json(item);
     } catch (error) {
       console.error("Create checklist item error:", error);

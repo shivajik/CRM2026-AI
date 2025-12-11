@@ -370,7 +370,7 @@ export interface IStorage {
   deleteTaskComment(id: string): Promise<void>;
   
   // Task Checklist operations
-  createTaskChecklistItem(item: InsertTaskChecklistItem): Promise<TaskChecklistItem>;
+  createTaskChecklistItem(item: InsertTaskChecklistItem, createdByUserId: string): Promise<TaskChecklistItem>;
   getTaskChecklistItems(taskId: string): Promise<TaskChecklistItem[]>;
   updateTaskChecklistItem(id: string, updates: Partial<InsertTaskChecklistItem>): Promise<TaskChecklistItem | undefined>;
   toggleTaskChecklistItem(id: string, userId: string): Promise<TaskChecklistItem | undefined>;
@@ -1994,12 +1994,12 @@ export class DatabaseStorage implements IStorage {
   }
 
   // Task Checklist operations
-  async createTaskChecklistItem(insertItem: InsertTaskChecklistItem): Promise<TaskChecklistItem> {
+  async createTaskChecklistItem(insertItem: InsertTaskChecklistItem, createdByUserId: string): Promise<TaskChecklistItem> {
     const [item] = await db.insert(schema.taskChecklistItems).values(insertItem).returning();
     
     await db.insert(schema.taskActivityLog).values({
       taskId: insertItem.taskId,
-      userId: insertItem.completedBy || 'system',
+      userId: createdByUserId,
       action: 'checklist_item_added',
       description: `Added checklist item: ${insertItem.title}`,
     });
