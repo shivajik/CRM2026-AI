@@ -78,6 +78,9 @@ export default function QuotationDetail() {
       <body>
         <div class="header">
           <div>
+            ${companyProfile?.logoUrl ? `
+              <img src="${companyProfile.logoUrl}" alt="Company Logo" style="max-height: 60px; max-width: 150px; object-fit: contain; margin-bottom: 10px;" />
+            ` : ""}
             <div class="company-name">${companyProfile?.companyName || "Your Company Name"}</div>
             ${companyProfile?.address || companyProfile?.city || companyProfile?.country ? `
               <div>${[companyProfile?.address, companyProfile?.city, companyProfile?.state, companyProfile?.postalCode, companyProfile?.country].filter(Boolean).join(", ")}</div>
