@@ -100,11 +100,11 @@ interface User {
 }
 
 const TASK_STATUSES = [
-  { id: "todo", label: "To Do", color: "bg-slate-500", icon: CheckSquare },
+  { id: "not_started", label: "To Do", color: "bg-slate-500", icon: CheckSquare },
   { id: "in_progress", label: "In Progress", color: "bg-blue-500", icon: Play },
-  { id: "review", label: "Review", color: "bg-purple-500", icon: Eye },
-  { id: "blocked", label: "Blocked", color: "bg-red-500", icon: AlertCircle },
-  { id: "done", label: "Done", color: "bg-green-500", icon: Check },
+  { id: "under_review", label: "Review", color: "bg-purple-500", icon: Eye },
+  { id: "on_hold", label: "Blocked", color: "bg-red-500", icon: AlertCircle },
+  { id: "completed", label: "Done", color: "bg-green-500", icon: Check },
   { id: "cancelled", label: "Cancelled", color: "bg-gray-400", icon: X },
 ];
 
@@ -118,7 +118,7 @@ const PRIORITIES = [
 const emptyTask = {
   title: "",
   description: "",
-  status: "todo",
+  status: "not_started",
   priority: "medium",
   dueDate: "",
   assignedTo: "",
@@ -337,12 +337,12 @@ export default function Tasks() {
     PRIORITIES.find(p => p.id === priority) || PRIORITIES[1];
 
   const isOverdue = (task: Task) => {
-    if (!task.dueDate || task.status === "done" || task.status === "cancelled") return false;
+    if (!task.dueDate || task.status === "completed" || task.status === "cancelled") return false;
     return isBefore(new Date(task.dueDate), new Date());
   };
 
   const isDueSoon = (task: Task) => {
-    if (!task.dueDate || task.status === "done" || task.status === "cancelled") return false;
+    if (!task.dueDate || task.status === "completed" || task.status === "cancelled") return false;
     const dueDate = new Date(task.dueDate);
     return isAfter(dueDate, new Date()) && isBefore(dueDate, addDays(new Date(), 2));
   };
@@ -474,7 +474,7 @@ export default function Tasks() {
                     className={cn(
                       "group hover:shadow-md transition-all cursor-pointer",
                       isOverdue(task) && "border-red-300 dark:border-red-800",
-                      task.status === "done" && "opacity-60"
+                      task.status === "completed" && "opacity-60"
                     )}
                     onClick={() => handleOpenDetail(task)}
                     data-testid={`card-task-${task.id}`}
@@ -491,7 +491,7 @@ export default function Tasks() {
                             <span 
                               className={cn(
                                 "font-medium",
-                                task.status === "done" && "line-through text-muted-foreground"
+                                task.status === "completed" && "line-through text-muted-foreground"
                               )}
                               data-testid={`text-title-${task.id}`}
                             >
@@ -761,14 +761,14 @@ export default function Tasks() {
                 <div className="grid gap-2">
                   <Label htmlFor="assignedTo">Assign To</Label>
                   <Select
-                    value={formData.assignedTo}
-                    onValueChange={(value) => setFormData({ ...formData, assignedTo: value })}
+                    value={formData.assignedTo || "_unassigned"}
+                    onValueChange={(value) => setFormData({ ...formData, assignedTo: value === "_unassigned" ? "" : value })}
                   >
                     <SelectTrigger data-testid="select-task-assignee">
                       <SelectValue placeholder="Select team member" />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="">Unassigned</SelectItem>
+                      <SelectItem value="_unassigned">Unassigned</SelectItem>
                       {users.map((user) => (
                         <SelectItem key={user.id} value={user.id}>
                           {user.firstName} {user.lastName}

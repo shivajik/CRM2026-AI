@@ -1260,6 +1260,7 @@ export async function registerRoutes(
         taskId: req.params.id,
         userId: req.user!.userId,
         startedAt: new Date(),
+        endedAt: null,
         description: req.body.description,
         isBillable: req.body.isBillable || false,
       });
