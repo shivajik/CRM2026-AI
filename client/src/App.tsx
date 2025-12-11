@@ -3,41 +3,48 @@ import { queryClient } from "./lib/queryClient";
 import { QueryClientProvider, useQuery } from "@tanstack/react-query";
 import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
-import NotFound from "@/pages/not-found";
-import Dashboard from "@/pages/Dashboard";
-import Contacts from "@/pages/Contacts";
-import Deals from "@/pages/Deals";
-import DealDetail from "@/pages/DealDetail";
-import Tasks from "@/pages/Tasks";
-import Settings from "@/pages/Settings";
-import Profile from "@/pages/Profile";
-import Billing from "@/pages/Billing";
-import Login from "@/pages/Login";
-import Register from "@/pages/Register";
-import Products from "@/pages/Products";
-import Customers from "@/pages/Customers";
-import CustomerDetail from "@/pages/CustomerDetail";
-import Quotations from "@/pages/Quotations";
-import QuotationDetail from "@/pages/QuotationDetail";
-import Invoices from "@/pages/Invoices";
-import InvoiceDetail from "@/pages/InvoiceDetail";
-import Activities from "@/pages/Activities";
-import Reports from "@/pages/Reports";
-import TeamManagement from "@/pages/TeamManagement";
-import TeamLogin from "@/pages/TeamLogin";
-import TeamDashboard from "@/pages/TeamDashboard";
-import SaasAdminDashboard from "@/pages/SaasAdminDashboard";
-import CustomerPortal from "@/pages/CustomerPortal";
-import Landing from "@/pages/Landing";
-import Features from "@/pages/Features";
-import Pricing from "@/pages/Pricing";
-import Checkout from "@/pages/Checkout";
-import Resources from "@/pages/Resources";
-import { USLanding, UKLanding, INLanding } from "@/pages/GeoLanding";
-import SEOAudit from "@/pages/SEOAudit";
-import EmailModule from "@/pages/EmailModule";
+import { ProtectedRoute } from "@/components/ProtectedRoute";
+import { ErrorBoundary } from "@/components/ErrorBoundary";
+import { LoadingSpinner } from "@/components/LoadingSpinner";
+import { lazy, Suspense } from "react";
 import { isAuthenticated, getUser } from "@/lib/auth";
 import { authApi } from "@/lib/api";
+
+const NotFound = lazy(() => import("@/pages/not-found"));
+const Dashboard = lazy(() => import("@/pages/Dashboard"));
+const Contacts = lazy(() => import("@/pages/Contacts"));
+const Deals = lazy(() => import("@/pages/Deals"));
+const DealDetail = lazy(() => import("@/pages/DealDetail"));
+const Tasks = lazy(() => import("@/pages/Tasks"));
+const Settings = lazy(() => import("@/pages/Settings"));
+const Profile = lazy(() => import("@/pages/Profile"));
+const Billing = lazy(() => import("@/pages/Billing"));
+const Login = lazy(() => import("@/pages/Login"));
+const Register = lazy(() => import("@/pages/Register"));
+const Products = lazy(() => import("@/pages/Products"));
+const Customers = lazy(() => import("@/pages/Customers"));
+const CustomerDetail = lazy(() => import("@/pages/CustomerDetail"));
+const Quotations = lazy(() => import("@/pages/Quotations"));
+const QuotationDetail = lazy(() => import("@/pages/QuotationDetail"));
+const Invoices = lazy(() => import("@/pages/Invoices"));
+const InvoiceDetail = lazy(() => import("@/pages/InvoiceDetail"));
+const Activities = lazy(() => import("@/pages/Activities"));
+const Reports = lazy(() => import("@/pages/Reports"));
+const TeamManagement = lazy(() => import("@/pages/TeamManagement"));
+const TeamLogin = lazy(() => import("@/pages/TeamLogin"));
+const TeamDashboard = lazy(() => import("@/pages/TeamDashboard"));
+const SaasAdminDashboard = lazy(() => import("@/pages/SaasAdminDashboard"));
+const CustomerPortal = lazy(() => import("@/pages/CustomerPortal"));
+const Landing = lazy(() => import("@/pages/Landing"));
+const Features = lazy(() => import("@/pages/Features"));
+const Pricing = lazy(() => import("@/pages/Pricing"));
+const Checkout = lazy(() => import("@/pages/Checkout"));
+const Resources = lazy(() => import("@/pages/Resources"));
+const SEOAudit = lazy(() => import("@/pages/SEOAudit"));
+const EmailModule = lazy(() => import("@/pages/EmailModule"));
+const USLanding = lazy(() => import("@/pages/GeoLanding").then(m => ({ default: m.USLanding })));
+const UKLanding = lazy(() => import("@/pages/GeoLanding").then(m => ({ default: m.UKLanding })));
+const INLanding = lazy(() => import("@/pages/GeoLanding").then(m => ({ default: m.INLanding })));
 
 function RoleBasedRedirect() {
   const [, setLocation] = useLocation();
@@ -54,11 +61,7 @@ function RoleBasedRedirect() {
   }
 
   if (isLoading) {
-    return (
-      <div className="min-h-screen flex items-center justify-center">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
-      </div>
-    );
+    return <LoadingSpinner />;
   }
 
   if (currentUser?.userType === "saas_admin") {
@@ -68,61 +71,83 @@ function RoleBasedRedirect() {
   } else if (currentUser?.userType === "team_member") {
     return <Redirect to="/team-dashboard" />;
   } else {
-    return <Dashboard />;
+    return (
+      <ProtectedRoute>
+        <Suspense fallback={<LoadingSpinner />}>
+          <Dashboard />
+        </Suspense>
+      </ProtectedRoute>
+    );
   }
+}
+
+function ProtectedPage({ component: Component }: { component: React.ComponentType }) {
+  return (
+    <ProtectedRoute>
+      <Component />
+    </ProtectedRoute>
+  );
 }
 
 function Router() {
   return (
-    <Switch>
-      <Route path="/" component={Landing} />
-      <Route path="/features" component={Features} />
-      <Route path="/pricing" component={Pricing} />
-      <Route path="/checkout" component={Checkout} />
-      <Route path="/resources" component={Resources} />
-      <Route path="/us" component={USLanding} />
-      <Route path="/uk" component={UKLanding} />
-      <Route path="/in" component={INLanding} />
-      <Route path="/audit" component={SEOAudit} />
-      <Route path="/app" component={RoleBasedRedirect} />
-      <Route path="/agency-dashboard" component={Dashboard} />
-      <Route path="/customers" component={Customers} />
-      <Route path="/customers/:id" component={CustomerDetail} />
-      <Route path="/contacts" component={Contacts} />
-      <Route path="/deals" component={Deals} />
-      <Route path="/deals/:id" component={DealDetail} />
-      <Route path="/products" component={Products} />
-      <Route path="/quotations" component={Quotations} />
-      <Route path="/quotations/:id" component={QuotationDetail} />
-      <Route path="/invoices" component={Invoices} />
-      <Route path="/invoices/:id" component={InvoiceDetail} />
-      <Route path="/email" component={EmailModule} />
-      <Route path="/tasks" component={Tasks} />
-      <Route path="/activities" component={Activities} />
-      <Route path="/reports" component={Reports} />
-      <Route path="/settings" component={Settings} />
-      <Route path="/profile" component={Profile} />
-      <Route path="/billing" component={Billing} />
-      <Route path="/team" component={TeamManagement} />
-      <Route path="/team-login" component={TeamLogin} />
-      <Route path="/team-dashboard" component={TeamDashboard} />
-      <Route path="/saas-admin" component={SaasAdminDashboard} />
-      <Route path="/customer-portal" component={CustomerPortal} />
-      <Route path="/login" component={Login} />
-      <Route path="/register" component={Register} />
-      <Route component={NotFound} />
-    </Switch>
+    <Suspense fallback={<LoadingSpinner />}>
+      <Switch>
+        {/* Public routes */}
+        <Route path="/" component={Landing} />
+        <Route path="/features" component={Features} />
+        <Route path="/pricing" component={Pricing} />
+        <Route path="/checkout" component={Checkout} />
+        <Route path="/resources" component={Resources} />
+        <Route path="/us" component={USLanding} />
+        <Route path="/uk" component={UKLanding} />
+        <Route path="/in" component={INLanding} />
+        <Route path="/audit" component={SEOAudit} />
+        <Route path="/login" component={Login} />
+        <Route path="/register" component={Register} />
+        <Route path="/team-login" component={TeamLogin} />
+        
+        {/* Protected routes */}
+        <Route path="/app" component={RoleBasedRedirect} />
+        <Route path="/agency-dashboard">{() => <ProtectedPage component={Dashboard} />}</Route>
+        <Route path="/customers">{() => <ProtectedPage component={Customers} />}</Route>
+        <Route path="/customers/:id">{() => <ProtectedPage component={CustomerDetail} />}</Route>
+        <Route path="/contacts">{() => <ProtectedPage component={Contacts} />}</Route>
+        <Route path="/deals">{() => <ProtectedPage component={Deals} />}</Route>
+        <Route path="/deals/:id">{() => <ProtectedPage component={DealDetail} />}</Route>
+        <Route path="/products">{() => <ProtectedPage component={Products} />}</Route>
+        <Route path="/quotations">{() => <ProtectedPage component={Quotations} />}</Route>
+        <Route path="/quotations/:id">{() => <ProtectedPage component={QuotationDetail} />}</Route>
+        <Route path="/invoices">{() => <ProtectedPage component={Invoices} />}</Route>
+        <Route path="/invoices/:id">{() => <ProtectedPage component={InvoiceDetail} />}</Route>
+        <Route path="/email">{() => <ProtectedPage component={EmailModule} />}</Route>
+        <Route path="/tasks">{() => <ProtectedPage component={Tasks} />}</Route>
+        <Route path="/activities">{() => <ProtectedPage component={Activities} />}</Route>
+        <Route path="/reports">{() => <ProtectedPage component={Reports} />}</Route>
+        <Route path="/settings">{() => <ProtectedPage component={Settings} />}</Route>
+        <Route path="/profile">{() => <ProtectedPage component={Profile} />}</Route>
+        <Route path="/billing">{() => <ProtectedPage component={Billing} />}</Route>
+        <Route path="/team">{() => <ProtectedPage component={TeamManagement} />}</Route>
+        <Route path="/team-dashboard">{() => <ProtectedPage component={TeamDashboard} />}</Route>
+        <Route path="/saas-admin">{() => <ProtectedPage component={SaasAdminDashboard} />}</Route>
+        <Route path="/customer-portal">{() => <ProtectedPage component={CustomerPortal} />}</Route>
+        
+        <Route component={NotFound} />
+      </Switch>
+    </Suspense>
   );
 }
 
 function App() {
   return (
-    <QueryClientProvider client={queryClient}>
-      <TooltipProvider>
-        <Toaster />
-        <Router />
-      </TooltipProvider>
-    </QueryClientProvider>
+    <ErrorBoundary>
+      <QueryClientProvider client={queryClient}>
+        <TooltipProvider>
+          <Toaster />
+          <Router />
+        </TooltipProvider>
+      </QueryClientProvider>
+    </ErrorBoundary>
   );
 }
 
