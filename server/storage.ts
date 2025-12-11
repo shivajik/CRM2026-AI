@@ -53,7 +53,7 @@ export interface IStorage {
   getUserById(id: string): Promise<User | undefined>;
   getUserByEmail(email: string): Promise<User | undefined>;
   getUsersByTenant(tenantId: string): Promise<User[]>;
-  updateUser(id: string, updates: { firstName?: string; lastName?: string; email?: string; profileImageUrl?: string }): Promise<User | undefined>;
+  updateUser(id: string, updates: { firstName?: string; lastName?: string; email?: string; profileImageUrl?: string; phone?: string; jobTitle?: string }): Promise<User | undefined>;
   
   // Role operations
   createRole(role: InsertRole): Promise<Role>;

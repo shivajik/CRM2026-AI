@@ -202,6 +202,8 @@ export async function registerRoutes(
         userType: user.userType,
         permissions: user.role?.permissions || [],
         profileImageUrl: user.profileImageUrl,
+        phone: user.phone,
+        jobTitle: user.jobTitle,
       });
     } catch (error) {
       console.error("Get user error:", error);
@@ -512,13 +514,13 @@ export async function registerRoutes(
   
   app.patch("/api/users/profile", requireAuth, async (req, res) => {
     try {
-      const { firstName, lastName, email, profileImageUrl } = req.body;
+      const { firstName, lastName, email, profileImageUrl, phone, jobTitle } = req.body;
       
-      if (!firstName && !lastName && !email && profileImageUrl === undefined) {
+      if (!firstName && !lastName && !email && profileImageUrl === undefined && phone === undefined && jobTitle === undefined) {
         return res.status(400).json({ message: "No valid fields provided for update" });
       }
       
-      const updates: { firstName?: string; lastName?: string; email?: string; profileImageUrl?: string } = {};
+      const updates: { firstName?: string; lastName?: string; email?: string; profileImageUrl?: string; phone?: string; jobTitle?: string } = {};
       
       if (firstName && typeof firstName === 'string') {
         updates.firstName = firstName.trim();
@@ -537,6 +539,12 @@ export async function registerRoutes(
       if (profileImageUrl !== undefined) {
         updates.profileImageUrl = profileImageUrl;
       }
+      if (phone !== undefined) {
+        updates.phone = typeof phone === 'string' ? phone.trim() : null;
+      }
+      if (jobTitle !== undefined) {
+        updates.jobTitle = typeof jobTitle === 'string' ? jobTitle.trim() : null;
+      }
       
       if (Object.keys(updates).length === 0) {
         return res.status(400).json({ message: "No valid fields provided for update" });
@@ -554,6 +562,8 @@ export async function registerRoutes(
         lastName: updatedUser.lastName,
         tenantId: updatedUser.tenantId,
         profileImageUrl: updatedUser.profileImageUrl,
+        phone: updatedUser.phone,
+        jobTitle: updatedUser.jobTitle,
       });
     } catch (error) {
       console.error("Update profile error:", error);

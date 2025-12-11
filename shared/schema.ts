@@ -46,6 +46,8 @@ export const users = pgTable("users", {
   passwordHash: text("password_hash").notNull(),
   firstName: text("first_name").notNull(),
   lastName: text("last_name").notNull(),
+  phone: text("phone"),
+  jobTitle: text("job_title"),
   profileImageUrl: text("profile_image_url"),
   roleId: varchar("role_id").references(() => roles.id),
   userType: text("user_type").notNull().default("team_member"), // saas_admin, agency_admin, team_member, customer
