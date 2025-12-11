@@ -4,7 +4,7 @@ import { storage } from "./storage";
 import { hashPassword, verifyPassword, generateAccessToken, generateRefreshToken, getRefreshTokenExpiry, verifyToken } from "./auth";
 import { requireAuth, validateTenant, requireAgencyAdmin, requireSaasAdmin, denyCustomerAccess } from "./middleware";
 import { z } from "zod";
-import { insertContactSchema, insertDealSchema, insertTaskSchema, insertProductSchema, insertCustomerSchema, insertQuotationSchema, insertQuotationItemSchema, insertInvoiceSchema, insertInvoiceItemSchema, insertPaymentSchema, insertActivitySchema } from "@shared/schema";
+import { insertContactSchema, insertDealSchema, insertTaskSchema, insertProductSchema, insertCustomerSchema, insertQuotationSchema, insertQuotationItemSchema, insertInvoiceSchema, insertInvoiceItemSchema, insertPaymentSchema, insertActivitySchema, insertProposalSchema, insertProposalTemplateSchema, insertProposalSectionSchema, insertProposalPricingItemSchema, insertTemplateSectionSchema, PROPOSAL_SECTION_TYPES } from "@shared/schema";
 
 export async function registerRoutes(
   httpServer: Server,
@@ -3161,6 +3161,791 @@ export async function registerRoutes(
     } catch (error) {
       console.error("AI assist error:", error);
       res.status(500).json({ message: "Failed to process AI request" });
+    }
+  });
+
+  // ==================== PROPOSAL BUILDER MODULE ====================
+
+  // Get all proposals
+  app.get("/api/proposals", requireAuth, validateTenant, async (req, res) => {
+    try {
+      const { status, customerId, ownerId } = req.query;
+      const proposals = await storage.getProposalsByTenant(req.user!.tenantId, {
+        status: status as string | undefined,
+        customerId: customerId as string | undefined,
+        ownerId: ownerId as string | undefined,
+      });
+      res.json(proposals);
+    } catch (error) {
+      console.error("Get proposals error:", error);
+      res.status(500).json({ message: "Failed to fetch proposals" });
+    }
+  });
+
+  // Get proposal analytics
+  app.get("/api/proposals/analytics", requireAuth, validateTenant, async (req, res) => {
+    try {
+      const analytics = await storage.getProposalAnalytics(req.user!.tenantId);
+      res.json(analytics);
+    } catch (error) {
+      console.error("Get proposal analytics error:", error);
+      res.status(500).json({ message: "Failed to fetch proposal analytics" });
+    }
+  });
+
+  // Get single proposal with details
+  app.get("/api/proposals/:id", requireAuth, validateTenant, async (req, res) => {
+    try {
+      const proposal = await storage.getProposalById(req.params.id, req.user!.tenantId);
+      if (!proposal) {
+        return res.status(404).json({ message: "Proposal not found" });
+      }
+      
+      const sections = await storage.getProposalSections(proposal.id);
+      const pricingItems = await storage.getProposalPricingItems(proposal.id);
+      const versions = await storage.getProposalVersions(proposal.id);
+      const activityLogs = await storage.getProposalActivityLogs(proposal.id);
+      const comments = await storage.getProposalComments(proposal.id);
+      const signatures = await storage.getProposalSignatures(proposal.id);
+      const customer = proposal.customerId ? await storage.getCustomerById(proposal.customerId, req.user!.tenantId) : null;
+      
+      res.json({
+        ...proposal,
+        sections,
+        pricingItems,
+        versions,
+        activityLogs,
+        comments,
+        signatures,
+        customer,
+      });
+    } catch (error) {
+      console.error("Get proposal error:", error);
+      res.status(500).json({ message: "Failed to fetch proposal" });
+    }
+  });
+
+  // Create new proposal
+  app.post("/api/proposals", requireAuth, validateTenant, async (req, res) => {
+    try {
+      const proposalNumber = await storage.getNextProposalNumber(req.user!.tenantId);
+      
+      const proposal = await storage.createProposal({
+        ...req.body,
+        tenantId: req.user!.tenantId,
+        createdBy: req.user!.userId,
+        ownerId: req.body.ownerId || req.user!.userId,
+        proposalNumber,
+        status: 'draft',
+      });
+      
+      await storage.createProposalActivityLog({
+        proposalId: proposal.id,
+        userId: req.user!.userId,
+        action: 'created',
+        details: 'Proposal created',
+      });
+      
+      res.status(201).json(proposal);
+    } catch (error) {
+      console.error("Create proposal error:", error);
+      res.status(500).json({ message: "Failed to create proposal" });
+    }
+  });
+
+  // Create proposal from template
+  app.post("/api/proposals/from-template/:templateId", requireAuth, validateTenant, async (req, res) => {
+    try {
+      const proposalNumber = await storage.getNextProposalNumber(req.user!.tenantId);
+      
+      const proposal = await storage.createProposalFromTemplate(req.params.templateId, {
+        ...req.body,
+        tenantId: req.user!.tenantId,
+        createdBy: req.user!.userId,
+        ownerId: req.body.ownerId || req.user!.userId,
+        proposalNumber,
+        status: 'draft',
+      });
+      
+      if (!proposal) {
+        return res.status(404).json({ message: "Template not found" });
+      }
+      
+      await storage.createProposalActivityLog({
+        proposalId: proposal.id,
+        userId: req.user!.userId,
+        action: 'created_from_template',
+        details: `Proposal created from template`,
+      });
+      
+      res.status(201).json(proposal);
+    } catch (error) {
+      console.error("Create proposal from template error:", error);
+      res.status(500).json({ message: "Failed to create proposal from template" });
+    }
+  });
+
+  // Update proposal
+  app.patch("/api/proposals/:id", requireAuth, validateTenant, async (req, res) => {
+    try {
+      const proposal = await storage.updateProposal(req.params.id, req.user!.tenantId, req.body);
+      if (!proposal) {
+        return res.status(404).json({ message: "Proposal not found" });
+      }
+      
+      await storage.createProposalActivityLog({
+        proposalId: proposal.id,
+        userId: req.user!.userId,
+        action: 'updated',
+        details: 'Proposal updated',
+      });
+      
+      res.json(proposal);
+    } catch (error) {
+      console.error("Update proposal error:", error);
+      res.status(500).json({ message: "Failed to update proposal" });
+    }
+  });
+
+  // Update proposal status
+  app.patch("/api/proposals/:id/status", requireAuth, validateTenant, async (req, res) => {
+    try {
+      const { status, notes } = req.body;
+      const proposal = await storage.updateProposalStatus(
+        req.params.id, 
+        req.user!.tenantId, 
+        status, 
+        req.user!.userId,
+        notes
+      );
+      
+      if (!proposal) {
+        return res.status(404).json({ message: "Proposal not found" });
+      }
+      
+      res.json(proposal);
+    } catch (error) {
+      console.error("Update proposal status error:", error);
+      res.status(500).json({ message: "Failed to update proposal status" });
+    }
+  });
+
+  // Send proposal (generate access token and update status)
+  app.post("/api/proposals/:id/send", requireAuth, validateTenant, async (req, res) => {
+    try {
+      const accessToken = await storage.generateProposalAccessToken(req.params.id, req.user!.tenantId);
+      const proposal = await storage.updateProposalStatus(
+        req.params.id, 
+        req.user!.tenantId, 
+        'sent', 
+        req.user!.userId,
+        'Proposal sent to client'
+      );
+      
+      if (!proposal) {
+        return res.status(404).json({ message: "Proposal not found" });
+      }
+      
+      res.json({ ...proposal, accessToken, shareUrl: `/proposal/view/${accessToken}` });
+    } catch (error) {
+      console.error("Send proposal error:", error);
+      res.status(500).json({ message: "Failed to send proposal" });
+    }
+  });
+
+  // Create proposal version (snapshot)
+  app.post("/api/proposals/:id/version", requireAuth, validateTenant, async (req, res) => {
+    try {
+      const proposal = await storage.getProposalById(req.params.id, req.user!.tenantId);
+      if (!proposal) {
+        return res.status(404).json({ message: "Proposal not found" });
+      }
+      
+      const sections = await storage.getProposalSections(proposal.id);
+      const pricingItems = await storage.getProposalPricingItems(proposal.id);
+      
+      const snapshot = JSON.stringify({
+        title: proposal.title,
+        sections,
+        pricingItems,
+        totalAmount: proposal.totalAmount,
+      });
+      
+      const version = await storage.createProposalVersion({
+        proposalId: proposal.id,
+        versionNumber: proposal.currentVersion,
+        createdBy: req.user!.userId,
+        snapshot,
+        changeNotes: req.body.notes || 'Version saved',
+      });
+      
+      await storage.updateProposal(proposal.id, req.user!.tenantId, {
+        currentVersion: proposal.currentVersion + 1,
+      } as any);
+      
+      res.status(201).json(version);
+    } catch (error) {
+      console.error("Create proposal version error:", error);
+      res.status(500).json({ message: "Failed to create proposal version" });
+    }
+  });
+
+  // Restore proposal version
+  app.post("/api/proposals/:id/restore/:versionId", requireAuth, validateTenant, async (req, res) => {
+    try {
+      const proposal = await storage.restoreProposalVersion(
+        req.params.id, 
+        req.params.versionId, 
+        req.user!.tenantId, 
+        req.user!.userId
+      );
+      
+      if (!proposal) {
+        return res.status(404).json({ message: "Proposal or version not found" });
+      }
+      
+      await storage.createProposalActivityLog({
+        proposalId: proposal.id,
+        userId: req.user!.userId,
+        action: 'version_restored',
+        details: `Restored to version ${req.params.versionId}`,
+      });
+      
+      res.json(proposal);
+    } catch (error) {
+      console.error("Restore proposal version error:", error);
+      res.status(500).json({ message: "Failed to restore proposal version" });
+    }
+  });
+
+  // Delete proposal
+  app.delete("/api/proposals/:id", requireAuth, validateTenant, async (req, res) => {
+    try {
+      await storage.deleteProposal(req.params.id, req.user!.tenantId);
+      res.json({ message: "Proposal deleted successfully" });
+    } catch (error) {
+      console.error("Delete proposal error:", error);
+      res.status(500).json({ message: "Failed to delete proposal" });
+    }
+  });
+
+  // Proposal Sections
+  app.post("/api/proposals/:proposalId/sections", requireAuth, validateTenant, async (req, res) => {
+    try {
+      const section = await storage.createProposalSection({
+        ...req.body,
+        proposalId: req.params.proposalId,
+      });
+      res.status(201).json(section);
+    } catch (error) {
+      console.error("Create proposal section error:", error);
+      res.status(500).json({ message: "Failed to create proposal section" });
+    }
+  });
+
+  app.patch("/api/proposals/sections/:id", requireAuth, validateTenant, async (req, res) => {
+    try {
+      const section = await storage.updateProposalSection(req.params.id, req.body);
+      if (!section) {
+        return res.status(404).json({ message: "Section not found" });
+      }
+      res.json(section);
+    } catch (error) {
+      console.error("Update proposal section error:", error);
+      res.status(500).json({ message: "Failed to update proposal section" });
+    }
+  });
+
+  app.delete("/api/proposals/sections/:id", requireAuth, validateTenant, async (req, res) => {
+    try {
+      await storage.deleteProposalSection(req.params.id);
+      res.json({ message: "Section deleted successfully" });
+    } catch (error) {
+      console.error("Delete proposal section error:", error);
+      res.status(500).json({ message: "Failed to delete proposal section" });
+    }
+  });
+
+  app.post("/api/proposals/:proposalId/sections/reorder", requireAuth, validateTenant, async (req, res) => {
+    try {
+      const { sectionIds } = req.body;
+      await storage.reorderProposalSections(req.params.proposalId, sectionIds);
+      res.json({ message: "Sections reordered successfully" });
+    } catch (error) {
+      console.error("Reorder proposal sections error:", error);
+      res.status(500).json({ message: "Failed to reorder sections" });
+    }
+  });
+
+  // Proposal Pricing Items
+  app.post("/api/proposals/:proposalId/pricing", requireAuth, validateTenant, async (req, res) => {
+    try {
+      const item = await storage.createProposalPricingItem({
+        ...req.body,
+        proposalId: req.params.proposalId,
+      });
+      
+      await storage.recalculateProposalTotals(req.params.proposalId, req.user!.tenantId);
+      
+      res.status(201).json(item);
+    } catch (error) {
+      console.error("Create pricing item error:", error);
+      res.status(500).json({ message: "Failed to create pricing item" });
+    }
+  });
+
+  app.patch("/api/proposals/pricing/:id", requireAuth, validateTenant, async (req, res) => {
+    try {
+      const item = await storage.updateProposalPricingItem(req.params.id, req.body);
+      if (!item) {
+        return res.status(404).json({ message: "Pricing item not found" });
+      }
+      
+      if (item.proposalId) {
+        await storage.recalculateProposalTotals(item.proposalId, req.user!.tenantId);
+      }
+      
+      res.json(item);
+    } catch (error) {
+      console.error("Update pricing item error:", error);
+      res.status(500).json({ message: "Failed to update pricing item" });
+    }
+  });
+
+  app.delete("/api/proposals/pricing/:id", requireAuth, validateTenant, async (req, res) => {
+    try {
+      await storage.deleteProposalPricingItem(req.params.id);
+      res.json({ message: "Pricing item deleted successfully" });
+    } catch (error) {
+      console.error("Delete pricing item error:", error);
+      res.status(500).json({ message: "Failed to delete pricing item" });
+    }
+  });
+
+  // Proposal Comments
+  app.post("/api/proposals/:proposalId/comments", requireAuth, validateTenant, async (req, res) => {
+    try {
+      const comment = await storage.createProposalComment({
+        ...req.body,
+        proposalId: req.params.proposalId,
+        userId: req.user!.userId,
+      });
+      res.status(201).json(comment);
+    } catch (error) {
+      console.error("Create comment error:", error);
+      res.status(500).json({ message: "Failed to create comment" });
+    }
+  });
+
+  app.patch("/api/proposals/comments/:id", requireAuth, validateTenant, async (req, res) => {
+    try {
+      const comment = await storage.updateProposalComment(req.params.id, req.body);
+      if (!comment) {
+        return res.status(404).json({ message: "Comment not found" });
+      }
+      res.json(comment);
+    } catch (error) {
+      console.error("Update comment error:", error);
+      res.status(500).json({ message: "Failed to update comment" });
+    }
+  });
+
+  app.delete("/api/proposals/comments/:id", requireAuth, validateTenant, async (req, res) => {
+    try {
+      await storage.deleteProposalComment(req.params.id);
+      res.json({ message: "Comment deleted successfully" });
+    } catch (error) {
+      console.error("Delete comment error:", error);
+      res.status(500).json({ message: "Failed to delete comment" });
+    }
+  });
+
+  // ==================== PROPOSAL TEMPLATES ====================
+
+  app.get("/api/proposal-templates", requireAuth, validateTenant, async (req, res) => {
+    try {
+      const templates = await storage.getProposalTemplatesByTenant(req.user!.tenantId);
+      res.json(templates);
+    } catch (error) {
+      console.error("Get templates error:", error);
+      res.status(500).json({ message: "Failed to fetch templates" });
+    }
+  });
+
+  app.get("/api/proposal-templates/:id", requireAuth, validateTenant, async (req, res) => {
+    try {
+      const template = await storage.getProposalTemplateById(req.params.id, req.user!.tenantId);
+      if (!template) {
+        return res.status(404).json({ message: "Template not found" });
+      }
+      
+      const sections = await storage.getTemplateSections(template.id);
+      res.json({ ...template, sections });
+    } catch (error) {
+      console.error("Get template error:", error);
+      res.status(500).json({ message: "Failed to fetch template" });
+    }
+  });
+
+  app.post("/api/proposal-templates", requireAuth, validateTenant, requireAgencyAdmin, async (req, res) => {
+    try {
+      const template = await storage.createProposalTemplate({
+        ...req.body,
+        tenantId: req.user!.tenantId,
+        createdBy: req.user!.userId,
+      });
+      res.status(201).json(template);
+    } catch (error) {
+      console.error("Create template error:", error);
+      res.status(500).json({ message: "Failed to create template" });
+    }
+  });
+
+  app.patch("/api/proposal-templates/:id", requireAuth, validateTenant, requireAgencyAdmin, async (req, res) => {
+    try {
+      const template = await storage.updateProposalTemplate(req.params.id, req.user!.tenantId, req.body);
+      if (!template) {
+        return res.status(404).json({ message: "Template not found" });
+      }
+      res.json(template);
+    } catch (error) {
+      console.error("Update template error:", error);
+      res.status(500).json({ message: "Failed to update template" });
+    }
+  });
+
+  app.post("/api/proposal-templates/:id/duplicate", requireAuth, validateTenant, requireAgencyAdmin, async (req, res) => {
+    try {
+      const template = await storage.duplicateProposalTemplate(
+        req.params.id, 
+        req.user!.tenantId, 
+        req.user!.userId
+      );
+      if (!template) {
+        return res.status(404).json({ message: "Template not found" });
+      }
+      res.status(201).json(template);
+    } catch (error) {
+      console.error("Duplicate template error:", error);
+      res.status(500).json({ message: "Failed to duplicate template" });
+    }
+  });
+
+  app.delete("/api/proposal-templates/:id", requireAuth, validateTenant, requireAgencyAdmin, async (req, res) => {
+    try {
+      await storage.deleteProposalTemplate(req.params.id, req.user!.tenantId);
+      res.json({ message: "Template deleted successfully" });
+    } catch (error) {
+      console.error("Delete template error:", error);
+      res.status(500).json({ message: "Failed to delete template" });
+    }
+  });
+
+  // Template Sections
+  app.post("/api/proposal-templates/:templateId/sections", requireAuth, validateTenant, requireAgencyAdmin, async (req, res) => {
+    try {
+      const section = await storage.createTemplateSection({
+        ...req.body,
+        templateId: req.params.templateId,
+      });
+      res.status(201).json(section);
+    } catch (error) {
+      console.error("Create template section error:", error);
+      res.status(500).json({ message: "Failed to create template section" });
+    }
+  });
+
+  app.patch("/api/proposal-templates/sections/:id", requireAuth, validateTenant, requireAgencyAdmin, async (req, res) => {
+    try {
+      const section = await storage.updateTemplateSection(req.params.id, req.body);
+      if (!section) {
+        return res.status(404).json({ message: "Section not found" });
+      }
+      res.json(section);
+    } catch (error) {
+      console.error("Update template section error:", error);
+      res.status(500).json({ message: "Failed to update template section" });
+    }
+  });
+
+  app.delete("/api/proposal-templates/sections/:id", requireAuth, validateTenant, requireAgencyAdmin, async (req, res) => {
+    try {
+      await storage.deleteTemplateSection(req.params.id);
+      res.json({ message: "Section deleted successfully" });
+    } catch (error) {
+      console.error("Delete template section error:", error);
+      res.status(500).json({ message: "Failed to delete template section" });
+    }
+  });
+
+  app.post("/api/proposal-templates/:templateId/sections/reorder", requireAuth, validateTenant, requireAgencyAdmin, async (req, res) => {
+    try {
+      const { sectionIds } = req.body;
+      await storage.reorderTemplateSections(req.params.templateId, sectionIds);
+      res.json({ message: "Sections reordered successfully" });
+    } catch (error) {
+      console.error("Reorder template sections error:", error);
+      res.status(500).json({ message: "Failed to reorder sections" });
+    }
+  });
+
+  // ==================== PUBLIC PROPOSAL VIEW (Client-facing) ====================
+
+  // Public proposal view (no auth required, uses access token)
+  app.get("/api/public/proposal/:accessToken", async (req, res) => {
+    try {
+      const proposal = await storage.getProposalByAccessToken(req.params.accessToken);
+      if (!proposal) {
+        return res.status(404).json({ message: "Proposal not found" });
+      }
+      
+      // Check if expired
+      if (proposal.expiresAt && new Date(proposal.expiresAt) < new Date()) {
+        return res.status(410).json({ message: "This proposal has expired" });
+      }
+      
+      const sections = await storage.getProposalSections(proposal.id);
+      const pricingItems = await storage.getProposalPricingItems(proposal.id);
+      const signatures = await storage.getProposalSignatures(proposal.id);
+      const customer = await storage.getCustomerById(proposal.customerId, proposal.tenantId);
+      const companyProfile = await storage.getCompanyProfile(proposal.tenantId);
+      
+      // Record view
+      await storage.recordProposalView(proposal.id, {
+        deviceType: req.headers['user-agent']?.includes('Mobile') ? 'mobile' : 'desktop',
+        userAgent: req.headers['user-agent'] || undefined,
+        ipAddress: req.ip || undefined,
+      });
+      
+      // Update status to viewed if it was sent
+      if (proposal.status === 'sent') {
+        await storage.updateProposal(proposal.id, proposal.tenantId, { status: 'viewed' } as any);
+      }
+      
+      res.json({
+        id: proposal.id,
+        title: proposal.title,
+        proposalNumber: proposal.proposalNumber,
+        status: proposal.status,
+        currency: proposal.currency,
+        subtotal: proposal.subtotal,
+        taxAmount: proposal.taxAmount,
+        discountAmount: proposal.discountAmount,
+        totalAmount: proposal.totalAmount,
+        validUntil: proposal.validUntil,
+        sections,
+        pricingItems,
+        signatures,
+        customer: customer ? { name: customer.name, company: customer.company, email: customer.email } : null,
+        company: companyProfile ? { 
+          name: companyProfile.companyName, 
+          logo: companyProfile.logo,
+          email: companyProfile.email,
+          phone: companyProfile.phone,
+        } : null,
+      });
+    } catch (error) {
+      console.error("Get public proposal error:", error);
+      res.status(500).json({ message: "Failed to fetch proposal" });
+    }
+  });
+
+  // Accept proposal (public)
+  app.post("/api/public/proposal/:accessToken/accept", async (req, res) => {
+    try {
+      const proposal = await storage.getProposalByAccessToken(req.params.accessToken);
+      if (!proposal) {
+        return res.status(404).json({ message: "Proposal not found" });
+      }
+      
+      const { signerName, signerEmail, signatureData, signatureType, selectedPackage } = req.body;
+      
+      // Create signature
+      await storage.createProposalSignature({
+        proposalId: proposal.id,
+        signerName,
+        signerEmail,
+        signatureType: signatureType || 'typed',
+        signatureData,
+        ipAddress: req.ip || undefined,
+        userAgent: req.headers['user-agent'] || undefined,
+      });
+      
+      // Update proposal status
+      await storage.updateProposal(proposal.id, proposal.tenantId, {
+        status: 'accepted',
+        selectedPackage: selectedPackage || undefined,
+        acceptedAt: new Date(),
+      } as any);
+      
+      await storage.createProposalActivityLog({
+        proposalId: proposal.id,
+        action: 'accepted',
+        details: `Proposal accepted by ${signerName} (${signerEmail})`,
+        ipAddress: req.ip || undefined,
+        userAgent: req.headers['user-agent'] || undefined,
+      });
+      
+      res.json({ message: "Proposal accepted successfully" });
+    } catch (error) {
+      console.error("Accept proposal error:", error);
+      res.status(500).json({ message: "Failed to accept proposal" });
+    }
+  });
+
+  // Reject proposal (public)
+  app.post("/api/public/proposal/:accessToken/reject", async (req, res) => {
+    try {
+      const proposal = await storage.getProposalByAccessToken(req.params.accessToken);
+      if (!proposal) {
+        return res.status(404).json({ message: "Proposal not found" });
+      }
+      
+      const { reason, email } = req.body;
+      
+      await storage.updateProposal(proposal.id, proposal.tenantId, {
+        status: 'rejected',
+        clientComments: reason || undefined,
+        rejectedAt: new Date(),
+      } as any);
+      
+      await storage.createProposalActivityLog({
+        proposalId: proposal.id,
+        action: 'rejected',
+        details: reason ? `Proposal rejected. Reason: ${reason}` : 'Proposal rejected',
+        ipAddress: req.ip || undefined,
+        userAgent: req.headers['user-agent'] || undefined,
+      });
+      
+      res.json({ message: "Proposal rejected" });
+    } catch (error) {
+      console.error("Reject proposal error:", error);
+      res.status(500).json({ message: "Failed to reject proposal" });
+    }
+  });
+
+  // Add client comment (public)
+  app.post("/api/public/proposal/:accessToken/comment", async (req, res) => {
+    try {
+      const proposal = await storage.getProposalByAccessToken(req.params.accessToken);
+      if (!proposal) {
+        return res.status(404).json({ message: "Proposal not found" });
+      }
+      
+      const { content, clientEmail, sectionId } = req.body;
+      
+      const comment = await storage.createProposalComment({
+        proposalId: proposal.id,
+        content,
+        clientEmail,
+        sectionId: sectionId || undefined,
+        isInternal: false,
+      });
+      
+      res.status(201).json(comment);
+    } catch (error) {
+      console.error("Add comment error:", error);
+      res.status(500).json({ message: "Failed to add comment" });
+    }
+  });
+
+  // ==================== PROPOSAL AI ASSISTANT ====================
+
+  app.post("/api/proposals/ai-assist", requireAuth, validateTenant, async (req, res) => {
+    try {
+      const { action, content, context } = req.body;
+      
+      let result = content || '';
+      
+      switch (action) {
+        case 'generate_introduction':
+          result = `We are pleased to present this proposal for ${context?.projectName || 'your project'}. Our team has carefully analyzed your requirements and developed a comprehensive solution that addresses your specific needs.\n\nWith our proven track record and expertise, we are confident in our ability to deliver exceptional results that exceed your expectations.`;
+          break;
+        case 'generate_scope':
+          result = `## Scope of Work\n\nThis engagement includes the following key deliverables:\n\n1. **Discovery & Planning** - Comprehensive analysis of requirements and project roadmap\n2. **Design & Development** - Creation of solutions aligned with your objectives\n3. **Testing & Quality Assurance** - Rigorous testing to ensure reliability\n4. **Deployment & Launch** - Seamless implementation and go-live support\n5. **Training & Documentation** - Knowledge transfer and user guides`;
+          break;
+        case 'generate_timeline':
+          result = `## Project Timeline\n\n| Phase | Duration | Milestones |\n|-------|----------|------------|\n| Discovery | Week 1-2 | Requirements finalized |\n| Design | Week 3-4 | Designs approved |\n| Development | Week 5-8 | Core features complete |\n| Testing | Week 9-10 | QA sign-off |\n| Launch | Week 11-12 | Go-live |`;
+          break;
+        case 'generate_terms':
+          result = `## Terms & Conditions\n\n**Payment Terms**\n- 50% deposit upon project commencement\n- 25% upon design approval\n- 25% upon project completion\n\n**Project Modifications**\nAny changes to the scope will be documented and may affect timeline and cost.\n\n**Intellectual Property**\nUpon full payment, all deliverables become your property.\n\n**Confidentiality**\nBoth parties agree to maintain confidentiality of sensitive information.`;
+          break;
+        case 'improve_tone':
+          result = content.replace(/\b(please|kindly)\b/gi, 'we would appreciate if you')
+            .replace(/\bASAP\b/gi, 'at your earliest convenience');
+          break;
+        case 'make_formal':
+          result = content.replace(/\b(hey|hi)\b/gi, 'Dear')
+            .replace(/\b(thanks)\b/gi, 'Thank you');
+          break;
+        case 'make_persuasive':
+          result = content + "\n\nThis solution represents an exceptional opportunity to achieve your goals efficiently and effectively. We are committed to delivering outstanding results and building a lasting partnership.";
+          break;
+        case 'shorten':
+          const sentences = content.split(/[.!?]+/).filter((s: string) => s.trim());
+          result = sentences.slice(0, Math.ceil(sentences.length / 2)).join('. ') + '.';
+          break;
+        case 'expand':
+          result = content + "\n\nOur approach is designed to maximize value while minimizing risk. We bring together industry best practices, innovative thinking, and a deep commitment to your success.";
+          break;
+        default:
+          result = content;
+      }
+      
+      res.json({ result, action });
+    } catch (error) {
+      console.error("AI assist error:", error);
+      res.status(500).json({ message: "Failed to process AI request" });
+    }
+  });
+
+  // Get section types
+  app.get("/api/proposals/section-types", requireAuth, validateTenant, async (req, res) => {
+    try {
+      const sectionTypes = Object.entries(PROPOSAL_SECTION_TYPES).map(([key, value]) => ({
+        id: value,
+        name: key.replace(/_/g, ' ').toLowerCase().replace(/\b\w/g, l => l.toUpperCase()),
+      }));
+      res.json(sectionTypes);
+    } catch (error) {
+      console.error("Get section types error:", error);
+      res.status(500).json({ message: "Failed to fetch section types" });
+    }
+  });
+
+  // Proposal merge fields
+  app.get("/api/proposals/merge-fields", requireAuth, validateTenant, async (req, res) => {
+    try {
+      const mergeFields = [
+        { category: "Client", fields: [
+          { key: "{{client.name}}", label: "Client Name" },
+          { key: "{{client.company}}", label: "Client Company" },
+          { key: "{{client.email}}", label: "Client Email" },
+          { key: "{{client.phone}}", label: "Client Phone" },
+          { key: "{{client.address}}", label: "Client Address" },
+        ]},
+        { category: "Project", fields: [
+          { key: "{{project.name}}", label: "Project Name" },
+          { key: "{{start_date}}", label: "Start Date" },
+          { key: "{{deliverable.count}}", label: "Deliverable Count" },
+        ]},
+        { category: "Proposal", fields: [
+          { key: "{{proposal.date}}", label: "Proposal Date" },
+          { key: "{{proposal.number}}", label: "Proposal Number" },
+          { key: "{{quote.total}}", label: "Quote Total" },
+          { key: "{{valid_until}}", label: "Valid Until" },
+        ]},
+        { category: "Agency", fields: [
+          { key: "{{agency.name}}", label: "Agency Name" },
+          { key: "{{agency.email}}", label: "Agency Email" },
+          { key: "{{agency.phone}}", label: "Agency Phone" },
+          { key: "{{agency.website}}", label: "Agency Website" },
+        ]},
+      ];
+      res.json(mergeFields);
+    } catch (error) {
+      console.error("Get merge fields error:", error);
+      res.status(500).json({ message: "Failed to fetch merge fields" });
     }
   });
 

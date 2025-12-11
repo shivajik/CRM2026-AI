@@ -44,6 +44,10 @@ const Checkout = lazy(() => import("@/pages/Checkout"));
 const Resources = lazy(() => import("@/pages/Resources"));
 const SEOAudit = lazy(() => import("@/pages/SEOAudit"));
 const EmailModule = lazy(() => import("@/pages/EmailModule"));
+const Proposals = lazy(() => import("@/pages/Proposals"));
+const ProposalBuilder = lazy(() => import("@/pages/ProposalBuilder"));
+const ProposalTemplates = lazy(() => import("@/pages/ProposalTemplates"));
+const PublicProposalView = lazy(() => import("@/pages/PublicProposalView"));
 const USLanding = lazy(() => import("@/pages/GeoLanding").then(m => ({ default: m.USLanding })));
 const UKLanding = lazy(() => import("@/pages/GeoLanding").then(m => ({ default: m.UKLanding })));
 const INLanding = lazy(() => import("@/pages/GeoLanding").then(m => ({ default: m.INLanding })));
@@ -131,6 +135,11 @@ function Router() {
         <Route path="/invoices">{() => <ProtectedPage component={Invoices} />}</Route>
         <Route path="/invoices/:id">{() => <ProtectedPage component={InvoiceDetail} />}</Route>
         <Route path="/email">{() => <ProtectedPage component={EmailModule} />}</Route>
+        <Route path="/proposals">{() => <ProtectedPage component={Proposals} />}</Route>
+        <Route path="/proposals/new">{() => <ProtectedPage component={ProposalBuilder} />}</Route>
+        <Route path="/proposals/edit/:id">{() => <ProtectedPage component={ProposalBuilder} />}</Route>
+        <Route path="/proposals/templates">{() => <ProtectedPage component={ProposalTemplates} />}</Route>
+        <Route path="/proposal/view/:accessToken" component={PublicProposalView} />
         <Route path="/tasks">{() => <ProtectedPage component={Tasks} />}</Route>
         <Route path="/activities">{() => <ProtectedPage component={Activities} />}</Route>
         <Route path="/reports">{() => <AdminPage component={Reports} />}</Route>

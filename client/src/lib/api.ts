@@ -437,3 +437,77 @@ export const emailApi = {
   aiAssist: (data: { action: string; content: string; context?: any }) => 
     apiRequest("/email/ai-assist", { method: "POST", body: JSON.stringify(data) }),
 };
+
+// Proposals API
+export const proposalsApi = {
+  getAll: (filters?: { status?: string; customerId?: string; ownerId?: string }) => {
+    const params = new URLSearchParams();
+    if (filters?.status) params.append("status", filters.status);
+    if (filters?.customerId) params.append("customerId", filters.customerId);
+    if (filters?.ownerId) params.append("ownerId", filters.ownerId);
+    const query = params.toString();
+    return apiRequest(`/proposals${query ? `?${query}` : ""}`);
+  },
+  getById: (id: string) => apiRequest(`/proposals/${id}`),
+  getAnalytics: () => apiRequest("/proposals/analytics"),
+  create: (data: any) => apiRequest("/proposals", { method: "POST", body: JSON.stringify(data) }),
+  update: (id: string, data: any) => apiRequest(`/proposals/${id}`, { method: "PATCH", body: JSON.stringify(data) }),
+  updateStatus: (id: string, data: { status: string; notes?: string }) => 
+    apiRequest(`/proposals/${id}/status`, { method: "PATCH", body: JSON.stringify(data) }),
+  send: (id: string) => apiRequest(`/proposals/${id}/send`, { method: "POST" }),
+  createVersion: (id: string, notes?: string) => 
+    apiRequest(`/proposals/${id}/version`, { method: "POST", body: JSON.stringify({ notes }) }),
+  restoreVersion: (id: string, versionId: string) => 
+    apiRequest(`/proposals/${id}/restore/${versionId}`, { method: "POST" }),
+  delete: (id: string) => apiRequest(`/proposals/${id}`, { method: "DELETE" }),
+  createFromTemplate: (templateId: string, data: any) => 
+    apiRequest(`/proposals/from-template/${templateId}`, { method: "POST", body: JSON.stringify(data) }),
+  
+  // Sections
+  createSection: (proposalId: string, data: any) => 
+    apiRequest(`/proposals/${proposalId}/sections`, { method: "POST", body: JSON.stringify(data) }),
+  updateSection: (id: string, data: any) => 
+    apiRequest(`/proposals/sections/${id}`, { method: "PATCH", body: JSON.stringify(data) }),
+  deleteSection: (id: string) => apiRequest(`/proposals/sections/${id}`, { method: "DELETE" }),
+  reorderSections: (proposalId: string, sectionIds: string[]) => 
+    apiRequest(`/proposals/${proposalId}/sections/reorder`, { method: "POST", body: JSON.stringify({ sectionIds }) }),
+  
+  // Pricing
+  createPricingItem: (proposalId: string, data: any) => 
+    apiRequest(`/proposals/${proposalId}/pricing`, { method: "POST", body: JSON.stringify(data) }),
+  updatePricingItem: (id: string, data: any) => 
+    apiRequest(`/proposals/pricing/${id}`, { method: "PATCH", body: JSON.stringify(data) }),
+  deletePricingItem: (id: string) => apiRequest(`/proposals/pricing/${id}`, { method: "DELETE" }),
+  
+  // Comments
+  createComment: (proposalId: string, data: any) => 
+    apiRequest(`/proposals/${proposalId}/comments`, { method: "POST", body: JSON.stringify(data) }),
+  updateComment: (id: string, data: any) => 
+    apiRequest(`/proposals/comments/${id}`, { method: "PATCH", body: JSON.stringify(data) }),
+  deleteComment: (id: string) => apiRequest(`/proposals/comments/${id}`, { method: "DELETE" }),
+  
+  // AI
+  aiAssist: (data: { action: string; content: string; context?: any }) => 
+    apiRequest("/proposals/ai-assist", { method: "POST", body: JSON.stringify(data) }),
+  getSectionTypes: () => apiRequest("/proposals/section-types"),
+  getMergeFields: () => apiRequest("/proposals/merge-fields"),
+};
+
+// Proposal Templates API
+export const proposalTemplatesApi = {
+  getAll: () => apiRequest("/proposal-templates"),
+  getById: (id: string) => apiRequest(`/proposal-templates/${id}`),
+  create: (data: any) => apiRequest("/proposal-templates", { method: "POST", body: JSON.stringify(data) }),
+  update: (id: string, data: any) => apiRequest(`/proposal-templates/${id}`, { method: "PATCH", body: JSON.stringify(data) }),
+  duplicate: (id: string) => apiRequest(`/proposal-templates/${id}/duplicate`, { method: "POST" }),
+  delete: (id: string) => apiRequest(`/proposal-templates/${id}`, { method: "DELETE" }),
+  
+  // Sections
+  createSection: (templateId: string, data: any) => 
+    apiRequest(`/proposal-templates/${templateId}/sections`, { method: "POST", body: JSON.stringify(data) }),
+  updateSection: (id: string, data: any) => 
+    apiRequest(`/proposal-templates/sections/${id}`, { method: "PATCH", body: JSON.stringify(data) }),
+  deleteSection: (id: string) => apiRequest(`/proposal-templates/sections/${id}`, { method: "DELETE" }),
+  reorderSections: (templateId: string, sectionIds: string[]) => 
+    apiRequest(`/proposal-templates/${templateId}/sections/reorder`, { method: "POST", body: JSON.stringify({ sectionIds }) }),
+};

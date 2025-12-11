@@ -1002,3 +1002,332 @@ export const insertSmtpSettingsSchema = createInsertSchema(smtpSettings).omit({
 });
 export type InsertSmtpSettings = z.infer<typeof insertSmtpSettingsSchema>;
 export type SmtpSettings = typeof smtpSettings.$inferSelect;
+
+// ==================== PROPOSAL BUILDER MODULE ====================
+
+// Proposal statuses
+export const PROPOSAL_STATUSES = {
+  DRAFT: 'draft',
+  SENT: 'sent',
+  VIEWED: 'viewed',
+  ACCEPTED: 'accepted',
+  REJECTED: 'rejected',
+  EXPIRED: 'expired',
+} as const;
+
+export type ProposalStatus = typeof PROPOSAL_STATUSES[keyof typeof PROPOSAL_STATUSES];
+
+// Proposal section types
+export const PROPOSAL_SECTION_TYPES = {
+  COVER: 'cover',
+  INTRODUCTION: 'introduction',
+  ABOUT_US: 'about_us',
+  SCOPE_OF_WORK: 'scope_of_work',
+  DELIVERABLES: 'deliverables',
+  TIMELINE: 'timeline',
+  PRICING_TABLE: 'pricing_table',
+  TERMS_CONDITIONS: 'terms_conditions',
+  SIGNATURE: 'signature',
+  ATTACHMENTS: 'attachments',
+  CUSTOM: 'custom',
+} as const;
+
+export type ProposalSectionType = typeof PROPOSAL_SECTION_TYPES[keyof typeof PROPOSAL_SECTION_TYPES];
+
+// Template purposes
+export const TEMPLATE_PURPOSES = {
+  WEB_DESIGN: 'web_design',
+  SEO: 'seo',
+  MAINTENANCE: 'maintenance',
+  BRANDING: 'branding',
+  MARKETING: 'marketing',
+  CONSULTING: 'consulting',
+  CUSTOM: 'custom',
+} as const;
+
+export type TemplatePurpose = typeof TEMPLATE_PURPOSES[keyof typeof TEMPLATE_PURPOSES];
+
+// Proposal Templates - reusable proposal structures
+export const proposalTemplates = pgTable("proposal_templates", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  tenantId: varchar("tenant_id").references(() => tenants.id, { onDelete: "cascade" }).notNull(),
+  createdBy: varchar("created_by").references(() => users.id).notNull(),
+  name: text("name").notNull(),
+  description: text("description"),
+  purpose: text("purpose").notNull().default("custom"),
+  isActive: boolean("is_active").default(true).notNull(),
+  isDefault: boolean("is_default").default(false).notNull(),
+  version: integer("version").default(1).notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+export const insertProposalTemplateSchema = createInsertSchema(proposalTemplates).omit({ 
+  id: true, 
+  createdAt: true,
+  updatedAt: true,
+  version: true,
+});
+export type InsertProposalTemplate = z.infer<typeof insertProposalTemplateSchema>;
+export type ProposalTemplate = typeof proposalTemplates.$inferSelect;
+
+// Main Proposals table
+export const proposals = pgTable("proposals", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  tenantId: varchar("tenant_id").references(() => tenants.id, { onDelete: "cascade" }).notNull(),
+  customerId: varchar("customer_id").references(() => customers.id, { onDelete: "cascade" }).notNull(),
+  templateId: varchar("template_id").references(() => proposalTemplates.id, { onDelete: "set null" }),
+  quotationId: varchar("quotation_id").references(() => quotations.id, { onDelete: "set null" }),
+  dealId: varchar("deal_id").references(() => deals.id, { onDelete: "set null" }),
+  createdBy: varchar("created_by").references(() => users.id).notNull(),
+  ownerId: varchar("owner_id").references(() => users.id).notNull(),
+  proposalNumber: text("proposal_number").notNull(),
+  title: text("title").notNull(),
+  status: text("status").notNull().default("draft"),
+  currency: text("currency").notNull().default("USD"),
+  subtotal: decimal("subtotal", { precision: 12, scale: 2 }).notNull().default("0"),
+  taxAmount: decimal("tax_amount", { precision: 12, scale: 2 }).notNull().default("0"),
+  discountAmount: decimal("discount_amount", { precision: 12, scale: 2 }).notNull().default("0"),
+  totalAmount: decimal("total_amount", { precision: 12, scale: 2 }).notNull().default("0"),
+  validUntil: timestamp("valid_until"),
+  sentAt: timestamp("sent_at"),
+  viewedAt: timestamp("viewed_at"),
+  acceptedAt: timestamp("accepted_at"),
+  rejectedAt: timestamp("rejected_at"),
+  expiresAt: timestamp("expires_at"),
+  accessToken: text("access_token"),
+  viewCount: integer("view_count").default(0).notNull(),
+  totalViewTime: integer("total_view_time").default(0).notNull(),
+  selectedPackage: text("selected_package"),
+  clientComments: text("client_comments"),
+  internalNotes: text("internal_notes"),
+  currentVersion: integer("current_version").default(1).notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+export const insertProposalSchema = createInsertSchema(proposals, {
+  validUntil: z.union([z.string(), z.date(), z.null()]).optional().transform(val => {
+    if (!val) return null;
+    if (val instanceof Date) return val;
+    return new Date(val);
+  }),
+  expiresAt: z.union([z.string(), z.date(), z.null()]).optional().transform(val => {
+    if (!val) return null;
+    if (val instanceof Date) return val;
+    return new Date(val);
+  }),
+}).omit({ 
+  id: true, 
+  createdAt: true,
+  updatedAt: true,
+  sentAt: true,
+  viewedAt: true,
+  acceptedAt: true,
+  rejectedAt: true,
+  accessToken: true,
+  viewCount: true,
+  totalViewTime: true,
+  currentVersion: true,
+});
+export type InsertProposal = z.infer<typeof insertProposalSchema>;
+export type Proposal = typeof proposals.$inferSelect;
+
+// Proposal Sections - content blocks within proposals/templates
+export const proposalSections = pgTable("proposal_sections", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  proposalId: varchar("proposal_id").references(() => proposals.id, { onDelete: "cascade" }),
+  templateId: varchar("template_id").references(() => proposalTemplates.id, { onDelete: "cascade" }),
+  sectionType: text("section_type").notNull(),
+  title: text("title").notNull(),
+  content: text("content"),
+  sortOrder: integer("sort_order").default(0).notNull(),
+  isLocked: boolean("is_locked").default(false).notNull(),
+  isVisible: boolean("is_visible").default(true).notNull(),
+  aiGenerated: boolean("ai_generated").default(false).notNull(),
+  settings: text("settings"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+export const insertProposalSectionSchema = createInsertSchema(proposalSections).omit({ 
+  id: true, 
+  createdAt: true,
+  updatedAt: true,
+});
+export type InsertProposalSection = z.infer<typeof insertProposalSectionSchema>;
+export type ProposalSection = typeof proposalSections.$inferSelect;
+
+// Proposal Pricing Items - line items in pricing tables
+export const proposalPricingItems = pgTable("proposal_pricing_items", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  proposalId: varchar("proposal_id").references(() => proposals.id, { onDelete: "cascade" }).notNull(),
+  sectionId: varchar("section_id").references(() => proposalSections.id, { onDelete: "cascade" }),
+  productId: varchar("product_id").references(() => products.id, { onDelete: "set null" }),
+  packageName: text("package_name"),
+  name: text("name").notNull(),
+  description: text("description"),
+  quantity: decimal("quantity", { precision: 10, scale: 2 }).notNull().default("1"),
+  unitPrice: decimal("unit_price", { precision: 12, scale: 2 }).notNull(),
+  taxRate: decimal("tax_rate", { precision: 5, scale: 2 }).default("0"),
+  discount: decimal("discount", { precision: 5, scale: 2 }).default("0"),
+  totalPrice: decimal("total_price", { precision: 12, scale: 2 }).notNull(),
+  isRecurring: boolean("is_recurring").default(false).notNull(),
+  recurringInterval: text("recurring_interval"),
+  isOptional: boolean("is_optional").default(false).notNull(),
+  isSelected: boolean("is_selected").default(true).notNull(),
+  sortOrder: integer("sort_order").default(0).notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+export const insertProposalPricingItemSchema = createInsertSchema(proposalPricingItems).omit({ 
+  id: true, 
+  createdAt: true,
+});
+export type InsertProposalPricingItem = z.infer<typeof insertProposalPricingItemSchema>;
+export type ProposalPricingItem = typeof proposalPricingItems.$inferSelect;
+
+// Proposal Versions - snapshot history
+export const proposalVersions = pgTable("proposal_versions", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  proposalId: varchar("proposal_id").references(() => proposals.id, { onDelete: "cascade" }).notNull(),
+  versionNumber: integer("version_number").notNull(),
+  createdBy: varchar("created_by").references(() => users.id).notNull(),
+  snapshot: text("snapshot").notNull(),
+  changeNotes: text("change_notes"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+export const insertProposalVersionSchema = createInsertSchema(proposalVersions).omit({ 
+  id: true, 
+  createdAt: true,
+});
+export type InsertProposalVersion = z.infer<typeof insertProposalVersionSchema>;
+export type ProposalVersion = typeof proposalVersions.$inferSelect;
+
+// Proposal Activity Log - all activities on proposals
+export const proposalActivityLogs = pgTable("proposal_activity_logs", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  proposalId: varchar("proposal_id").references(() => proposals.id, { onDelete: "cascade" }).notNull(),
+  userId: varchar("user_id").references(() => users.id, { onDelete: "set null" }),
+  action: text("action").notNull(),
+  details: text("details"),
+  ipAddress: text("ip_address"),
+  userAgent: text("user_agent"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+export const insertProposalActivityLogSchema = createInsertSchema(proposalActivityLogs).omit({ 
+  id: true, 
+  createdAt: true,
+});
+export type InsertProposalActivityLog = z.infer<typeof insertProposalActivityLogSchema>;
+export type ProposalActivityLog = typeof proposalActivityLogs.$inferSelect;
+
+// Proposal Signatures - e-signature records
+export const proposalSignatures = pgTable("proposal_signatures", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  proposalId: varchar("proposal_id").references(() => proposals.id, { onDelete: "cascade" }).notNull(),
+  signerName: text("signer_name").notNull(),
+  signerEmail: text("signer_email").notNull(),
+  signerRole: text("signer_role"),
+  signatureType: text("signature_type").notNull().default("typed"),
+  signatureData: text("signature_data"),
+  ipAddress: text("ip_address"),
+  userAgent: text("user_agent"),
+  signedAt: timestamp("signed_at").defaultNow().notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+export const insertProposalSignatureSchema = createInsertSchema(proposalSignatures).omit({ 
+  id: true, 
+  createdAt: true,
+  signedAt: true,
+});
+export type InsertProposalSignature = z.infer<typeof insertProposalSignatureSchema>;
+export type ProposalSignature = typeof proposalSignatures.$inferSelect;
+
+// Proposal View Logs - tracking when proposals are viewed
+export const proposalViewLogs = pgTable("proposal_view_logs", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  proposalId: varchar("proposal_id").references(() => proposals.id, { onDelete: "cascade" }).notNull(),
+  viewerEmail: text("viewer_email"),
+  deviceType: text("device_type"),
+  ipAddress: text("ip_address"),
+  userAgent: text("user_agent"),
+  duration: integer("duration").default(0).notNull(),
+  sectionsViewed: text("sections_viewed").array().default(sql`'{}'::text[]`),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+export const insertProposalViewLogSchema = createInsertSchema(proposalViewLogs, {
+  sectionsViewed: z.array(z.string()).optional().default([]),
+}).omit({ 
+  id: true, 
+  createdAt: true,
+});
+export type InsertProposalViewLog = z.infer<typeof insertProposalViewLogSchema>;
+export type ProposalViewLog = typeof proposalViewLogs.$inferSelect;
+
+// Proposal Status History - audit trail for status changes
+export const proposalStatusHistory = pgTable("proposal_status_history", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  proposalId: varchar("proposal_id").references(() => proposals.id, { onDelete: "cascade" }).notNull(),
+  changedBy: varchar("changed_by").references(() => users.id, { onDelete: "set null" }),
+  fromStatus: text("from_status"),
+  toStatus: text("to_status").notNull(),
+  notes: text("notes"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+export const insertProposalStatusHistorySchema = createInsertSchema(proposalStatusHistory).omit({ 
+  id: true, 
+  createdAt: true,
+});
+export type InsertProposalStatusHistory = z.infer<typeof insertProposalStatusHistorySchema>;
+export type ProposalStatusHistory = typeof proposalStatusHistory.$inferSelect;
+
+// Template Sections - sections for templates (reusable)
+export const templateSections = pgTable("template_sections", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  templateId: varchar("template_id").references(() => proposalTemplates.id, { onDelete: "cascade" }).notNull(),
+  sectionType: text("section_type").notNull(),
+  title: text("title").notNull(),
+  content: text("content"),
+  sortOrder: integer("sort_order").default(0).notNull(),
+  isLocked: boolean("is_locked").default(false).notNull(),
+  isVisible: boolean("is_visible").default(true).notNull(),
+  settings: text("settings"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+export const insertTemplateSectionSchema = createInsertSchema(templateSections).omit({ 
+  id: true, 
+  createdAt: true,
+  updatedAt: true,
+});
+export type InsertTemplateSection = z.infer<typeof insertTemplateSectionSchema>;
+export type TemplateSection = typeof templateSections.$inferSelect;
+
+// Proposal Comments - internal/client comments on proposals
+export const proposalComments = pgTable("proposal_comments", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  proposalId: varchar("proposal_id").references(() => proposals.id, { onDelete: "cascade" }).notNull(),
+  sectionId: varchar("section_id").references(() => proposalSections.id, { onDelete: "cascade" }),
+  userId: varchar("user_id").references(() => users.id, { onDelete: "set null" }),
+  clientEmail: text("client_email"),
+  content: text("content").notNull(),
+  isInternal: boolean("is_internal").default(true).notNull(),
+  isResolved: boolean("is_resolved").default(false).notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+export const insertProposalCommentSchema = createInsertSchema(proposalComments).omit({ 
+  id: true, 
+  createdAt: true,
+  updatedAt: true,
+});
+export type InsertProposalComment = z.infer<typeof insertProposalCommentSchema>;
+export type ProposalComment = typeof proposalComments.$inferSelect;

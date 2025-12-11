@@ -3,7 +3,7 @@ import { useQuery } from "@tanstack/react-query";
 import { cn } from "@/lib/utils";
 import { 
   LayoutDashboard, Users, Briefcase, CheckSquare, Settings,
-  Package, Building2, FileText, Receipt, Activity, BarChart3, UsersRound, Mail 
+  Package, Building2, FileText, Receipt, Activity, BarChart3, UsersRound, Mail, FileEdit 
 } from "lucide-react";
 import { getUser } from "@/lib/auth";
 import { authApi } from "@/lib/api";
@@ -23,6 +23,7 @@ const agencyAdminItems: SidebarItem[] = [
   { icon: Briefcase, label: "Deals", href: "/deals" },
   { icon: Package, label: "Products", href: "/products" },
   { icon: FileText, label: "Quotations", href: "/quotations" },
+  { icon: FileEdit, label: "Proposals", href: "/proposals" },
   { icon: Receipt, label: "Invoices", href: "/invoices" },
   { icon: Mail, label: "Email", href: "/email" },
   { icon: CheckSquare, label: "Tasks", href: "/tasks" },
@@ -38,6 +39,7 @@ const teamMemberItems: SidebarItem[] = [
   { icon: Users, label: "Contacts", href: "/contacts" },
   { icon: Briefcase, label: "Deals", href: "/deals" },
   { icon: FileText, label: "Quotations", href: "/quotations" },
+  { icon: FileEdit, label: "Proposals", href: "/proposals" },
   { icon: Receipt, label: "Invoices", href: "/invoices" },
   { icon: Mail, label: "Email", href: "/email" },
   { icon: CheckSquare, label: "Tasks", href: "/tasks" },

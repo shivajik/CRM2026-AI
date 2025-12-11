@@ -1,5 +1,5 @@
 import { db } from "./db";
-import { eq, and, desc, gte, lte, sql } from "drizzle-orm";
+import { eq, and, desc, gte, lte, sql, asc } from "drizzle-orm";
 import * as schema from "@shared/schema";
 import type {
   InsertTenant, Tenant,
@@ -41,6 +41,17 @@ import type {
   InsertTaskNotification, TaskNotification,
   InsertTaskAiHistory, TaskAiHistory,
   InsertTaskActivityLog, TaskActivityLog,
+  InsertProposalTemplate, ProposalTemplate,
+  InsertProposal, Proposal,
+  InsertProposalSection, ProposalSection,
+  InsertProposalPricingItem, ProposalPricingItem,
+  InsertProposalVersion, ProposalVersion,
+  InsertProposalActivityLog, ProposalActivityLog,
+  InsertProposalSignature, ProposalSignature,
+  InsertProposalViewLog, ProposalViewLog,
+  InsertProposalStatusHistory, ProposalStatusHistory,
+  InsertTemplateSection, TemplateSection,
+  InsertProposalComment, ProposalComment,
 } from "@shared/schema";
 
 export interface IStorage {
@@ -418,6 +429,92 @@ export interface IStorage {
     tasksByPriority: { priority: string; count: number }[];
     teamPerformance: { userId: string; userName: string; completed: number; inProgress: number }[];
   }>;
+
+  // ==================== PROPOSAL BUILDER OPERATIONS ====================
+
+  // Proposal Template operations
+  createProposalTemplate(template: InsertProposalTemplate): Promise<ProposalTemplate>;
+  getProposalTemplatesByTenant(tenantId: string): Promise<ProposalTemplate[]>;
+  getProposalTemplateById(id: string, tenantId: string): Promise<ProposalTemplate | undefined>;
+  updateProposalTemplate(id: string, tenantId: string, updates: Partial<InsertProposalTemplate>): Promise<ProposalTemplate | undefined>;
+  deleteProposalTemplate(id: string, tenantId: string): Promise<void>;
+  duplicateProposalTemplate(id: string, tenantId: string, createdBy: string): Promise<ProposalTemplate | undefined>;
+
+  // Template Section operations
+  createTemplateSection(section: InsertTemplateSection): Promise<TemplateSection>;
+  getTemplateSections(templateId: string): Promise<TemplateSection[]>;
+  updateTemplateSection(id: string, updates: Partial<InsertTemplateSection>): Promise<TemplateSection | undefined>;
+  deleteTemplateSection(id: string): Promise<void>;
+  reorderTemplateSections(templateId: string, sectionIds: string[]): Promise<void>;
+
+  // Proposal operations
+  createProposal(proposal: InsertProposal): Promise<Proposal>;
+  getProposalsByTenant(tenantId: string, filters?: { status?: string; customerId?: string; ownerId?: string }): Promise<Proposal[]>;
+  getProposalById(id: string, tenantId: string): Promise<Proposal | undefined>;
+  getProposalByAccessToken(accessToken: string): Promise<Proposal | undefined>;
+  updateProposal(id: string, tenantId: string, updates: Partial<InsertProposal>): Promise<Proposal | undefined>;
+  deleteProposal(id: string, tenantId: string): Promise<void>;
+  getNextProposalNumber(tenantId: string): Promise<string>;
+  updateProposalStatus(id: string, tenantId: string, status: string, changedBy: string, notes?: string): Promise<Proposal | undefined>;
+  generateProposalAccessToken(id: string, tenantId: string): Promise<string>;
+
+  // Proposal Section operations
+  createProposalSection(section: InsertProposalSection): Promise<ProposalSection>;
+  getProposalSections(proposalId: string): Promise<ProposalSection[]>;
+  updateProposalSection(id: string, updates: Partial<InsertProposalSection>): Promise<ProposalSection | undefined>;
+  deleteProposalSection(id: string): Promise<void>;
+  reorderProposalSections(proposalId: string, sectionIds: string[]): Promise<void>;
+
+  // Proposal Pricing Item operations
+  createProposalPricingItem(item: InsertProposalPricingItem): Promise<ProposalPricingItem>;
+  getProposalPricingItems(proposalId: string): Promise<ProposalPricingItem[]>;
+  updateProposalPricingItem(id: string, updates: Partial<InsertProposalPricingItem>): Promise<ProposalPricingItem | undefined>;
+  deleteProposalPricingItem(id: string): Promise<void>;
+  deleteProposalPricingItems(proposalId: string): Promise<void>;
+  recalculateProposalTotals(proposalId: string, tenantId: string): Promise<Proposal | undefined>;
+
+  // Proposal Version operations
+  createProposalVersion(version: InsertProposalVersion): Promise<ProposalVersion>;
+  getProposalVersions(proposalId: string): Promise<ProposalVersion[]>;
+  getProposalVersionById(id: string): Promise<ProposalVersion | undefined>;
+  restoreProposalVersion(proposalId: string, versionId: string, tenantId: string, userId: string): Promise<Proposal | undefined>;
+
+  // Proposal Activity Log operations
+  createProposalActivityLog(log: InsertProposalActivityLog): Promise<ProposalActivityLog>;
+  getProposalActivityLogs(proposalId: string): Promise<ProposalActivityLog[]>;
+
+  // Proposal Signature operations
+  createProposalSignature(signature: InsertProposalSignature): Promise<ProposalSignature>;
+  getProposalSignatures(proposalId: string): Promise<ProposalSignature[]>;
+
+  // Proposal View Log operations
+  createProposalViewLog(log: InsertProposalViewLog): Promise<ProposalViewLog>;
+  getProposalViewLogs(proposalId: string): Promise<ProposalViewLog[]>;
+  recordProposalView(proposalId: string, viewData: Partial<InsertProposalViewLog>): Promise<void>;
+
+  // Proposal Status History operations
+  getProposalStatusHistory(proposalId: string): Promise<ProposalStatusHistory[]>;
+
+  // Proposal Comment operations
+  createProposalComment(comment: InsertProposalComment): Promise<ProposalComment>;
+  getProposalComments(proposalId: string): Promise<ProposalComment[]>;
+  updateProposalComment(id: string, updates: Partial<InsertProposalComment>): Promise<ProposalComment | undefined>;
+  deleteProposalComment(id: string): Promise<void>;
+
+  // Proposal Analytics
+  getProposalAnalytics(tenantId: string): Promise<{
+    totalProposals: number;
+    acceptedProposals: number;
+    rejectedProposals: number;
+    pendingProposals: number;
+    totalValue: number;
+    acceptedValue: number;
+    avgViewTime: number;
+    conversionRate: number;
+  }>;
+
+  // Create proposal from template
+  createProposalFromTemplate(templateId: string, proposalData: InsertProposal): Promise<Proposal | undefined>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -2310,6 +2407,508 @@ export class DatabaseStorage implements IStorage {
       tasksByPriority,
       teamPerformance,
     };
+  }
+
+  // ==================== PROPOSAL BUILDER OPERATIONS ====================
+
+  // Proposal Template operations
+  async createProposalTemplate(template: InsertProposalTemplate): Promise<ProposalTemplate> {
+    const [result] = await db.insert(schema.proposalTemplates).values(template).returning();
+    return result;
+  }
+
+  async getProposalTemplatesByTenant(tenantId: string): Promise<ProposalTemplate[]> {
+    return db.select().from(schema.proposalTemplates)
+      .where(eq(schema.proposalTemplates.tenantId, tenantId))
+      .orderBy(desc(schema.proposalTemplates.createdAt));
+  }
+
+  async getProposalTemplateById(id: string, tenantId: string): Promise<ProposalTemplate | undefined> {
+    const [template] = await db.select().from(schema.proposalTemplates)
+      .where(and(eq(schema.proposalTemplates.id, id), eq(schema.proposalTemplates.tenantId, tenantId)));
+    return template;
+  }
+
+  async updateProposalTemplate(id: string, tenantId: string, updates: Partial<InsertProposalTemplate>): Promise<ProposalTemplate | undefined> {
+    const [template] = await db.update(schema.proposalTemplates)
+      .set({ ...updates, updatedAt: new Date() })
+      .where(and(eq(schema.proposalTemplates.id, id), eq(schema.proposalTemplates.tenantId, tenantId)))
+      .returning();
+    return template;
+  }
+
+  async deleteProposalTemplate(id: string, tenantId: string): Promise<void> {
+    await db.delete(schema.proposalTemplates)
+      .where(and(eq(schema.proposalTemplates.id, id), eq(schema.proposalTemplates.tenantId, tenantId)));
+  }
+
+  async duplicateProposalTemplate(id: string, tenantId: string, createdBy: string): Promise<ProposalTemplate | undefined> {
+    const original = await this.getProposalTemplateById(id, tenantId);
+    if (!original) return undefined;
+
+    const [newTemplate] = await db.insert(schema.proposalTemplates).values({
+      tenantId,
+      createdBy,
+      name: `${original.name} (Copy)`,
+      description: original.description,
+      purpose: original.purpose,
+      isActive: true,
+      isDefault: false,
+    }).returning();
+
+    const sections = await this.getTemplateSections(id);
+    for (const section of sections) {
+      await db.insert(schema.templateSections).values({
+        templateId: newTemplate.id,
+        sectionType: section.sectionType,
+        title: section.title,
+        content: section.content,
+        sortOrder: section.sortOrder,
+        isLocked: section.isLocked,
+        isVisible: section.isVisible,
+        settings: section.settings,
+      });
+    }
+
+    return newTemplate;
+  }
+
+  // Template Section operations
+  async createTemplateSection(section: InsertTemplateSection): Promise<TemplateSection> {
+    const [result] = await db.insert(schema.templateSections).values(section).returning();
+    return result;
+  }
+
+  async getTemplateSections(templateId: string): Promise<TemplateSection[]> {
+    return db.select().from(schema.templateSections)
+      .where(eq(schema.templateSections.templateId, templateId))
+      .orderBy(asc(schema.templateSections.sortOrder));
+  }
+
+  async updateTemplateSection(id: string, updates: Partial<InsertTemplateSection>): Promise<TemplateSection | undefined> {
+    const [section] = await db.update(schema.templateSections)
+      .set({ ...updates, updatedAt: new Date() })
+      .where(eq(schema.templateSections.id, id))
+      .returning();
+    return section;
+  }
+
+  async deleteTemplateSection(id: string): Promise<void> {
+    await db.delete(schema.templateSections).where(eq(schema.templateSections.id, id));
+  }
+
+  async reorderTemplateSections(templateId: string, sectionIds: string[]): Promise<void> {
+    for (let i = 0; i < sectionIds.length; i++) {
+      await db.update(schema.templateSections)
+        .set({ sortOrder: i })
+        .where(and(eq(schema.templateSections.id, sectionIds[i]), eq(schema.templateSections.templateId, templateId)));
+    }
+  }
+
+  // Proposal operations
+  async createProposal(proposal: InsertProposal): Promise<Proposal> {
+    const [result] = await db.insert(schema.proposals).values(proposal).returning();
+    return result;
+  }
+
+  async getProposalsByTenant(tenantId: string, filters?: { status?: string; customerId?: string; ownerId?: string }): Promise<Proposal[]> {
+    const conditions = [eq(schema.proposals.tenantId, tenantId)];
+    
+    if (filters?.status) {
+      conditions.push(eq(schema.proposals.status, filters.status));
+    }
+    if (filters?.customerId) {
+      conditions.push(eq(schema.proposals.customerId, filters.customerId));
+    }
+    if (filters?.ownerId) {
+      conditions.push(eq(schema.proposals.ownerId, filters.ownerId));
+    }
+    
+    return db.select().from(schema.proposals)
+      .where(and(...conditions))
+      .orderBy(desc(schema.proposals.createdAt));
+  }
+
+  async getProposalById(id: string, tenantId: string): Promise<Proposal | undefined> {
+    const [proposal] = await db.select().from(schema.proposals)
+      .where(and(eq(schema.proposals.id, id), eq(schema.proposals.tenantId, tenantId)));
+    return proposal;
+  }
+
+  async getProposalByAccessToken(accessToken: string): Promise<Proposal | undefined> {
+    const [proposal] = await db.select().from(schema.proposals)
+      .where(eq(schema.proposals.accessToken, accessToken));
+    return proposal;
+  }
+
+  async updateProposal(id: string, tenantId: string, updates: Partial<InsertProposal>): Promise<Proposal | undefined> {
+    const [proposal] = await db.update(schema.proposals)
+      .set({ ...updates, updatedAt: new Date() })
+      .where(and(eq(schema.proposals.id, id), eq(schema.proposals.tenantId, tenantId)))
+      .returning();
+    return proposal;
+  }
+
+  async deleteProposal(id: string, tenantId: string): Promise<void> {
+    await db.delete(schema.proposals)
+      .where(and(eq(schema.proposals.id, id), eq(schema.proposals.tenantId, tenantId)));
+  }
+
+  async getNextProposalNumber(tenantId: string): Promise<string> {
+    const proposals = await db.select().from(schema.proposals)
+      .where(eq(schema.proposals.tenantId, tenantId))
+      .orderBy(desc(schema.proposals.createdAt));
+    
+    const count = proposals.length + 1;
+    const year = new Date().getFullYear();
+    return `PROP-${year}-${count.toString().padStart(4, '0')}`;
+  }
+
+  async updateProposalStatus(id: string, tenantId: string, status: string, changedBy: string, notes?: string): Promise<Proposal | undefined> {
+    const proposal = await this.getProposalById(id, tenantId);
+    if (!proposal) return undefined;
+
+    const [updated] = await db.update(schema.proposals)
+      .set({ 
+        status, 
+        updatedAt: new Date(),
+        ...(status === 'sent' && { sentAt: new Date() }),
+        ...(status === 'viewed' && { viewedAt: new Date() }),
+        ...(status === 'accepted' && { acceptedAt: new Date() }),
+        ...(status === 'rejected' && { rejectedAt: new Date() }),
+      })
+      .where(and(eq(schema.proposals.id, id), eq(schema.proposals.tenantId, tenantId)))
+      .returning();
+
+    await db.insert(schema.proposalStatusHistory).values({
+      proposalId: id,
+      changedBy,
+      fromStatus: proposal.status,
+      toStatus: status,
+      notes,
+    });
+
+    return updated;
+  }
+
+  async generateProposalAccessToken(id: string, tenantId: string): Promise<string> {
+    const token = `prop_${Date.now()}_${Math.random().toString(36).substring(2, 15)}`;
+    await db.update(schema.proposals)
+      .set({ accessToken: token })
+      .where(and(eq(schema.proposals.id, id), eq(schema.proposals.tenantId, tenantId)));
+    return token;
+  }
+
+  // Proposal Section operations
+  async createProposalSection(section: InsertProposalSection): Promise<ProposalSection> {
+    const [result] = await db.insert(schema.proposalSections).values(section).returning();
+    return result;
+  }
+
+  async getProposalSections(proposalId: string): Promise<ProposalSection[]> {
+    return db.select().from(schema.proposalSections)
+      .where(eq(schema.proposalSections.proposalId, proposalId))
+      .orderBy(asc(schema.proposalSections.sortOrder));
+  }
+
+  async updateProposalSection(id: string, updates: Partial<InsertProposalSection>): Promise<ProposalSection | undefined> {
+    const [section] = await db.update(schema.proposalSections)
+      .set({ ...updates, updatedAt: new Date() })
+      .where(eq(schema.proposalSections.id, id))
+      .returning();
+    return section;
+  }
+
+  async deleteProposalSection(id: string): Promise<void> {
+    await db.delete(schema.proposalSections).where(eq(schema.proposalSections.id, id));
+  }
+
+  async reorderProposalSections(proposalId: string, sectionIds: string[]): Promise<void> {
+    for (let i = 0; i < sectionIds.length; i++) {
+      await db.update(schema.proposalSections)
+        .set({ sortOrder: i })
+        .where(and(eq(schema.proposalSections.id, sectionIds[i]), eq(schema.proposalSections.proposalId, proposalId)));
+    }
+  }
+
+  // Proposal Pricing Item operations
+  async createProposalPricingItem(item: InsertProposalPricingItem): Promise<ProposalPricingItem> {
+    const [result] = await db.insert(schema.proposalPricingItems).values(item).returning();
+    return result;
+  }
+
+  async getProposalPricingItems(proposalId: string): Promise<ProposalPricingItem[]> {
+    return db.select().from(schema.proposalPricingItems)
+      .where(eq(schema.proposalPricingItems.proposalId, proposalId))
+      .orderBy(asc(schema.proposalPricingItems.sortOrder));
+  }
+
+  async updateProposalPricingItem(id: string, updates: Partial<InsertProposalPricingItem>): Promise<ProposalPricingItem | undefined> {
+    const [item] = await db.update(schema.proposalPricingItems)
+      .set(updates)
+      .where(eq(schema.proposalPricingItems.id, id))
+      .returning();
+    return item;
+  }
+
+  async deleteProposalPricingItem(id: string): Promise<void> {
+    await db.delete(schema.proposalPricingItems).where(eq(schema.proposalPricingItems.id, id));
+  }
+
+  async deleteProposalPricingItems(proposalId: string): Promise<void> {
+    await db.delete(schema.proposalPricingItems).where(eq(schema.proposalPricingItems.proposalId, proposalId));
+  }
+
+  async recalculateProposalTotals(proposalId: string, tenantId: string): Promise<Proposal | undefined> {
+    const items = await this.getProposalPricingItems(proposalId);
+    
+    let subtotal = 0;
+    let taxAmount = 0;
+    let discountAmount = 0;
+
+    for (const item of items) {
+      if (item.isSelected) {
+        const itemTotal = parseFloat(item.totalPrice as string) || 0;
+        const itemTax = (parseFloat(item.taxRate as string) || 0) * itemTotal / 100;
+        const itemDiscount = (parseFloat(item.discount as string) || 0) * itemTotal / 100;
+        
+        subtotal += itemTotal;
+        taxAmount += itemTax;
+        discountAmount += itemDiscount;
+      }
+    }
+
+    const totalAmount = subtotal + taxAmount - discountAmount;
+
+    return this.updateProposal(proposalId, tenantId, {
+      subtotal: subtotal.toFixed(2),
+      taxAmount: taxAmount.toFixed(2),
+      discountAmount: discountAmount.toFixed(2),
+      totalAmount: totalAmount.toFixed(2),
+    } as any);
+  }
+
+  // Proposal Version operations
+  async createProposalVersion(version: InsertProposalVersion): Promise<ProposalVersion> {
+    const [result] = await db.insert(schema.proposalVersions).values(version).returning();
+    return result;
+  }
+
+  async getProposalVersions(proposalId: string): Promise<ProposalVersion[]> {
+    return db.select().from(schema.proposalVersions)
+      .where(eq(schema.proposalVersions.proposalId, proposalId))
+      .orderBy(desc(schema.proposalVersions.versionNumber));
+  }
+
+  async getProposalVersionById(id: string): Promise<ProposalVersion | undefined> {
+    const [version] = await db.select().from(schema.proposalVersions)
+      .where(eq(schema.proposalVersions.id, id));
+    return version;
+  }
+
+  async restoreProposalVersion(proposalId: string, versionId: string, tenantId: string, userId: string): Promise<Proposal | undefined> {
+    const version = await this.getProposalVersionById(versionId);
+    if (!version) return undefined;
+
+    const proposal = await this.getProposalById(proposalId, tenantId);
+    if (!proposal) return undefined;
+
+    const snapshot = JSON.parse(version.snapshot);
+    
+    await this.deleteProposalPricingItems(proposalId);
+    await db.delete(schema.proposalSections).where(eq(schema.proposalSections.proposalId, proposalId));
+
+    if (snapshot.sections) {
+      for (const section of snapshot.sections) {
+        await this.createProposalSection({
+          proposalId,
+          sectionType: section.sectionType,
+          title: section.title,
+          content: section.content,
+          sortOrder: section.sortOrder,
+          isLocked: section.isLocked,
+          isVisible: section.isVisible,
+          settings: section.settings,
+        });
+      }
+    }
+
+    if (snapshot.pricingItems) {
+      for (const item of snapshot.pricingItems) {
+        await this.createProposalPricingItem({
+          proposalId,
+          name: item.name,
+          description: item.description,
+          quantity: item.quantity,
+          unitPrice: item.unitPrice,
+          taxRate: item.taxRate,
+          discount: item.discount,
+          totalPrice: item.totalPrice,
+          isRecurring: item.isRecurring,
+          recurringInterval: item.recurringInterval,
+          isOptional: item.isOptional,
+          isSelected: item.isSelected,
+          sortOrder: item.sortOrder,
+        });
+      }
+    }
+
+    const newVersion = proposal.currentVersion + 1;
+    return this.updateProposal(proposalId, tenantId, {
+      currentVersion: newVersion,
+      title: snapshot.title || proposal.title,
+    } as any);
+  }
+
+  // Proposal Activity Log operations
+  async createProposalActivityLog(log: InsertProposalActivityLog): Promise<ProposalActivityLog> {
+    const [result] = await db.insert(schema.proposalActivityLogs).values(log).returning();
+    return result;
+  }
+
+  async getProposalActivityLogs(proposalId: string): Promise<ProposalActivityLog[]> {
+    return db.select().from(schema.proposalActivityLogs)
+      .where(eq(schema.proposalActivityLogs.proposalId, proposalId))
+      .orderBy(desc(schema.proposalActivityLogs.createdAt));
+  }
+
+  // Proposal Signature operations
+  async createProposalSignature(signature: InsertProposalSignature): Promise<ProposalSignature> {
+    const [result] = await db.insert(schema.proposalSignatures).values(signature).returning();
+    return result;
+  }
+
+  async getProposalSignatures(proposalId: string): Promise<ProposalSignature[]> {
+    return db.select().from(schema.proposalSignatures)
+      .where(eq(schema.proposalSignatures.proposalId, proposalId))
+      .orderBy(desc(schema.proposalSignatures.signedAt));
+  }
+
+  // Proposal View Log operations
+  async createProposalViewLog(log: InsertProposalViewLog): Promise<ProposalViewLog> {
+    const [result] = await db.insert(schema.proposalViewLogs).values(log).returning();
+    return result;
+  }
+
+  async getProposalViewLogs(proposalId: string): Promise<ProposalViewLog[]> {
+    return db.select().from(schema.proposalViewLogs)
+      .where(eq(schema.proposalViewLogs.proposalId, proposalId))
+      .orderBy(desc(schema.proposalViewLogs.createdAt));
+  }
+
+  async recordProposalView(proposalId: string, viewData: Partial<InsertProposalViewLog>): Promise<void> {
+    await db.insert(schema.proposalViewLogs).values({
+      proposalId,
+      ...viewData,
+    } as InsertProposalViewLog);
+
+    await db.update(schema.proposals)
+      .set({ 
+        viewCount: sql`view_count + 1`,
+        totalViewTime: sql`total_view_time + ${viewData.duration || 0}`,
+        viewedAt: new Date(),
+      })
+      .where(eq(schema.proposals.id, proposalId));
+  }
+
+  // Proposal Status History operations
+  async getProposalStatusHistory(proposalId: string): Promise<ProposalStatusHistory[]> {
+    return db.select().from(schema.proposalStatusHistory)
+      .where(eq(schema.proposalStatusHistory.proposalId, proposalId))
+      .orderBy(desc(schema.proposalStatusHistory.createdAt));
+  }
+
+  // Proposal Comment operations
+  async createProposalComment(comment: InsertProposalComment): Promise<ProposalComment> {
+    const [result] = await db.insert(schema.proposalComments).values(comment).returning();
+    return result;
+  }
+
+  async getProposalComments(proposalId: string): Promise<ProposalComment[]> {
+    return db.select().from(schema.proposalComments)
+      .where(eq(schema.proposalComments.proposalId, proposalId))
+      .orderBy(desc(schema.proposalComments.createdAt));
+  }
+
+  async updateProposalComment(id: string, updates: Partial<InsertProposalComment>): Promise<ProposalComment | undefined> {
+    const [comment] = await db.update(schema.proposalComments)
+      .set({ ...updates, updatedAt: new Date() })
+      .where(eq(schema.proposalComments.id, id))
+      .returning();
+    return comment;
+  }
+
+  async deleteProposalComment(id: string): Promise<void> {
+    await db.delete(schema.proposalComments).where(eq(schema.proposalComments.id, id));
+  }
+
+  // Proposal Analytics
+  async getProposalAnalytics(tenantId: string): Promise<{
+    totalProposals: number;
+    acceptedProposals: number;
+    rejectedProposals: number;
+    pendingProposals: number;
+    totalValue: number;
+    acceptedValue: number;
+    avgViewTime: number;
+    conversionRate: number;
+  }> {
+    const proposals = await db.select().from(schema.proposals)
+      .where(eq(schema.proposals.tenantId, tenantId));
+
+    const totalProposals = proposals.length;
+    const acceptedProposals = proposals.filter(p => p.status === 'accepted').length;
+    const rejectedProposals = proposals.filter(p => p.status === 'rejected').length;
+    const pendingProposals = proposals.filter(p => ['draft', 'sent', 'viewed'].includes(p.status)).length;
+    
+    const totalValue = proposals.reduce((sum, p) => sum + parseFloat(p.totalAmount as string || '0'), 0);
+    const acceptedValue = proposals
+      .filter(p => p.status === 'accepted')
+      .reduce((sum, p) => sum + parseFloat(p.totalAmount as string || '0'), 0);
+    
+    const avgViewTime = proposals.length > 0
+      ? proposals.reduce((sum, p) => sum + (p.totalViewTime || 0), 0) / proposals.length
+      : 0;
+    
+    const conversionRate = totalProposals > 0 ? (acceptedProposals / totalProposals) * 100 : 0;
+
+    return {
+      totalProposals,
+      acceptedProposals,
+      rejectedProposals,
+      pendingProposals,
+      totalValue,
+      acceptedValue,
+      avgViewTime: Math.round(avgViewTime),
+      conversionRate: Math.round(conversionRate * 10) / 10,
+    };
+  }
+
+  // Create proposal from template
+  async createProposalFromTemplate(templateId: string, proposalData: InsertProposal): Promise<Proposal | undefined> {
+    const template = await this.getProposalTemplateById(templateId, proposalData.tenantId);
+    if (!template) return undefined;
+
+    const proposal = await this.createProposal({
+      ...proposalData,
+      templateId,
+    });
+
+    const templateSections = await this.getTemplateSections(templateId);
+    for (const section of templateSections) {
+      await this.createProposalSection({
+        proposalId: proposal.id,
+        sectionType: section.sectionType,
+        title: section.title,
+        content: section.content,
+        sortOrder: section.sortOrder,
+        isLocked: section.isLocked,
+        isVisible: section.isVisible,
+        settings: section.settings,
+      });
+    }
+
+    return proposal;
   }
 }
 
