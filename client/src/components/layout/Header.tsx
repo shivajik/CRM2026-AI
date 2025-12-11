@@ -87,14 +87,18 @@ export function Header() {
               <User className="w-4 h-4 mr-2" />
               Profile
             </DropdownMenuItem>
-            <DropdownMenuItem onClick={() => setLocation("/billing")} data-testid="menu-item-billing">
-              <CreditCard className="w-4 h-4 mr-2" />
-              Billing
-            </DropdownMenuItem>
-            <DropdownMenuItem onClick={() => setLocation("/settings")} data-testid="menu-item-settings">
-              <Settings className="w-4 h-4 mr-2" />
-              Settings
-            </DropdownMenuItem>
+            {currentUser?.isAdmin && (
+              <>
+                <DropdownMenuItem onClick={() => setLocation("/billing")} data-testid="menu-item-billing">
+                  <CreditCard className="w-4 h-4 mr-2" />
+                  Billing
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={() => setLocation("/settings")} data-testid="menu-item-settings">
+                  <Settings className="w-4 h-4 mr-2" />
+                  Settings
+                </DropdownMenuItem>
+              </>
+            )}
             <DropdownMenuSeparator />
             <DropdownMenuItem onClick={handleLogout} data-testid="menu-item-logout">
               <LogOut className="w-4 h-4 mr-2" />
