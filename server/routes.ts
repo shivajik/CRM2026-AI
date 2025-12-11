@@ -1696,11 +1696,25 @@ export async function registerRoutes(
 
   app.post("/api/saas-admin/packages", requireAuth, requireSaasAdmin, async (req, res) => {
     try {
-      const { name, displayName, description, price, billingCycle, isActive, isPopular, sortOrder, features, moduleIds } = req.body;
-      
-      if (!name || !displayName) {
-        return res.status(400).json({ message: "Name and display name are required" });
+      const packageInputSchema = z.object({
+        name: z.string().min(1, "Name is required").max(100),
+        displayName: z.string().min(1, "Display name is required").max(200),
+        description: z.string().max(1000).optional(),
+        price: z.string().regex(/^\d+(\.\d{1,2})?$/, "Invalid price format").optional(),
+        billingCycle: z.enum(["monthly", "yearly", "one_time"]).optional(),
+        isActive: z.boolean().optional(),
+        isPopular: z.boolean().optional(),
+        sortOrder: z.number().int().min(0).max(1000).optional(),
+        features: z.array(z.string().max(200)).max(50).optional(),
+        moduleIds: z.array(z.string()).optional(),
+      });
+
+      const parsed = packageInputSchema.safeParse(req.body);
+      if (!parsed.success) {
+        return res.status(400).json({ message: parsed.error.errors[0].message });
       }
+
+      const { name, displayName, description, price, billingCycle, isActive, isPopular, sortOrder, features, moduleIds } = parsed.data;
 
       const pkg = await storage.createPackage({
         name,
@@ -1715,6 +1729,13 @@ export async function registerRoutes(
       });
 
       if (moduleIds && moduleIds.length > 0) {
+        const validModules = await storage.getAllModules();
+        const validModuleIds = validModules.map(m => m.id);
+        const invalidIds = moduleIds.filter(id => !validModuleIds.includes(id));
+        if (invalidIds.length > 0) {
+          await storage.deletePackage(pkg.id);
+          return res.status(400).json({ message: `Invalid module IDs: ${invalidIds.join(", ")}` });
+        }
         await storage.setPackageModules(pkg.id, moduleIds);
       }
 
@@ -1738,7 +1759,25 @@ export async function registerRoutes(
 
   app.patch("/api/saas-admin/packages/:id", requireAuth, requireSaasAdmin, async (req, res) => {
     try {
-      const { name, displayName, description, price, billingCycle, isActive, isPopular, sortOrder, features, moduleIds } = req.body;
+      const packageUpdateSchema = z.object({
+        name: z.string().min(1).max(100).optional(),
+        displayName: z.string().min(1).max(200).optional(),
+        description: z.string().max(1000).optional(),
+        price: z.string().regex(/^\d+(\.\d{1,2})?$/, "Invalid price format").optional(),
+        billingCycle: z.enum(["monthly", "yearly", "one_time"]).optional(),
+        isActive: z.boolean().optional(),
+        isPopular: z.boolean().optional(),
+        sortOrder: z.number().int().min(0).max(1000).optional(),
+        features: z.array(z.string().max(200)).max(50).optional(),
+        moduleIds: z.array(z.string()).optional(),
+      });
+
+      const parsed = packageUpdateSchema.safeParse(req.body);
+      if (!parsed.success) {
+        return res.status(400).json({ message: parsed.error.errors[0].message });
+      }
+
+      const { name, displayName, description, price, billingCycle, isActive, isPopular, sortOrder, features, moduleIds } = parsed.data;
 
       const existingPkg = await storage.getPackageById(req.params.id);
       if (!existingPkg) {
@@ -1759,6 +1798,14 @@ export async function registerRoutes(
       const pkg = await storage.updatePackage(req.params.id, updates);
 
       if (moduleIds !== undefined) {
+        if (moduleIds.length > 0) {
+          const validModules = await storage.getAllModules();
+          const validModuleIds = validModules.map(m => m.id);
+          const invalidIds = moduleIds.filter(id => !validModuleIds.includes(id));
+          if (invalidIds.length > 0) {
+            return res.status(400).json({ message: `Invalid module IDs: ${invalidIds.join(", ")}` });
+          }
+        }
         await storage.setPackageModules(req.params.id, moduleIds);
       }
 

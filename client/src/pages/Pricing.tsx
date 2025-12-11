@@ -1,9 +1,10 @@
 import { useState } from "react";
 import { Link } from "wouter";
+import { useQuery } from "@tanstack/react-query";
 import { MarketingLayout } from "@/components/marketing/MarketingLayout";
 import { SEOHead } from "@/components/SEOHead";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
@@ -15,9 +16,11 @@ import {
   Shield,
   Clock,
   Users,
-  Zap
+  Zap,
+  Package
 } from "lucide-react";
 import { pricingPlans, faqs } from "@/lib/marketingData";
+import { packagesApi } from "@/lib/api";
 
 const featureMatrix = [
   { feature: "Team members", starter: "Up to 5", professional: "Up to 25", enterprise: "Unlimited" },
@@ -160,6 +163,124 @@ function PricingCardsSection() {
         <p className="text-center text-sm text-muted-foreground mt-8">
           All plans include a 14-day free trial. No credit card required.
         </p>
+      </div>
+    </section>
+  );
+}
+
+function DynamicPackagesSection() {
+  const { data: packages = [], isLoading } = useQuery({
+    queryKey: ["publicPackages"],
+    queryFn: packagesApi.getAll,
+  });
+
+  if (isLoading) {
+    return (
+      <section className="py-16 bg-muted/30" data-testid="section-dynamic-packages">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="text-center mb-12">
+            <h2 className="text-3xl font-heading font-bold mb-4">Available Packages</h2>
+            <p className="text-muted-foreground">Loading packages...</p>
+          </div>
+        </div>
+      </section>
+    );
+  }
+
+  if (packages.length === 0) {
+    return null;
+  }
+
+  const sortedPackages = [...packages].sort((a: any, b: any) => {
+    const orderA = a.sortOrder ?? 999;
+    const orderB = b.sortOrder ?? 999;
+    if (orderA !== orderB) return orderA - orderB;
+    return (a.displayName || "").localeCompare(b.displayName || "");
+  });
+
+  return (
+    <section className="py-16 bg-muted/30" data-testid="section-dynamic-packages">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+        <div className="text-center mb-12">
+          <Badge variant="outline" className="mb-4">
+            <Package className="w-3 h-3 mr-1" />
+            Modular Packages
+          </Badge>
+          <h2 className="text-3xl font-heading font-bold mb-4">
+            Choose Your Perfect Package
+          </h2>
+          <p className="text-muted-foreground max-w-2xl mx-auto">
+            Our modular packages let you pick exactly the CRM features you need. 
+            Start with the essentials and add more as you grow.
+          </p>
+        </div>
+
+        <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6 max-w-6xl mx-auto">
+          {sortedPackages.map((pkg: any) => (
+            <Card
+              key={pkg.id}
+              className={`relative overflow-hidden flex flex-col ${
+                pkg.isPopular ? "border-primary shadow-lg ring-2 ring-primary/20" : ""
+              }`}
+              data-testid={`package-card-${pkg.id}`}
+            >
+              {pkg.isPopular && (
+                <div className="absolute top-0 right-0 bg-primary text-primary-foreground text-xs font-semibold px-3 py-1 rounded-bl-lg">
+                  Popular
+                </div>
+              )}
+              <CardHeader>
+                <CardTitle className="text-xl font-heading">{pkg.displayName}</CardTitle>
+                <CardDescription>{pkg.description}</CardDescription>
+              </CardHeader>
+              <CardContent className="flex-1 flex flex-col">
+                <div className="mb-6">
+                  <span className="text-4xl font-heading font-bold">
+                    ${parseFloat(pkg.price || 0).toFixed(0)}
+                  </span>
+                  <span className="text-muted-foreground">
+                    /{pkg.billingCycle === "yearly" ? "year" : pkg.billingCycle === "one_time" ? "one-time" : "month"}
+                  </span>
+                </div>
+
+                {pkg.modules && pkg.modules.length > 0 && (
+                  <div className="mb-4">
+                    <p className="text-sm font-medium mb-2">Included Modules:</p>
+                    <div className="flex flex-wrap gap-1.5">
+                      {pkg.modules.map((module: any) => (
+                        <Badge key={module.id} variant="secondary" className="text-xs">
+                          {module.displayName}
+                        </Badge>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {pkg.features && pkg.features.length > 0 && (
+                  <div className="space-y-2 mb-6 flex-1">
+                    {pkg.features.map((feature: string, index: number) => (
+                      <div key={index} className="flex items-start gap-2 text-sm">
+                        <Check className="h-4 w-4 text-primary mt-0.5 flex-shrink-0" />
+                        <span>{feature}</span>
+                      </div>
+                    ))}
+                  </div>
+                )}
+
+                <Link href="/checkout">
+                  <Button
+                    className="w-full mt-auto"
+                    variant={pkg.isPopular ? "default" : "outline"}
+                    data-testid={`button-package-${pkg.id}`}
+                  >
+                    Get Started
+                    <ArrowRight className="ml-2 h-4 w-4" />
+                  </Button>
+                </Link>
+              </CardContent>
+            </Card>
+          ))}
+        </div>
       </div>
     </section>
   );
@@ -349,6 +470,7 @@ export default function Pricing() {
       />
       <HeroSection />
       <PricingCardsSection />
+      <DynamicPackagesSection />
       <FeatureComparisonSection />
       <TrustSection />
       <FAQSection />
