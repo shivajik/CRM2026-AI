@@ -7,6 +7,7 @@ import { z } from "zod";
 export const tenants = pgTable("tenants", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   name: text("name").notNull(),
+  packageId: varchar("package_id"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 

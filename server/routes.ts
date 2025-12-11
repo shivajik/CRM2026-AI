@@ -530,6 +530,20 @@ export async function registerRoutes(
       res.status(500).json({ message: "Failed to fetch modules" });
     }
   });
+
+  app.get("/api/tenant/package", requireAuth, validateTenant, async (req, res) => {
+    try {
+      const tenant = await storage.getTenant(req.user!.tenantId);
+      if (!tenant?.packageId) {
+        return res.json(null);
+      }
+      const pkg = await storage.getPackageById(tenant.packageId);
+      res.json(pkg);
+    } catch (error) {
+      console.error("Get tenant package error:", error);
+      res.status(500).json({ message: "Failed to fetch package" });
+    }
+  });
   
   app.patch("/api/tenant/modules/:id", requireAuth, validateTenant, async (req, res) => {
     try {

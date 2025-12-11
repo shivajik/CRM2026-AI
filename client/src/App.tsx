@@ -10,6 +10,8 @@ import Deals from "@/pages/Deals";
 import DealDetail from "@/pages/DealDetail";
 import Tasks from "@/pages/Tasks";
 import Settings from "@/pages/Settings";
+import Profile from "@/pages/Profile";
+import Billing from "@/pages/Billing";
 import Login from "@/pages/Login";
 import Register from "@/pages/Register";
 import Products from "@/pages/Products";
@@ -97,6 +99,8 @@ function Router() {
       <Route path="/activities" component={Activities} />
       <Route path="/reports" component={Reports} />
       <Route path="/settings" component={Settings} />
+      <Route path="/profile" component={Profile} />
+      <Route path="/billing" component={Billing} />
       <Route path="/team" component={TeamManagement} />
       <Route path="/team-login" component={TeamLogin} />
       <Route path="/team-dashboard" component={TeamDashboard} />

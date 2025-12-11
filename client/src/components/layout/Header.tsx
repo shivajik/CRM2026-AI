@@ -1,4 +1,4 @@
-import { Menu, Bell, Search } from "lucide-react";
+import { Menu, Bell, Search, User, CreditCard, Settings, LogOut } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
@@ -9,8 +9,30 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { useLocation } from "wouter";
+import { useQuery } from "@tanstack/react-query";
+import { authApi } from "@/lib/api";
+import { clearAuth } from "@/lib/auth";
 
 export function Header() {
+  const [, setLocation] = useLocation();
+
+  const { data: currentUser } = useQuery({
+    queryKey: ["currentUser"],
+    queryFn: authApi.me,
+  });
+
+  const getInitials = () => {
+    const first = currentUser?.firstName?.charAt(0) || "";
+    const last = currentUser?.lastName?.charAt(0) || "";
+    return (first + last).toUpperCase() || "U";
+  };
+
+  const handleLogout = () => {
+    clearAuth();
+    setLocation("/login");
+  };
+
   return (
     <header className="h-16 border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 px-6 flex items-center justify-between sticky top-0 z-40">
       <div className="flex items-center gap-4 md:hidden">
@@ -37,27 +59,41 @@ export function Header() {
         </Button>
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
-            <Button variant="ghost" className="relative h-8 w-8 rounded-full">
+            <Button variant="ghost" className="relative h-8 w-8 rounded-full" data-testid="button-user-menu">
                <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center text-xs font-bold text-primary">
-                JD
+                {getInitials()}
               </div>
             </Button>
           </DropdownMenuTrigger>
           <DropdownMenuContent className="w-56" align="end" forceMount>
             <DropdownMenuLabel className="font-normal">
               <div className="flex flex-col space-y-1">
-                <p className="text-sm font-medium leading-none">John Doe</p>
+                <p className="text-sm font-medium leading-none">
+                  {currentUser?.firstName} {currentUser?.lastName}
+                </p>
                 <p className="text-xs leading-none text-muted-foreground">
-                  john@nexus.com
+                  {currentUser?.email}
                 </p>
               </div>
             </DropdownMenuLabel>
             <DropdownMenuSeparator />
-            <DropdownMenuItem>Profile</DropdownMenuItem>
-            <DropdownMenuItem>Billing</DropdownMenuItem>
-            <DropdownMenuItem>Settings</DropdownMenuItem>
+            <DropdownMenuItem onClick={() => setLocation("/profile")} data-testid="menu-item-profile">
+              <User className="w-4 h-4 mr-2" />
+              Profile
+            </DropdownMenuItem>
+            <DropdownMenuItem onClick={() => setLocation("/billing")} data-testid="menu-item-billing">
+              <CreditCard className="w-4 h-4 mr-2" />
+              Billing
+            </DropdownMenuItem>
+            <DropdownMenuItem onClick={() => setLocation("/settings")} data-testid="menu-item-settings">
+              <Settings className="w-4 h-4 mr-2" />
+              Settings
+            </DropdownMenuItem>
             <DropdownMenuSeparator />
-            <DropdownMenuItem>Log out</DropdownMenuItem>
+            <DropdownMenuItem onClick={handleLogout} data-testid="menu-item-logout">
+              <LogOut className="w-4 h-4 mr-2" />
+              Log out
+            </DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>
       </div>
