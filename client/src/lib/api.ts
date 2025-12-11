@@ -120,6 +120,33 @@ export const usersApi = {
     apiRequest("/users/profile", { method: "PATCH", body: JSON.stringify(data) }),
 };
 
+// Company Profile API
+export const companyProfileApi = {
+  get: () => apiRequest("/company-profile"),
+  update: (data: {
+    companyName?: string;
+    email?: string;
+    phone?: string;
+    website?: string;
+    address?: string;
+    city?: string;
+    state?: string;
+    country?: string;
+    postalCode?: string;
+    logoUrl?: string;
+    taxId?: string;
+    registrationNumber?: string;
+    industry?: string;
+    companySize?: string;
+    currency?: string;
+    defaultPaymentTerms?: string;
+    invoicePrefix?: string;
+    quotePrefix?: string;
+    invoiceNotes?: string;
+    quoteNotes?: string;
+  }) => apiRequest("/company-profile", { method: "PUT", body: JSON.stringify(data) }),
+};
+
 // Tasks API
 export const tasksApi = {
   getAll: () => apiRequest("/tasks"),

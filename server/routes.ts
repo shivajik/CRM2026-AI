@@ -467,6 +467,54 @@ export async function registerRoutes(
       res.status(500).json({ message: "Failed to update profile" });
     }
   });
+
+  // ==================== COMPANY PROFILE ROUTES ====================
+  
+  app.get("/api/company-profile", requireAuth, validateTenant, async (req, res) => {
+    try {
+      const profile = await storage.getCompanyProfile(req.user!.tenantId);
+      if (!profile) {
+        const tenant = await storage.getTenant(req.user!.tenantId);
+        return res.json({
+          tenantId: req.user!.tenantId,
+          companyName: tenant?.name || '',
+          email: '',
+          phone: '',
+          website: '',
+          address: '',
+          city: '',
+          state: '',
+          country: '',
+          postalCode: '',
+          logoUrl: '',
+          taxId: '',
+          registrationNumber: '',
+          industry: '',
+          companySize: '',
+          currency: 'USD',
+          defaultPaymentTerms: 'net30',
+          invoicePrefix: 'INV',
+          quotePrefix: 'QT',
+          invoiceNotes: '',
+          quoteNotes: '',
+        });
+      }
+      res.json(profile);
+    } catch (error) {
+      console.error("Get company profile error:", error);
+      res.status(500).json({ message: "Failed to fetch company profile" });
+    }
+  });
+
+  app.put("/api/company-profile", requireAuth, validateTenant, requireAgencyAdmin, async (req, res) => {
+    try {
+      const profile = await storage.upsertCompanyProfile(req.user!.tenantId, req.body);
+      res.json(profile);
+    } catch (error) {
+      console.error("Update company profile error:", error);
+      res.status(500).json({ message: "Failed to update company profile" });
+    }
+  });
   
   // ==================== TENANT MODULE ROUTES ====================
   
