@@ -3229,15 +3229,36 @@ export async function registerRoutes(
   app.post("/api/proposals", requireAuth, validateTenant, async (req, res) => {
     try {
       const proposalNumber = await storage.getNextProposalNumber(req.user!.tenantId);
+      const { sections, pricingItems, ...proposalData } = req.body;
       
       const proposal = await storage.createProposal({
-        ...req.body,
+        ...proposalData,
         tenantId: req.user!.tenantId,
         createdBy: req.user!.userId,
         ownerId: req.body.ownerId || req.user!.userId,
         proposalNumber,
         status: 'draft',
       });
+      
+      // Create sections if provided
+      if (sections && Array.isArray(sections)) {
+        for (const section of sections) {
+          await storage.createProposalSection({
+            proposalId: proposal.id,
+            ...section,
+          });
+        }
+      }
+      
+      // Create pricing items if provided
+      if (pricingItems && Array.isArray(pricingItems)) {
+        for (const item of pricingItems) {
+          await storage.createProposalPricingItem({
+            proposalId: proposal.id,
+            ...item,
+          });
+        }
+      }
       
       await storage.createProposalActivityLog({
         proposalId: proposal.id,
@@ -3246,7 +3267,14 @@ export async function registerRoutes(
         details: 'Proposal created',
       });
       
-      res.status(201).json(proposal);
+      // Fetch the complete proposal with sections and pricing
+      const createdSections = await storage.getProposalSections(proposal.id);
+      const createdPricingItems = await storage.getProposalPricingItems(proposal.id);
+      res.status(201).json({
+        ...proposal,
+        sections: createdSections,
+        pricingItems: createdPricingItems,
+      });
     } catch (error) {
       console.error("Create proposal error:", error);
       res.status(500).json({ message: "Failed to create proposal" });

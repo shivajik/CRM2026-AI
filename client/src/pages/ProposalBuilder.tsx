@@ -101,6 +101,8 @@ export default function ProposalBuilder() {
   const createMutation = useMutation({
     mutationFn: proposalsApi.create,
     onSuccess: (data: any) => {
+      queryClient.setQueryData(["proposal", data.id], data);
+      queryClient.invalidateQueries({ queryKey: ["proposals"] });
       toast({ title: "Proposal created successfully" });
       setLocation(`/proposals/edit/${data.id}`);
     },
@@ -170,7 +172,7 @@ export default function ProposalBuilder() {
   });
 
   const handleSave = () => {
-    const data = {
+    const data: any = {
       title,
       customerId: customerId || null,
       currency,
@@ -180,6 +182,24 @@ export default function ProposalBuilder() {
     if (isEditing) {
       updateMutation.mutate(data);
     } else {
+      // Include staged sections and pricing items when creating
+      data.sections = sections.filter(s => !s.id).map((s, i) => ({
+        sectionType: s.sectionType || "custom",
+        title: s.title || "Untitled Section",
+        content: s.content || "",
+        sortOrder: i,
+        isVisible: true,
+        isLocked: false,
+      }));
+      data.pricingItems = pricingItems.filter(p => !p.id).map((p, i) => ({
+        name: p.name || "Item",
+        description: p.description || "",
+        quantity: String(Number(p.quantity) || 1),
+        unitPrice: String(Number(p.unitPrice) || 0),
+        discountPercent: String(Number(p.discountPercent) || 0),
+        totalPrice: String(Number(p.totalPrice) || 0),
+        sortOrder: i,
+      }));
       createMutation.mutate(data);
     }
   };
@@ -462,7 +482,6 @@ export default function ProposalBuilder() {
                   variant="outline"
                   className="w-full"
                   onClick={() => setShowAddSection(true)}
-                  disabled={!isEditing}
                   data-testid="button-add-section"
                 >
                   <Plus className="w-4 h-4 mr-2" />
@@ -475,7 +494,7 @@ export default function ProposalBuilder() {
                   <CardHeader>
                     <div className="flex items-center justify-between">
                       <CardTitle>Pricing Table</CardTitle>
-                      <Button size="sm" onClick={handleAddPricingItem} disabled={!isEditing} data-testid="button-add-item">
+                      <Button size="sm" onClick={handleAddPricingItem} data-testid="button-add-item">
                         <Plus className="w-4 h-4 mr-2" />
                         Add Item
                       </Button>
