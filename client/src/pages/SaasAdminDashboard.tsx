@@ -55,6 +55,11 @@ export default function SaasAdminDashboard() {
     sortOrder: 0,
     features: [] as string[],
     moduleIds: [] as string[],
+    contactLimit: -1,
+    teamMemberLimit: -1,
+    storageLimit: -1,
+    projectLimit: -1,
+    apiCallsLimit: -1,
   });
   const [newFeature, setNewFeature] = useState("");
   
@@ -191,6 +196,11 @@ export default function SaasAdminDashboard() {
       sortOrder: 0,
       features: [],
       moduleIds: [],
+      contactLimit: -1,
+      teamMemberLimit: -1,
+      storageLimit: -1,
+      projectLimit: -1,
+      apiCallsLimit: -1,
     });
     setNewFeature("");
   };
@@ -214,6 +224,11 @@ export default function SaasAdminDashboard() {
       sortOrder: pkg.sortOrder || 0,
       features: pkg.features || [],
       moduleIds: pkg.modules?.map((m: any) => m.id) || [],
+      contactLimit: pkg.contactLimit ?? -1,
+      teamMemberLimit: pkg.teamMemberLimit ?? -1,
+      storageLimit: pkg.storageLimit ?? -1,
+      projectLimit: pkg.projectLimit ?? -1,
+      apiCallsLimit: pkg.apiCallsLimit ?? -1,
     });
     setShowPackageDialog(true);
   };
@@ -1455,6 +1470,83 @@ export default function SaasAdminDashboard() {
                     data-testid="switch-package-popular"
                   />
                   <Label htmlFor="isPopular">Mark as Popular</Label>
+                </div>
+              </div>
+
+              <div className="space-y-3">
+                <Label className="text-base font-semibold">Package Limits</Label>
+                <p className="text-sm text-muted-foreground">Set -1 for unlimited</p>
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="contactLimit">Contact Limit</Label>
+                    <Input
+                      id="contactLimit"
+                      type="number"
+                      value={packageForm.contactLimit}
+                      onChange={(e) => {
+                        const val = parseInt(e.target.value);
+                        setPackageForm({...packageForm, contactLimit: Number.isNaN(val) ? -1 : val});
+                      }}
+                      placeholder="-1 for unlimited"
+                      data-testid="input-package-contact-limit"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="teamMemberLimit">Team Member Limit</Label>
+                    <Input
+                      id="teamMemberLimit"
+                      type="number"
+                      value={packageForm.teamMemberLimit}
+                      onChange={(e) => {
+                        const val = parseInt(e.target.value);
+                        setPackageForm({...packageForm, teamMemberLimit: Number.isNaN(val) ? -1 : val});
+                      }}
+                      placeholder="-1 for unlimited"
+                      data-testid="input-package-team-limit"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="storageLimit">Storage Limit (MB)</Label>
+                    <Input
+                      id="storageLimit"
+                      type="number"
+                      value={packageForm.storageLimit}
+                      onChange={(e) => {
+                        const val = parseInt(e.target.value);
+                        setPackageForm({...packageForm, storageLimit: Number.isNaN(val) ? -1 : val});
+                      }}
+                      placeholder="-1 for unlimited"
+                      data-testid="input-package-storage-limit"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="projectLimit">Project Limit</Label>
+                    <Input
+                      id="projectLimit"
+                      type="number"
+                      value={packageForm.projectLimit}
+                      onChange={(e) => {
+                        const val = parseInt(e.target.value);
+                        setPackageForm({...packageForm, projectLimit: Number.isNaN(val) ? -1 : val});
+                      }}
+                      placeholder="-1 for unlimited"
+                      data-testid="input-package-project-limit"
+                    />
+                  </div>
+                  <div className="space-y-2 col-span-2">
+                    <Label htmlFor="apiCallsLimit">API Calls Limit (per month)</Label>
+                    <Input
+                      id="apiCallsLimit"
+                      type="number"
+                      value={packageForm.apiCallsLimit}
+                      onChange={(e) => {
+                        const val = parseInt(e.target.value);
+                        setPackageForm({...packageForm, apiCallsLimit: Number.isNaN(val) ? -1 : val});
+                      }}
+                      placeholder="-1 for unlimited"
+                      data-testid="input-package-api-limit"
+                    />
+                  </div>
                 </div>
               </div>
 

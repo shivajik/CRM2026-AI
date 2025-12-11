@@ -518,6 +518,12 @@ export const packages = pgTable("packages", {
   isPopular: boolean("is_popular").default(false).notNull(),
   sortOrder: integer("sort_order").default(0),
   features: text("features").array().default(sql`'{}'::text[]`),
+  // Package limits
+  contactLimit: integer("contact_limit").default(-1), // -1 = unlimited
+  teamMemberLimit: integer("team_member_limit").default(-1),
+  storageLimit: integer("storage_limit_mb").default(-1), // in MB
+  projectLimit: integer("project_limit").default(-1),
+  apiCallsLimit: integer("api_calls_limit").default(-1), // per month
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });
