@@ -7,7 +7,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Separator } from "@/components/ui/separator";
-import { invoicesApi, customersApi } from "@/lib/api";
+import { invoicesApi, customersApi, companyProfileApi } from "@/lib/api";
 import { ArrowLeft, Download, Receipt, Building2, Calendar, CreditCard, DollarSign } from "lucide-react";
 import { format } from "date-fns";
 
@@ -36,10 +36,15 @@ export default function InvoiceDetail() {
     queryFn: customersApi.getAll,
   });
 
+  const { data: companyProfile } = useQuery({
+    queryKey: ["companyProfile"],
+    queryFn: companyProfileApi.get,
+  });
+
   const customer = customers.find((c: any) => c.id === invoice?.customerId);
 
   const handleExportPDF = () => {
-    if (!invoice || !customer) return;
+    if (!invoice || !customer || !companyProfile) return;
     
     const printContent = `
       <!DOCTYPE html>
@@ -75,8 +80,13 @@ export default function InvoiceDetail() {
       <body>
         <div class="header">
           <div>
-            <div class="company-name">Your Company Name</div>
-            <div>CRM System</div>
+            <div class="company-name">${companyProfile?.companyName || "Your Company Name"}</div>
+            ${companyProfile?.address || companyProfile?.city || companyProfile?.country ? `
+              <div>${[companyProfile?.address, companyProfile?.city, companyProfile?.state, companyProfile?.postalCode, companyProfile?.country].filter(Boolean).join(", ")}</div>
+            ` : ""}
+            ${companyProfile?.phone ? `<div>${companyProfile.phone}</div>` : ""}
+            ${companyProfile?.email ? `<div>${companyProfile.email}</div>` : ""}
+            ${companyProfile?.website ? `<div>${companyProfile.website}</div>` : ""}
           </div>
           <div class="invoice-info">
             <div class="invoice-number">${invoice.invoiceNumber}</div>
@@ -230,7 +240,7 @@ export default function InvoiceDetail() {
                 {invoice.status}
               </Badge>
             </div>
-            <Button onClick={handleExportPDF} data-testid="button-export-pdf">
+            <Button onClick={handleExportPDF} disabled={!companyProfile} data-testid="button-export-pdf">
               <Download className="h-4 w-4 mr-2" />
               Export PDF
             </Button>

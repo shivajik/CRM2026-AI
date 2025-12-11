@@ -7,7 +7,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Separator } from "@/components/ui/separator";
-import { quotationsApi, customersApi } from "@/lib/api";
+import { quotationsApi, customersApi, companyProfileApi } from "@/lib/api";
 import { ArrowLeft, Download, FileText, Building2, Calendar, DollarSign } from "lucide-react";
 import { format } from "date-fns";
 
@@ -35,10 +35,15 @@ export default function QuotationDetail() {
     queryFn: customersApi.getAll,
   });
 
+  const { data: companyProfile } = useQuery({
+    queryKey: ["companyProfile"],
+    queryFn: companyProfileApi.get,
+  });
+
   const customer = customers.find((c: any) => c.id === quotation?.customerId);
 
   const handleExportPDF = () => {
-    if (!quotation || !customer) return;
+    if (!quotation || !customer || !companyProfile) return;
     
     const printContent = `
       <!DOCTYPE html>
@@ -73,8 +78,13 @@ export default function QuotationDetail() {
       <body>
         <div class="header">
           <div>
-            <div class="company-name">Your Company Name</div>
-            <div>CRM System</div>
+            <div class="company-name">${companyProfile?.companyName || "Your Company Name"}</div>
+            ${companyProfile?.address || companyProfile?.city || companyProfile?.country ? `
+              <div>${[companyProfile?.address, companyProfile?.city, companyProfile?.state, companyProfile?.postalCode, companyProfile?.country].filter(Boolean).join(", ")}</div>
+            ` : ""}
+            ${companyProfile?.phone ? `<div>${companyProfile.phone}</div>` : ""}
+            ${companyProfile?.email ? `<div>${companyProfile.email}</div>` : ""}
+            ${companyProfile?.website ? `<div>${companyProfile.website}</div>` : ""}
           </div>
           <div class="quote-info">
             <div class="quote-number">${quotation.quoteNumber}</div>
@@ -201,7 +211,7 @@ export default function QuotationDetail() {
                 {quotation.status}
               </Badge>
             </div>
-            <Button onClick={handleExportPDF} data-testid="button-export-pdf">
+            <Button onClick={handleExportPDF} disabled={!companyProfile} data-testid="button-export-pdf">
               <Download className="h-4 w-4 mr-2" />
               Export PDF
             </Button>
