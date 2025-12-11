@@ -1,0 +1,105 @@
+You are a Replit Coding Agent. Your mission: build a production-ready, enterprise-grade frontend for a SaaS landing + marketing site that converts visitors into buyers. Deliver a complete, deployable project with the following priorities, constraints, and deliverables.
+
+PRIORITIES
+1. Conversion-first experience (above-the-fold clarity, single primary CTA, frictionless checkout flow).
+2. SEO, AEO (Answer Engine Optimization — structured data & snippet targeting), and GEO (geotargeting & local SEO) best practices baked into pages and content.
+3. Human-sounding copy with a Humanise score > 60 (see “Humanise verification” below).
+4. Accessibility (WCAG 2.1 AA), performance (high Lighthouse scores), and small bundle sizes.
+5. Clean, modular components and automated tests.
+
+IMPLEMENTATION NOTE (IMPORTANT)
+- Do **not** suggest, recommend, or prescribe a specific technical stack in your output or documentation. Choose sensible tools and approaches internally as needed, but do not present or justify a particular stack to reviewers. Focus all language on outcomes, pages, accessibility, SEO, content, and deliverables — not on particular frameworks or runtime choices.
+
+PAGES & FEATURES TO BUILD
+1. Landing / Home page (hero, benefits, features, social proof, pricing, FAQ, footer).
+   - Hero must clearly state product value proposition, price starting line (if appropriate), and a single primary CTA (Buy / Start free trial).
+   - Include a 1-minute explainer video placeholder, 3 logos of customers/trust badges, and a short testimonial carousel.
+2. Product / Features page with modular sections for A/B testing (short copy + long copy variants).
+3. Pricing page: clear pricing tiers, feature matrix, CTA, monthly/annual toggle, trial/guarantee messaging.
+4. Checkout flow: lightweight client-side form to collect user details and simulate payment flow with success and failure pages. Include trust badges and refund info.
+5. Resources / Blog skeleton (sitemap capability).
+6. Geo-targeted landing variations (examples for US, UK, India) and hreflang tags. Provide one localized content variant per region.
+7. Sitemap.xml, robots.txt, and canonical tags.
+8. Accessibility & SEO audit page: show Lighthouse-style scores and an a11y checklist (can be auto-generated mock results).
+9. Global header/footer component (sticky CTA in header).
+
+SEO, AEO & GEO REQUIREMENTS
+- Generate semantic HTML and ARIA roles.
+- Title, meta description, meta robots for each page. Titles must use primary keywords + emotional trigger.
+- JSON-LD structured data: `WebSite`, `Organization`, `Product`, `FAQPage`, `BreadcrumbList`, `LocalBusiness` (for GEO).
+- Create content blocks designed to be eligible for featured snippets: short direct answer (40–70 words), bullet lists, and tables where appropriate.
+- Implement Open Graph & Twitter Card meta tags with sample images and dimensions.
+- Implement hreflang and geotargeted landing pages. Add sample `geo.region` meta tags and localized schema (addresses, phone number placeholders).
+- Create a simple sitemap generator route or static output that produces XML.
+
+CONTENT & HUMANISATION
+- Produce all page copy (headlines, subheadlines, CTAs, feature descriptions, testimonials, FAQs, pricing blurbs). Copy must:
+  - Read like a human writer: use contractions, active voice, varied sentence length, 1–2 micro-anecdotes, and small colloquial touches.
+  - Avoid overuse of marketing clichés; prefer specific benefits & outcomes.
+  - Include social proof lines (3–4 short case-style sentences).
+  - Include explicit microcopy for privacy, data use, and refund policy.
+- Humanise verification:
+  - Run built-in checks and produce a Humanise report including: Flesch Reading Ease, average sentence length, % of sentences with contractions, lexical diversity, and an estimated Humanise score (scale 0–100) with justification showing why score > 60.
+  - Provide a short plan/technique list showing how you reduced "AI style" features (e.g., fewer repetitive sentence starts, added idiomatic phrases, active voice conversion).
+- Create two copy variants: "Concise conversion-first" and "Long-form SEO-rich" for each main page.
+
+PERFORMANCE, ACCESSIBILITY & TESTING
+- Aim for high-performance targets: explain expected Lighthouse-like targets for Performance, Accessibility, Best Practices, and SEO and provide guidance to reproduce audits.
+- Use image optimization and lazy loading for non-critical images.
+- Implement critical CSS strategies and avoid render-blocking scripts.
+- Add automated unit tests for core components and at least one end-to-end test to check the main purchase flow.
+- Include a11y checks (axe-core style) in the test suite.
+
+CRO (conversion rate optimization) FEATURES
+- Sticky primary CTA and one floating micro-CTA.
+- Exit-intent newsletter modal (non-intrusive).
+- Social proof & trust badges above the fold.
+- Scarcity/urgency microcopy for pricing (e.g., “Only X seats left at this price” — simulated).
+- Clear money-back guarantee and refund microcopy.
+
+DELIVERABLES (what you must produce in the repo root)
+1. Fully working project with clear README that explains how to run and build the site locally (install/build/run commands — avoid naming specific package managers or framework commands).
+2. Component library folder with reusable components and story-like examples.
+3. Page templates for pages listed above.
+4. `public/` assets and optimized OG images (placeholder).
+5. Sitemap XML generator or static `sitemap.xml`.
+6. Structured data JSON-LD included on pages.
+7. Test suite with commands to run unit and end-to-end tests.
+8. SEO & Humanise Report (`/reports/SEO-Humanise-Report.md`) including:
+   - Meta/title inventory.
+   - List of target keywords (primary + secondary) for each page.
+   - Humanise score breakdown and copy variants.
+   - GEO & hreflang plan.
+   - Mock audit results and instructions to reproduce.
+9. Deployment notes (how to deploy on Replit and one other common hosting environment) without specifying platform-specific configuration files or recommending a particular stack.
+10. Checklist `DELIVERY-CHECKLIST.md` showing all acceptance criteria.
+
+UX & DESIGN GUIDELINES
+- Modern, minimal aesthetic: large hero headline, 2–3 supporting benefit bullets, testimonial snapshot, compact pricing card.
+- Neutral color palette and strong CTA color (configurable).
+- Responsive design (mobile-first). Ensure forms are usable on small screens.
+- Provide 2 theme variants (Light & Dark).
+
+IMPLEMENTATION & COMMUNICATION INSTRUCTIONS FOR AGENT
+- Work in short commits with clear commit messages.
+- After finishing each major milestone (Landing, Pricing, Checkout), create a short demo page and provide a one-paragraph release note inside the repo (`/RELEASE_NOTES.md`).
+- Document assumptions (placeholder logos, video, or simulated data) in `ASSUMPTIONS.md`.
+- At the end, run the Humanise verification and produce the `/reports/SEO-Humanise-Report.md` file demonstrating Humanise score > 60. If initial score < 60, iterate copy until > 60 and document changes.
+- Provide a simple “how to preview” instruction for reviewers who want to see localized variants (e.g., routes like `/us`, `/uk`, `/in`).
+
+SAMPLE KEYWORDS & TONE
+- Provide suggested primary keywords (phrases tailored to product) and a recommended tone: confident, helpful, concise. Use one brief micro-anecdote per page to humanize narrative.
+
+NON-FUNCTIONAL REQUIREMENTS & SECURITY
+- Simulate payments; do not include real payment provider keys.
+- All secrets should be referenced via environment variables or placeholders (documented).
+- Do not include any third-party tracking keys or private credentials.
+
+FINAL MESSAGE / OUTPUT
+When complete, produce a final message in the repository root `FINAL_REPORT.md` that includes:
+- Short demo walkthrough (what pages/components do).
+- How to run tests and reproduce audits.
+- SEO & Humanise summary with evidence (readability metrics, % contractions, sample sentences that were humanized).
+- Notes about further recommended improvements (A/B tests, analytics, CRO experiments).
+
+Begin work now. If you must make assumptions, choose realistic defaults and document them in `ASSUMPTIONS.md`. Prioritize the conversion experience, SEO & schema coverage, and making the content sound human (Humanise score > 60).
