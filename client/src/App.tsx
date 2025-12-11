@@ -35,6 +35,7 @@ import Checkout from "@/pages/Checkout";
 import Resources from "@/pages/Resources";
 import { USLanding, UKLanding, INLanding } from "@/pages/GeoLanding";
 import SEOAudit from "@/pages/SEOAudit";
+import EmailModule from "@/pages/EmailModule";
 import { isAuthenticated, getUser } from "@/lib/auth";
 import { authApi } from "@/lib/api";
 
@@ -95,6 +96,7 @@ function Router() {
       <Route path="/quotations/:id" component={QuotationDetail} />
       <Route path="/invoices" component={Invoices} />
       <Route path="/invoices/:id" component={InvoiceDetail} />
+      <Route path="/email" component={EmailModule} />
       <Route path="/tasks" component={Tasks} />
       <Route path="/activities" component={Activities} />
       <Route path="/reports" component={Reports} />

@@ -311,3 +311,57 @@ export const saasAdminApi = {
 export const packagesApi = {
   getAll: () => apiRequest("/packages"),
 };
+
+// Email Module API
+export const emailApi = {
+  // Templates
+  getTemplates: () => apiRequest("/email/templates"),
+  getTemplateById: (id: string) => apiRequest(`/email/templates/${id}`),
+  createTemplate: (data: any) => apiRequest("/email/templates", { method: "POST", body: JSON.stringify(data) }),
+  updateTemplate: (id: string, data: any) => apiRequest(`/email/templates/${id}`, { method: "PATCH", body: JSON.stringify(data) }),
+  deleteTemplate: (id: string) => apiRequest(`/email/templates/${id}`, { method: "DELETE" }),
+  
+  // Logs
+  getLogs: () => apiRequest("/email/logs"),
+  getLogById: (id: string) => apiRequest(`/email/logs/${id}`),
+  
+  // Send
+  send: (data: any) => apiRequest("/email/send", { method: "POST", body: JSON.stringify(data) }),
+  
+  // Automations
+  getAutomations: () => apiRequest("/email/automations"),
+  getAutomationById: (id: string) => apiRequest(`/email/automations/${id}`),
+  createAutomation: (data: any) => apiRequest("/email/automations", { method: "POST", body: JSON.stringify(data) }),
+  updateAutomation: (id: string, data: any) => apiRequest(`/email/automations/${id}`, { method: "PATCH", body: JSON.stringify(data) }),
+  deleteAutomation: (id: string) => apiRequest(`/email/automations/${id}`, { method: "DELETE" }),
+  
+  // Sequences
+  getSequences: () => apiRequest("/email/sequences"),
+  getSequenceById: (id: string) => apiRequest(`/email/sequences/${id}`),
+  createSequence: (data: any) => apiRequest("/email/sequences", { method: "POST", body: JSON.stringify(data) }),
+  updateSequence: (id: string, data: any) => apiRequest(`/email/sequences/${id}`, { method: "PATCH", body: JSON.stringify(data) }),
+  deleteSequence: (id: string) => apiRequest(`/email/sequences/${id}`, { method: "DELETE" }),
+  
+  // Steps
+  createStep: (sequenceId: string, data: any) => apiRequest(`/email/sequences/${sequenceId}/steps`, { method: "POST", body: JSON.stringify(data) }),
+  updateStep: (id: string, data: any) => apiRequest(`/email/steps/${id}`, { method: "PATCH", body: JSON.stringify(data) }),
+  deleteStep: (id: string) => apiRequest(`/email/steps/${id}`, { method: "DELETE" }),
+  
+  // Scheduled Emails
+  getScheduled: () => apiRequest("/email/scheduled"),
+  deleteScheduled: (id: string) => apiRequest(`/email/scheduled/${id}`, { method: "DELETE" }),
+  
+  // Sender Accounts
+  getSenders: () => apiRequest("/email/senders"),
+  createSender: (data: any) => apiRequest("/email/senders", { method: "POST", body: JSON.stringify(data) }),
+  updateSender: (id: string, data: any) => apiRequest(`/email/senders/${id}`, { method: "PATCH", body: JSON.stringify(data) }),
+  deleteSender: (id: string) => apiRequest(`/email/senders/${id}`, { method: "DELETE" }),
+  
+  // Merge Fields
+  getMergeFields: () => apiRequest("/email/merge-fields"),
+  processMergeFields: (data: any) => apiRequest("/email/process-merge-fields", { method: "POST", body: JSON.stringify(data) }),
+  
+  // AI Assistant
+  aiAssist: (data: { action: string; content: string; context?: any }) => 
+    apiRequest("/email/ai-assist", { method: "POST", body: JSON.stringify(data) }),
+};

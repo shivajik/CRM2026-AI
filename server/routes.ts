@@ -1950,6 +1950,547 @@ export async function registerRoutes(
     }
   });
 
+  // ==================== EMAIL MODULE ROUTES ====================
+
+  // Email Templates
+  app.get("/api/email/templates", requireAuth, validateTenant, async (req, res) => {
+    try {
+      const templates = await storage.getEmailTemplatesByTenant(req.user!.tenantId);
+      res.json(templates);
+    } catch (error) {
+      console.error("Get email templates error:", error);
+      res.status(500).json({ message: "Failed to fetch email templates" });
+    }
+  });
+
+  app.get("/api/email/templates/:id", requireAuth, validateTenant, async (req, res) => {
+    try {
+      const template = await storage.getEmailTemplateById(req.params.id, req.user!.tenantId);
+      if (!template) {
+        return res.status(404).json({ message: "Template not found" });
+      }
+      res.json(template);
+    } catch (error) {
+      console.error("Get email template error:", error);
+      res.status(500).json({ message: "Failed to fetch email template" });
+    }
+  });
+
+  app.post("/api/email/templates", requireAuth, validateTenant, requireAgencyAdmin, async (req, res) => {
+    try {
+      const template = await storage.createEmailTemplate({
+        ...req.body,
+        tenantId: req.user!.tenantId,
+        createdBy: req.user!.userId,
+      });
+      res.status(201).json(template);
+    } catch (error) {
+      console.error("Create email template error:", error);
+      res.status(500).json({ message: "Failed to create email template" });
+    }
+  });
+
+  app.patch("/api/email/templates/:id", requireAuth, validateTenant, requireAgencyAdmin, async (req, res) => {
+    try {
+      const template = await storage.updateEmailTemplate(req.params.id, req.user!.tenantId, req.body);
+      if (!template) {
+        return res.status(404).json({ message: "Template not found" });
+      }
+      res.json(template);
+    } catch (error) {
+      console.error("Update email template error:", error);
+      res.status(500).json({ message: "Failed to update email template" });
+    }
+  });
+
+  app.delete("/api/email/templates/:id", requireAuth, validateTenant, requireAgencyAdmin, async (req, res) => {
+    try {
+      await storage.deleteEmailTemplate(req.params.id, req.user!.tenantId);
+      res.json({ message: "Template deleted successfully" });
+    } catch (error) {
+      console.error("Delete email template error:", error);
+      res.status(500).json({ message: "Failed to delete email template" });
+    }
+  });
+
+  // Email Logs
+  app.get("/api/email/logs", requireAuth, validateTenant, async (req, res) => {
+    try {
+      const logs = await storage.getEmailLogsByTenant(req.user!.tenantId);
+      res.json(logs);
+    } catch (error) {
+      console.error("Get email logs error:", error);
+      res.status(500).json({ message: "Failed to fetch email logs" });
+    }
+  });
+
+  app.get("/api/email/logs/:id", requireAuth, validateTenant, async (req, res) => {
+    try {
+      const log = await storage.getEmailLogById(req.params.id, req.user!.tenantId);
+      if (!log) {
+        return res.status(404).json({ message: "Email log not found" });
+      }
+      res.json(log);
+    } catch (error) {
+      console.error("Get email log error:", error);
+      res.status(500).json({ message: "Failed to fetch email log" });
+    }
+  });
+
+  // Send Email
+  app.post("/api/email/send", requireAuth, validateTenant, denyCustomerAccess, async (req, res) => {
+    try {
+      const { toEmail, ccEmails, bccEmails, subject, body, templateId, customerId, quotationId, invoiceId, attachments, scheduledAt } = req.body;
+      
+      if (!toEmail || !subject || !body) {
+        return res.status(400).json({ message: "To, subject, and body are required" });
+      }
+
+      const senderAccount = await storage.getDefaultSenderAccount(req.user!.tenantId);
+      const fromEmail = senderAccount?.email || 'noreply@nexuscrm.com';
+
+      const log = await storage.createEmailLog({
+        tenantId: req.user!.tenantId,
+        sentBy: req.user!.userId,
+        templateId: templateId || null,
+        customerId: customerId || null,
+        quotationId: quotationId || null,
+        invoiceId: invoiceId || null,
+        fromEmail,
+        toEmail,
+        ccEmails: ccEmails || null,
+        bccEmails: bccEmails || null,
+        subject,
+        body,
+        attachments: attachments || [],
+        status: scheduledAt ? 'scheduled' : 'sent',
+        scheduledAt: scheduledAt ? new Date(scheduledAt) : null,
+        trackingId: `track-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+      });
+
+      if (!scheduledAt) {
+        await storage.updateEmailLog(log.id, { sentAt: new Date() });
+      }
+
+      res.status(201).json({ message: "Email sent successfully", log });
+    } catch (error) {
+      console.error("Send email error:", error);
+      res.status(500).json({ message: "Failed to send email" });
+    }
+  });
+
+  // Automation Rules
+  app.get("/api/email/automations", requireAuth, validateTenant, async (req, res) => {
+    try {
+      const rules = await storage.getAutomationRulesByTenant(req.user!.tenantId);
+      res.json(rules);
+    } catch (error) {
+      console.error("Get automation rules error:", error);
+      res.status(500).json({ message: "Failed to fetch automation rules" });
+    }
+  });
+
+  app.get("/api/email/automations/:id", requireAuth, validateTenant, async (req, res) => {
+    try {
+      const rule = await storage.getAutomationRuleById(req.params.id, req.user!.tenantId);
+      if (!rule) {
+        return res.status(404).json({ message: "Automation rule not found" });
+      }
+      res.json(rule);
+    } catch (error) {
+      console.error("Get automation rule error:", error);
+      res.status(500).json({ message: "Failed to fetch automation rule" });
+    }
+  });
+
+  app.post("/api/email/automations", requireAuth, validateTenant, requireAgencyAdmin, async (req, res) => {
+    try {
+      const rule = await storage.createAutomationRule({
+        ...req.body,
+        tenantId: req.user!.tenantId,
+        createdBy: req.user!.userId,
+      });
+      res.status(201).json(rule);
+    } catch (error) {
+      console.error("Create automation rule error:", error);
+      res.status(500).json({ message: "Failed to create automation rule" });
+    }
+  });
+
+  app.patch("/api/email/automations/:id", requireAuth, validateTenant, requireAgencyAdmin, async (req, res) => {
+    try {
+      const rule = await storage.updateAutomationRule(req.params.id, req.user!.tenantId, req.body);
+      if (!rule) {
+        return res.status(404).json({ message: "Automation rule not found" });
+      }
+      res.json(rule);
+    } catch (error) {
+      console.error("Update automation rule error:", error);
+      res.status(500).json({ message: "Failed to update automation rule" });
+    }
+  });
+
+  app.delete("/api/email/automations/:id", requireAuth, validateTenant, requireAgencyAdmin, async (req, res) => {
+    try {
+      await storage.deleteAutomationRule(req.params.id, req.user!.tenantId);
+      res.json({ message: "Automation rule deleted successfully" });
+    } catch (error) {
+      console.error("Delete automation rule error:", error);
+      res.status(500).json({ message: "Failed to delete automation rule" });
+    }
+  });
+
+  // Follow-up Sequences
+  app.get("/api/email/sequences", requireAuth, validateTenant, async (req, res) => {
+    try {
+      const sequences = await storage.getFollowUpSequencesByTenant(req.user!.tenantId);
+      res.json(sequences);
+    } catch (error) {
+      console.error("Get follow-up sequences error:", error);
+      res.status(500).json({ message: "Failed to fetch follow-up sequences" });
+    }
+  });
+
+  app.get("/api/email/sequences/:id", requireAuth, validateTenant, async (req, res) => {
+    try {
+      const sequence = await storage.getFollowUpSequenceById(req.params.id, req.user!.tenantId);
+      if (!sequence) {
+        return res.status(404).json({ message: "Follow-up sequence not found" });
+      }
+      const steps = await storage.getFollowUpStepsBySequence(sequence.id);
+      res.json({ ...sequence, steps });
+    } catch (error) {
+      console.error("Get follow-up sequence error:", error);
+      res.status(500).json({ message: "Failed to fetch follow-up sequence" });
+    }
+  });
+
+  app.post("/api/email/sequences", requireAuth, validateTenant, requireAgencyAdmin, async (req, res) => {
+    try {
+      const { steps, ...sequenceData } = req.body;
+      const sequence = await storage.createFollowUpSequence({
+        ...sequenceData,
+        tenantId: req.user!.tenantId,
+        createdBy: req.user!.userId,
+      });
+      
+      if (steps && Array.isArray(steps)) {
+        for (const step of steps) {
+          await storage.createFollowUpStep({
+            ...step,
+            sequenceId: sequence.id,
+          });
+        }
+      }
+      
+      const createdSteps = await storage.getFollowUpStepsBySequence(sequence.id);
+      res.status(201).json({ ...sequence, steps: createdSteps });
+    } catch (error) {
+      console.error("Create follow-up sequence error:", error);
+      res.status(500).json({ message: "Failed to create follow-up sequence" });
+    }
+  });
+
+  app.patch("/api/email/sequences/:id", requireAuth, validateTenant, requireAgencyAdmin, async (req, res) => {
+    try {
+      const { steps, ...sequenceData } = req.body;
+      const sequence = await storage.updateFollowUpSequence(req.params.id, req.user!.tenantId, sequenceData);
+      if (!sequence) {
+        return res.status(404).json({ message: "Follow-up sequence not found" });
+      }
+      
+      const updatedSteps = await storage.getFollowUpStepsBySequence(sequence.id);
+      res.json({ ...sequence, steps: updatedSteps });
+    } catch (error) {
+      console.error("Update follow-up sequence error:", error);
+      res.status(500).json({ message: "Failed to update follow-up sequence" });
+    }
+  });
+
+  app.delete("/api/email/sequences/:id", requireAuth, validateTenant, requireAgencyAdmin, async (req, res) => {
+    try {
+      await storage.deleteFollowUpSequence(req.params.id, req.user!.tenantId);
+      res.json({ message: "Follow-up sequence deleted successfully" });
+    } catch (error) {
+      console.error("Delete follow-up sequence error:", error);
+      res.status(500).json({ message: "Failed to delete follow-up sequence" });
+    }
+  });
+
+  // Follow-up Steps
+  app.post("/api/email/sequences/:sequenceId/steps", requireAuth, validateTenant, requireAgencyAdmin, async (req, res) => {
+    try {
+      const step = await storage.createFollowUpStep({
+        ...req.body,
+        sequenceId: req.params.sequenceId,
+      });
+      res.status(201).json(step);
+    } catch (error) {
+      console.error("Create follow-up step error:", error);
+      res.status(500).json({ message: "Failed to create follow-up step" });
+    }
+  });
+
+  app.patch("/api/email/steps/:id", requireAuth, validateTenant, requireAgencyAdmin, async (req, res) => {
+    try {
+      const step = await storage.updateFollowUpStep(req.params.id, req.body);
+      if (!step) {
+        return res.status(404).json({ message: "Follow-up step not found" });
+      }
+      res.json(step);
+    } catch (error) {
+      console.error("Update follow-up step error:", error);
+      res.status(500).json({ message: "Failed to update follow-up step" });
+    }
+  });
+
+  app.delete("/api/email/steps/:id", requireAuth, validateTenant, requireAgencyAdmin, async (req, res) => {
+    try {
+      await storage.deleteFollowUpStep(req.params.id);
+      res.json({ message: "Follow-up step deleted successfully" });
+    } catch (error) {
+      console.error("Delete follow-up step error:", error);
+      res.status(500).json({ message: "Failed to delete follow-up step" });
+    }
+  });
+
+  // Scheduled Emails
+  app.get("/api/email/scheduled", requireAuth, validateTenant, async (req, res) => {
+    try {
+      const emails = await storage.getPendingScheduledEmails(req.user!.tenantId);
+      res.json(emails);
+    } catch (error) {
+      console.error("Get scheduled emails error:", error);
+      res.status(500).json({ message: "Failed to fetch scheduled emails" });
+    }
+  });
+
+  app.delete("/api/email/scheduled/:id", requireAuth, validateTenant, async (req, res) => {
+    try {
+      await storage.deleteScheduledEmail(req.params.id);
+      res.json({ message: "Scheduled email cancelled successfully" });
+    } catch (error) {
+      console.error("Delete scheduled email error:", error);
+      res.status(500).json({ message: "Failed to cancel scheduled email" });
+    }
+  });
+
+  // Email Sender Accounts
+  app.get("/api/email/senders", requireAuth, validateTenant, async (req, res) => {
+    try {
+      const accounts = await storage.getEmailSenderAccountsByTenant(req.user!.tenantId);
+      res.json(accounts);
+    } catch (error) {
+      console.error("Get sender accounts error:", error);
+      res.status(500).json({ message: "Failed to fetch sender accounts" });
+    }
+  });
+
+  app.post("/api/email/senders", requireAuth, validateTenant, requireAgencyAdmin, async (req, res) => {
+    try {
+      const account = await storage.createEmailSenderAccount({
+        ...req.body,
+        tenantId: req.user!.tenantId,
+      });
+      res.status(201).json(account);
+    } catch (error) {
+      console.error("Create sender account error:", error);
+      res.status(500).json({ message: "Failed to create sender account" });
+    }
+  });
+
+  app.patch("/api/email/senders/:id", requireAuth, validateTenant, requireAgencyAdmin, async (req, res) => {
+    try {
+      const account = await storage.updateEmailSenderAccount(req.params.id, req.body);
+      if (!account) {
+        return res.status(404).json({ message: "Sender account not found" });
+      }
+      res.json(account);
+    } catch (error) {
+      console.error("Update sender account error:", error);
+      res.status(500).json({ message: "Failed to update sender account" });
+    }
+  });
+
+  app.delete("/api/email/senders/:id", requireAuth, validateTenant, requireAgencyAdmin, async (req, res) => {
+    try {
+      await storage.deleteEmailSenderAccount(req.params.id);
+      res.json({ message: "Sender account deleted successfully" });
+    } catch (error) {
+      console.error("Delete sender account error:", error);
+      res.status(500).json({ message: "Failed to delete sender account" });
+    }
+  });
+
+  // Merge Fields - Get available merge fields
+  app.get("/api/email/merge-fields", requireAuth, validateTenant, async (req, res) => {
+    try {
+      const mergeFields = [
+        { category: "Client", fields: [
+          { key: "{{client.name}}", label: "Client Name" },
+          { key: "{{client.email}}", label: "Client Email" },
+          { key: "{{client.phone}}", label: "Client Phone" },
+          { key: "{{client.company}}", label: "Client Company" },
+          { key: "{{client.address}}", label: "Client Address" },
+        ]},
+        { category: "Quotation", fields: [
+          { key: "{{quotation.number}}", label: "Quotation Number" },
+          { key: "{{quotation.amount}}", label: "Quotation Amount" },
+          { key: "{{quotation.title}}", label: "Quotation Title" },
+          { key: "{{quotation.valid_until}}", label: "Valid Until" },
+        ]},
+        { category: "Invoice", fields: [
+          { key: "{{invoice.number}}", label: "Invoice Number" },
+          { key: "{{invoice.amount}}", label: "Invoice Amount" },
+          { key: "{{invoice.due_date}}", label: "Due Date" },
+          { key: "{{invoice.balance}}", label: "Balance Due" },
+        ]},
+        { category: "Agency", fields: [
+          { key: "{{agency.name}}", label: "Agency Name" },
+          { key: "{{agency.email}}", label: "Agency Email" },
+          { key: "{{agency.phone}}", label: "Agency Phone" },
+          { key: "{{agency.website}}", label: "Agency Website" },
+        ]},
+        { category: "User", fields: [
+          { key: "{{user.name}}", label: "Sender Name" },
+          { key: "{{user.email}}", label: "Sender Email" },
+        ]},
+        { category: "Date", fields: [
+          { key: "{{current_date}}", label: "Current Date" },
+          { key: "{{due_date}}", label: "Due Date" },
+        ]},
+      ];
+      res.json(mergeFields);
+    } catch (error) {
+      console.error("Get merge fields error:", error);
+      res.status(500).json({ message: "Failed to fetch merge fields" });
+    }
+  });
+
+  // Process merge fields in content
+  app.post("/api/email/process-merge-fields", requireAuth, validateTenant, async (req, res) => {
+    try {
+      const { content, customerId, quotationId, invoiceId } = req.body;
+      
+      let processedContent = content;
+      
+      // Get customer data
+      if (customerId) {
+        const customer = await storage.getCustomerById(customerId, req.user!.tenantId);
+        if (customer) {
+          processedContent = processedContent
+            .replace(/\{\{client\.name\}\}/g, customer.name || '')
+            .replace(/\{\{client\.email\}\}/g, customer.email || '')
+            .replace(/\{\{client\.phone\}\}/g, customer.phone || '')
+            .replace(/\{\{client\.company\}\}/g, customer.company || '')
+            .replace(/\{\{client\.address\}\}/g, customer.address || '');
+        }
+      }
+      
+      // Get quotation data
+      if (quotationId) {
+        const quotation = await storage.getQuotationById(quotationId, req.user!.tenantId);
+        if (quotation) {
+          processedContent = processedContent
+            .replace(/\{\{quotation\.number\}\}/g, quotation.quoteNumber || '')
+            .replace(/\{\{quotation\.amount\}\}/g, String(quotation.totalAmount) || '')
+            .replace(/\{\{quotation\.title\}\}/g, quotation.title || '')
+            .replace(/\{\{quotation\.valid_until\}\}/g, quotation.validUntil ? new Date(quotation.validUntil).toLocaleDateString() : '');
+        }
+      }
+      
+      // Get invoice data
+      if (invoiceId) {
+        const invoice = await storage.getInvoiceById(invoiceId, req.user!.tenantId);
+        if (invoice) {
+          processedContent = processedContent
+            .replace(/\{\{invoice\.number\}\}/g, invoice.invoiceNumber || '')
+            .replace(/\{\{invoice\.amount\}\}/g, String(invoice.totalAmount) || '')
+            .replace(/\{\{invoice\.due_date\}\}/g, invoice.dueDate ? new Date(invoice.dueDate).toLocaleDateString() : '')
+            .replace(/\{\{invoice\.balance\}\}/g, String(invoice.balanceDue) || '');
+        }
+      }
+      
+      // Get company profile
+      const companyProfile = await storage.getCompanyProfile(req.user!.tenantId);
+      if (companyProfile) {
+        processedContent = processedContent
+          .replace(/\{\{agency\.name\}\}/g, companyProfile.companyName || '')
+          .replace(/\{\{agency\.email\}\}/g, companyProfile.email || '')
+          .replace(/\{\{agency\.phone\}\}/g, companyProfile.phone || '')
+          .replace(/\{\{agency\.website\}\}/g, companyProfile.website || '');
+      }
+      
+      // Get user data
+      const user = await storage.getUserById(req.user!.userId);
+      if (user) {
+        processedContent = processedContent
+          .replace(/\{\{user\.name\}\}/g, `${user.firstName} ${user.lastName}`)
+          .replace(/\{\{user\.email\}\}/g, user.email || '');
+      }
+      
+      // Date fields
+      processedContent = processedContent
+        .replace(/\{\{current_date\}\}/g, new Date().toLocaleDateString());
+      
+      // Handle fallback values like {{field | "default"}}
+      processedContent = processedContent.replace(/\{\{[^}]+\s*\|\s*"([^"]+)"\}\}/g, '$1');
+      
+      res.json({ processedContent });
+    } catch (error) {
+      console.error("Process merge fields error:", error);
+      res.status(500).json({ message: "Failed to process merge fields" });
+    }
+  });
+
+  // AI Writing Assistant endpoint
+  app.post("/api/email/ai-assist", requireAuth, validateTenant, async (req, res) => {
+    try {
+      const { action, content, context } = req.body;
+      
+      // Simulated AI responses based on action
+      let result = content;
+      
+      switch (action) {
+        case 'improve_tone':
+          result = content.replace(/\b(please|kindly)\b/gi, 'we would appreciate if you')
+            .replace(/\bASAP\b/gi, 'at your earliest convenience')
+            .replace(/\bfyi\b/gi, 'for your information');
+          break;
+        case 'shorten':
+          const sentences = content.split(/[.!?]+/).filter((s: string) => s.trim());
+          result = sentences.slice(0, Math.ceil(sentences.length / 2)).join('. ') + '.';
+          break;
+        case 'make_persuasive':
+          result = content + "\n\nWe believe this opportunity aligns perfectly with your goals, and we're confident you'll see exceptional value in moving forward. Don't miss this chance to elevate your business.";
+          break;
+        case 'fix_grammar':
+          result = content.replace(/\s+/g, ' ').trim();
+          break;
+        case 'generate_subject':
+          const words = content.split(' ').slice(0, 5).join(' ');
+          result = `Re: ${words}...`;
+          break;
+        case 'expand':
+          result = content + "\n\nWe would like to provide you with more details about our services. Our team is dedicated to delivering exceptional results tailored to your specific needs. We look forward to the opportunity to discuss how we can help you achieve your goals.";
+          break;
+        case 'formal':
+          result = `Dear Valued Customer,\n\n${content}\n\nBest regards`;
+          break;
+        case 'friendly':
+          result = `Hi there!\n\n${content}\n\nCheers!`;
+          break;
+        default:
+          result = content;
+      }
+      
+      res.json({ result, action });
+    } catch (error) {
+      console.error("AI assist error:", error);
+      res.status(500).json({ message: "Failed to process AI request" });
+    }
+  });
+
   return httpServer;
 }
 

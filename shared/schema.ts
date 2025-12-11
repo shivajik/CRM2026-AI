@@ -548,3 +548,191 @@ export const packageModules = pgTable("package_modules", {
 export const insertPackageModuleSchema = createInsertSchema(packageModules).omit({ id: true });
 export type InsertPackageModule = z.infer<typeof insertPackageModuleSchema>;
 export type PackageModule = typeof packageModules.$inferSelect;
+
+// ==================== EMAIL COMMUNICATION MODULE ====================
+
+// Email Templates - reusable email templates
+export const emailTemplates = pgTable("email_templates", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  tenantId: varchar("tenant_id").references(() => tenants.id, { onDelete: "cascade" }).notNull(),
+  createdBy: varchar("created_by").references(() => users.id).notNull(),
+  name: text("name").notNull(),
+  purpose: text("purpose").notNull().default("custom"), // quotation, invoice, follow_up, meeting, payment_reminder, welcome, renewal, feedback, custom
+  subject: text("subject").notNull(),
+  body: text("body").notNull(),
+  mergeFields: text("merge_fields").array().default(sql`'{}'::text[]`),
+  isDefault: boolean("is_default").default(false).notNull(),
+  defaultFor: text("default_for"), // quotation, invoice, payment_reminder, etc.
+  isActive: boolean("is_active").default(true).notNull(),
+  version: integer("version").default(1),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+export const insertEmailTemplateSchema = createInsertSchema(emailTemplates).omit({ 
+  id: true, 
+  createdAt: true, 
+  updatedAt: true 
+});
+export type InsertEmailTemplate = z.infer<typeof insertEmailTemplateSchema>;
+export type EmailTemplate = typeof emailTemplates.$inferSelect;
+
+// Email Logs - tracks all sent emails
+export const emailLogs = pgTable("email_logs", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  tenantId: varchar("tenant_id").references(() => tenants.id, { onDelete: "cascade" }).notNull(),
+  sentBy: varchar("sent_by").references(() => users.id).notNull(),
+  templateId: varchar("template_id").references(() => emailTemplates.id),
+  customerId: varchar("customer_id").references(() => customers.id, { onDelete: "set null" }),
+  quotationId: varchar("quotation_id").references(() => quotations.id, { onDelete: "set null" }),
+  invoiceId: varchar("invoice_id").references(() => invoices.id, { onDelete: "set null" }),
+  fromEmail: text("from_email").notNull(),
+  toEmail: text("to_email").notNull(),
+  ccEmails: text("cc_emails"),
+  bccEmails: text("bcc_emails"),
+  subject: text("subject").notNull(),
+  body: text("body").notNull(),
+  attachments: text("attachments").array().default(sql`'{}'::text[]`),
+  status: text("status").notNull().default("pending"), // pending, scheduled, sent, delivered, opened, clicked, failed, bounced
+  scheduledAt: timestamp("scheduled_at"),
+  sentAt: timestamp("sent_at"),
+  openedAt: timestamp("opened_at"),
+  clickedAt: timestamp("clicked_at"),
+  errorMessage: text("error_message"),
+  trackingId: text("tracking_id"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+export const insertEmailLogSchema = createInsertSchema(emailLogs, {
+  scheduledAt: z.union([z.string(), z.date(), z.null()]).optional().transform(val => {
+    if (!val) return null;
+    if (val instanceof Date) return val;
+    return new Date(val);
+  }),
+}).omit({ 
+  id: true, 
+  createdAt: true,
+  sentAt: true,
+  openedAt: true,
+  clickedAt: true,
+});
+export type InsertEmailLog = z.infer<typeof insertEmailLogSchema>;
+export type EmailLog = typeof emailLogs.$inferSelect;
+
+// Automation Rules - configures automatic email sending
+export const automationRules = pgTable("automation_rules", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  tenantId: varchar("tenant_id").references(() => tenants.id, { onDelete: "cascade" }).notNull(),
+  createdBy: varchar("created_by").references(() => users.id).notNull(),
+  name: text("name").notNull(),
+  description: text("description"),
+  trigger: text("trigger").notNull(), // quotation_created, invoice_created, quotation_sent, invoice_sent, invoice_overdue, customer_status_change, quotation_not_accepted
+  templateId: varchar("template_id").references(() => emailTemplates.id).notNull(),
+  delayValue: integer("delay_value").default(0),
+  delayUnit: text("delay_unit").default("minutes"), // minutes, hours, days
+  conditions: text("conditions"), // JSON string for conditional filters
+  isEnabled: boolean("is_enabled").default(true).notNull(),
+  lastTriggered: timestamp("last_triggered"),
+  triggerCount: integer("trigger_count").default(0),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+export const insertAutomationRuleSchema = createInsertSchema(automationRules).omit({ 
+  id: true, 
+  createdAt: true, 
+  updatedAt: true,
+  lastTriggered: true,
+  triggerCount: true,
+});
+export type InsertAutomationRule = z.infer<typeof insertAutomationRuleSchema>;
+export type AutomationRule = typeof automationRules.$inferSelect;
+
+// Follow-up Sequences - multi-step email sequences
+export const followUpSequences = pgTable("follow_up_sequences", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  tenantId: varchar("tenant_id").references(() => tenants.id, { onDelete: "cascade" }).notNull(),
+  createdBy: varchar("created_by").references(() => users.id).notNull(),
+  name: text("name").notNull(),
+  description: text("description"),
+  purpose: text("purpose").notNull().default("general"), // payment, quotation, onboarding, renewal, feedback, general
+  isEnabled: boolean("is_enabled").default(true).notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+export const insertFollowUpSequenceSchema = createInsertSchema(followUpSequences).omit({ 
+  id: true, 
+  createdAt: true, 
+  updatedAt: true 
+});
+export type InsertFollowUpSequence = z.infer<typeof insertFollowUpSequenceSchema>;
+export type FollowUpSequence = typeof followUpSequences.$inferSelect;
+
+// Follow-up Steps - individual steps in a sequence
+export const followUpSteps = pgTable("follow_up_steps", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  sequenceId: varchar("sequence_id").references(() => followUpSequences.id, { onDelete: "cascade" }).notNull(),
+  templateId: varchar("template_id").references(() => emailTemplates.id).notNull(),
+  stepOrder: integer("step_order").notNull().default(1),
+  delayDays: integer("delay_days").notNull().default(1),
+  conditions: text("conditions"), // JSON string for skip conditions
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+export const insertFollowUpStepSchema = createInsertSchema(followUpSteps).omit({ 
+  id: true, 
+  createdAt: true 
+});
+export type InsertFollowUpStep = z.infer<typeof insertFollowUpStepSchema>;
+export type FollowUpStep = typeof followUpSteps.$inferSelect;
+
+// Scheduled Emails - queue for pending/scheduled emails
+export const scheduledEmails = pgTable("scheduled_emails", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  tenantId: varchar("tenant_id").references(() => tenants.id, { onDelete: "cascade" }).notNull(),
+  automationRuleId: varchar("automation_rule_id").references(() => automationRules.id, { onDelete: "set null" }),
+  sequenceId: varchar("sequence_id").references(() => followUpSequences.id, { onDelete: "set null" }),
+  stepId: varchar("step_id").references(() => followUpSteps.id, { onDelete: "set null" }),
+  templateId: varchar("template_id").references(() => emailTemplates.id).notNull(),
+  customerId: varchar("customer_id").references(() => customers.id, { onDelete: "cascade" }).notNull(),
+  quotationId: varchar("quotation_id").references(() => quotations.id, { onDelete: "set null" }),
+  invoiceId: varchar("invoice_id").references(() => invoices.id, { onDelete: "set null" }),
+  scheduledFor: timestamp("scheduled_for").notNull(),
+  status: text("status").notNull().default("pending"), // pending, sent, skipped, cancelled, failed
+  skipReason: text("skip_reason"),
+  processedAt: timestamp("processed_at"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+export const insertScheduledEmailSchema = createInsertSchema(scheduledEmails, {
+  scheduledFor: z.union([z.string(), z.date()]).transform(val => {
+    if (val instanceof Date) return val;
+    return new Date(val);
+  }),
+}).omit({ 
+  id: true, 
+  createdAt: true,
+  processedAt: true,
+});
+export type InsertScheduledEmail = z.infer<typeof insertScheduledEmailSchema>;
+export type ScheduledEmail = typeof scheduledEmails.$inferSelect;
+
+// Email Sender Accounts - configurable sender emails
+export const emailSenderAccounts = pgTable("email_sender_accounts", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  tenantId: varchar("tenant_id").references(() => tenants.id, { onDelete: "cascade" }).notNull(),
+  email: text("email").notNull(),
+  name: text("name").notNull(),
+  isDefault: boolean("is_default").default(false).notNull(),
+  isVerified: boolean("is_verified").default(false).notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+export const insertEmailSenderAccountSchema = createInsertSchema(emailSenderAccounts).omit({ 
+  id: true, 
+  createdAt: true,
+  isVerified: true,
+});
+export type InsertEmailSenderAccount = z.infer<typeof insertEmailSenderAccountSchema>;
+export type EmailSenderAccount = typeof emailSenderAccounts.$inferSelect;

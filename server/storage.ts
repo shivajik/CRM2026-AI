@@ -24,6 +24,13 @@ import type {
   InsertCompanyProfile, CompanyProfile,
   InsertPackage, Package,
   InsertPackageModule, PackageModule,
+  InsertEmailTemplate, EmailTemplate,
+  InsertEmailLog, EmailLog,
+  InsertAutomationRule, AutomationRule,
+  InsertFollowUpSequence, FollowUpSequence,
+  InsertFollowUpStep, FollowUpStep,
+  InsertScheduledEmail, ScheduledEmail,
+  InsertEmailSenderAccount, EmailSenderAccount,
 } from "@shared/schema";
 
 export interface IStorage {
@@ -251,6 +258,56 @@ export interface IStorage {
   setPackageModules(packageId: string, moduleIds: string[]): Promise<void>;
   getPackageWithModules(packageId: string): Promise<(Package & { modules: Module[] }) | undefined>;
   getAllPackagesWithModules(): Promise<(Package & { modules: Module[] })[]>;
+
+  // Email Template operations
+  createEmailTemplate(template: InsertEmailTemplate): Promise<EmailTemplate>;
+  getEmailTemplatesByTenant(tenantId: string): Promise<EmailTemplate[]>;
+  getEmailTemplateById(id: string, tenantId: string): Promise<EmailTemplate | undefined>;
+  updateEmailTemplate(id: string, tenantId: string, updates: Partial<InsertEmailTemplate>): Promise<EmailTemplate | undefined>;
+  deleteEmailTemplate(id: string, tenantId: string): Promise<void>;
+  getDefaultTemplateForPurpose(tenantId: string, purpose: string): Promise<EmailTemplate | undefined>;
+
+  // Email Log operations
+  createEmailLog(log: InsertEmailLog): Promise<EmailLog>;
+  getEmailLogsByTenant(tenantId: string): Promise<EmailLog[]>;
+  getEmailLogById(id: string, tenantId: string): Promise<EmailLog | undefined>;
+  updateEmailLog(id: string, updates: Partial<EmailLog>): Promise<EmailLog | undefined>;
+  getEmailLogsByCustomer(customerId: string, tenantId: string): Promise<EmailLog[]>;
+
+  // Automation Rule operations
+  createAutomationRule(rule: InsertAutomationRule): Promise<AutomationRule>;
+  getAutomationRulesByTenant(tenantId: string): Promise<AutomationRule[]>;
+  getAutomationRuleById(id: string, tenantId: string): Promise<AutomationRule | undefined>;
+  updateAutomationRule(id: string, tenantId: string, updates: Partial<InsertAutomationRule>): Promise<AutomationRule | undefined>;
+  deleteAutomationRule(id: string, tenantId: string): Promise<void>;
+  getEnabledAutomationsByTrigger(tenantId: string, trigger: string): Promise<AutomationRule[]>;
+
+  // Follow-up Sequence operations
+  createFollowUpSequence(sequence: InsertFollowUpSequence): Promise<FollowUpSequence>;
+  getFollowUpSequencesByTenant(tenantId: string): Promise<FollowUpSequence[]>;
+  getFollowUpSequenceById(id: string, tenantId: string): Promise<FollowUpSequence | undefined>;
+  updateFollowUpSequence(id: string, tenantId: string, updates: Partial<InsertFollowUpSequence>): Promise<FollowUpSequence | undefined>;
+  deleteFollowUpSequence(id: string, tenantId: string): Promise<void>;
+
+  // Follow-up Step operations
+  createFollowUpStep(step: InsertFollowUpStep): Promise<FollowUpStep>;
+  getFollowUpStepsBySequence(sequenceId: string): Promise<FollowUpStep[]>;
+  updateFollowUpStep(id: string, updates: Partial<InsertFollowUpStep>): Promise<FollowUpStep | undefined>;
+  deleteFollowUpStep(id: string): Promise<void>;
+
+  // Scheduled Email operations
+  createScheduledEmail(email: InsertScheduledEmail): Promise<ScheduledEmail>;
+  getScheduledEmailsByTenant(tenantId: string): Promise<ScheduledEmail[]>;
+  getPendingScheduledEmails(tenantId: string): Promise<ScheduledEmail[]>;
+  updateScheduledEmail(id: string, updates: Partial<ScheduledEmail>): Promise<ScheduledEmail | undefined>;
+  deleteScheduledEmail(id: string): Promise<void>;
+
+  // Email Sender Account operations
+  createEmailSenderAccount(account: InsertEmailSenderAccount): Promise<EmailSenderAccount>;
+  getEmailSenderAccountsByTenant(tenantId: string): Promise<EmailSenderAccount[]>;
+  getDefaultSenderAccount(tenantId: string): Promise<EmailSenderAccount | undefined>;
+  updateEmailSenderAccount(id: string, updates: Partial<InsertEmailSenderAccount>): Promise<EmailSenderAccount | undefined>;
+  deleteEmailSenderAccount(id: string): Promise<void>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -1286,6 +1343,242 @@ export class DatabaseStorage implements IStorage {
       })
     );
     return result;
+  }
+
+  // ==================== EMAIL MODULE OPERATIONS ====================
+
+  // Email Template operations
+  async createEmailTemplate(insertTemplate: InsertEmailTemplate): Promise<EmailTemplate> {
+    const [template] = await db.insert(schema.emailTemplates).values(insertTemplate).returning();
+    return template;
+  }
+
+  async getEmailTemplatesByTenant(tenantId: string): Promise<EmailTemplate[]> {
+    return db.select().from(schema.emailTemplates)
+      .where(eq(schema.emailTemplates.tenantId, tenantId))
+      .orderBy(desc(schema.emailTemplates.createdAt));
+  }
+
+  async getEmailTemplateById(id: string, tenantId: string): Promise<EmailTemplate | undefined> {
+    const [template] = await db.select().from(schema.emailTemplates)
+      .where(and(eq(schema.emailTemplates.id, id), eq(schema.emailTemplates.tenantId, tenantId)));
+    return template;
+  }
+
+  async updateEmailTemplate(id: string, tenantId: string, updates: Partial<InsertEmailTemplate>): Promise<EmailTemplate | undefined> {
+    const [template] = await db.update(schema.emailTemplates)
+      .set({ ...updates, updatedAt: new Date() })
+      .where(and(eq(schema.emailTemplates.id, id), eq(schema.emailTemplates.tenantId, tenantId)))
+      .returning();
+    return template;
+  }
+
+  async deleteEmailTemplate(id: string, tenantId: string): Promise<void> {
+    await db.delete(schema.emailTemplates)
+      .where(and(eq(schema.emailTemplates.id, id), eq(schema.emailTemplates.tenantId, tenantId)));
+  }
+
+  async getDefaultTemplateForPurpose(tenantId: string, purpose: string): Promise<EmailTemplate | undefined> {
+    const [template] = await db.select().from(schema.emailTemplates)
+      .where(and(
+        eq(schema.emailTemplates.tenantId, tenantId),
+        eq(schema.emailTemplates.isDefault, true),
+        eq(schema.emailTemplates.defaultFor, purpose)
+      ));
+    return template;
+  }
+
+  // Email Log operations
+  async createEmailLog(insertLog: InsertEmailLog): Promise<EmailLog> {
+    const [log] = await db.insert(schema.emailLogs).values(insertLog).returning();
+    return log;
+  }
+
+  async getEmailLogsByTenant(tenantId: string): Promise<EmailLog[]> {
+    return db.select().from(schema.emailLogs)
+      .where(eq(schema.emailLogs.tenantId, tenantId))
+      .orderBy(desc(schema.emailLogs.createdAt));
+  }
+
+  async getEmailLogById(id: string, tenantId: string): Promise<EmailLog | undefined> {
+    const [log] = await db.select().from(schema.emailLogs)
+      .where(and(eq(schema.emailLogs.id, id), eq(schema.emailLogs.tenantId, tenantId)));
+    return log;
+  }
+
+  async updateEmailLog(id: string, updates: Partial<EmailLog>): Promise<EmailLog | undefined> {
+    const [log] = await db.update(schema.emailLogs)
+      .set(updates)
+      .where(eq(schema.emailLogs.id, id))
+      .returning();
+    return log;
+  }
+
+  async getEmailLogsByCustomer(customerId: string, tenantId: string): Promise<EmailLog[]> {
+    return db.select().from(schema.emailLogs)
+      .where(and(eq(schema.emailLogs.customerId, customerId), eq(schema.emailLogs.tenantId, tenantId)))
+      .orderBy(desc(schema.emailLogs.createdAt));
+  }
+
+  // Automation Rule operations
+  async createAutomationRule(insertRule: InsertAutomationRule): Promise<AutomationRule> {
+    const [rule] = await db.insert(schema.automationRules).values(insertRule).returning();
+    return rule;
+  }
+
+  async getAutomationRulesByTenant(tenantId: string): Promise<AutomationRule[]> {
+    return db.select().from(schema.automationRules)
+      .where(eq(schema.automationRules.tenantId, tenantId))
+      .orderBy(desc(schema.automationRules.createdAt));
+  }
+
+  async getAutomationRuleById(id: string, tenantId: string): Promise<AutomationRule | undefined> {
+    const [rule] = await db.select().from(schema.automationRules)
+      .where(and(eq(schema.automationRules.id, id), eq(schema.automationRules.tenantId, tenantId)));
+    return rule;
+  }
+
+  async updateAutomationRule(id: string, tenantId: string, updates: Partial<InsertAutomationRule>): Promise<AutomationRule | undefined> {
+    const [rule] = await db.update(schema.automationRules)
+      .set({ ...updates, updatedAt: new Date() })
+      .where(and(eq(schema.automationRules.id, id), eq(schema.automationRules.tenantId, tenantId)))
+      .returning();
+    return rule;
+  }
+
+  async deleteAutomationRule(id: string, tenantId: string): Promise<void> {
+    await db.delete(schema.automationRules)
+      .where(and(eq(schema.automationRules.id, id), eq(schema.automationRules.tenantId, tenantId)));
+  }
+
+  async getEnabledAutomationsByTrigger(tenantId: string, trigger: string): Promise<AutomationRule[]> {
+    return db.select().from(schema.automationRules)
+      .where(and(
+        eq(schema.automationRules.tenantId, tenantId),
+        eq(schema.automationRules.trigger, trigger),
+        eq(schema.automationRules.isEnabled, true)
+      ));
+  }
+
+  // Follow-up Sequence operations
+  async createFollowUpSequence(insertSequence: InsertFollowUpSequence): Promise<FollowUpSequence> {
+    const [sequence] = await db.insert(schema.followUpSequences).values(insertSequence).returning();
+    return sequence;
+  }
+
+  async getFollowUpSequencesByTenant(tenantId: string): Promise<FollowUpSequence[]> {
+    return db.select().from(schema.followUpSequences)
+      .where(eq(schema.followUpSequences.tenantId, tenantId))
+      .orderBy(desc(schema.followUpSequences.createdAt));
+  }
+
+  async getFollowUpSequenceById(id: string, tenantId: string): Promise<FollowUpSequence | undefined> {
+    const [sequence] = await db.select().from(schema.followUpSequences)
+      .where(and(eq(schema.followUpSequences.id, id), eq(schema.followUpSequences.tenantId, tenantId)));
+    return sequence;
+  }
+
+  async updateFollowUpSequence(id: string, tenantId: string, updates: Partial<InsertFollowUpSequence>): Promise<FollowUpSequence | undefined> {
+    const [sequence] = await db.update(schema.followUpSequences)
+      .set({ ...updates, updatedAt: new Date() })
+      .where(and(eq(schema.followUpSequences.id, id), eq(schema.followUpSequences.tenantId, tenantId)))
+      .returning();
+    return sequence;
+  }
+
+  async deleteFollowUpSequence(id: string, tenantId: string): Promise<void> {
+    await db.delete(schema.followUpSequences)
+      .where(and(eq(schema.followUpSequences.id, id), eq(schema.followUpSequences.tenantId, tenantId)));
+  }
+
+  // Follow-up Step operations
+  async createFollowUpStep(insertStep: InsertFollowUpStep): Promise<FollowUpStep> {
+    const [step] = await db.insert(schema.followUpSteps).values(insertStep).returning();
+    return step;
+  }
+
+  async getFollowUpStepsBySequence(sequenceId: string): Promise<FollowUpStep[]> {
+    return db.select().from(schema.followUpSteps)
+      .where(eq(schema.followUpSteps.sequenceId, sequenceId))
+      .orderBy(schema.followUpSteps.stepOrder);
+  }
+
+  async updateFollowUpStep(id: string, updates: Partial<InsertFollowUpStep>): Promise<FollowUpStep | undefined> {
+    const [step] = await db.update(schema.followUpSteps)
+      .set(updates)
+      .where(eq(schema.followUpSteps.id, id))
+      .returning();
+    return step;
+  }
+
+  async deleteFollowUpStep(id: string): Promise<void> {
+    await db.delete(schema.followUpSteps).where(eq(schema.followUpSteps.id, id));
+  }
+
+  // Scheduled Email operations
+  async createScheduledEmail(insertEmail: InsertScheduledEmail): Promise<ScheduledEmail> {
+    const [email] = await db.insert(schema.scheduledEmails).values(insertEmail).returning();
+    return email;
+  }
+
+  async getScheduledEmailsByTenant(tenantId: string): Promise<ScheduledEmail[]> {
+    return db.select().from(schema.scheduledEmails)
+      .where(eq(schema.scheduledEmails.tenantId, tenantId))
+      .orderBy(schema.scheduledEmails.scheduledFor);
+  }
+
+  async getPendingScheduledEmails(tenantId: string): Promise<ScheduledEmail[]> {
+    return db.select().from(schema.scheduledEmails)
+      .where(and(
+        eq(schema.scheduledEmails.tenantId, tenantId),
+        eq(schema.scheduledEmails.status, "pending")
+      ))
+      .orderBy(schema.scheduledEmails.scheduledFor);
+  }
+
+  async updateScheduledEmail(id: string, updates: Partial<ScheduledEmail>): Promise<ScheduledEmail | undefined> {
+    const [email] = await db.update(schema.scheduledEmails)
+      .set(updates)
+      .where(eq(schema.scheduledEmails.id, id))
+      .returning();
+    return email;
+  }
+
+  async deleteScheduledEmail(id: string): Promise<void> {
+    await db.delete(schema.scheduledEmails).where(eq(schema.scheduledEmails.id, id));
+  }
+
+  // Email Sender Account operations
+  async createEmailSenderAccount(insertAccount: InsertEmailSenderAccount): Promise<EmailSenderAccount> {
+    const [account] = await db.insert(schema.emailSenderAccounts).values(insertAccount).returning();
+    return account;
+  }
+
+  async getEmailSenderAccountsByTenant(tenantId: string): Promise<EmailSenderAccount[]> {
+    return db.select().from(schema.emailSenderAccounts)
+      .where(eq(schema.emailSenderAccounts.tenantId, tenantId))
+      .orderBy(desc(schema.emailSenderAccounts.createdAt));
+  }
+
+  async getDefaultSenderAccount(tenantId: string): Promise<EmailSenderAccount | undefined> {
+    const [account] = await db.select().from(schema.emailSenderAccounts)
+      .where(and(
+        eq(schema.emailSenderAccounts.tenantId, tenantId),
+        eq(schema.emailSenderAccounts.isDefault, true)
+      ));
+    return account;
+  }
+
+  async updateEmailSenderAccount(id: string, updates: Partial<InsertEmailSenderAccount>): Promise<EmailSenderAccount | undefined> {
+    const [account] = await db.update(schema.emailSenderAccounts)
+      .set(updates)
+      .where(eq(schema.emailSenderAccounts.id, id))
+      .returning();
+    return account;
+  }
+
+  async deleteEmailSenderAccount(id: string): Promise<void> {
+    await db.delete(schema.emailSenderAccounts).where(eq(schema.emailSenderAccounts.id, id));
   }
 }
 
