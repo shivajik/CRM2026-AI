@@ -540,10 +540,10 @@ export async function registerRoutes(
         updates.profileImageUrl = profileImageUrl;
       }
       if (phone !== undefined) {
-        updates.phone = typeof phone === 'string' ? phone.trim() : null;
+        updates.phone = typeof phone === 'string' ? phone.trim() : undefined;
       }
       if (jobTitle !== undefined) {
-        updates.jobTitle = typeof jobTitle === 'string' ? jobTitle.trim() : null;
+        updates.jobTitle = typeof jobTitle === 'string' ? jobTitle.trim() : undefined;
       }
       
       if (Object.keys(updates).length === 0) {

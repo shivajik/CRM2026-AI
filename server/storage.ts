@@ -452,14 +452,16 @@ export class DatabaseStorage implements IStorage {
     return db.select().from(schema.users).where(eq(schema.users.tenantId, tenantId));
   }
   
-  async updateUser(id: string, updates: { firstName?: string; lastName?: string; email?: string; profileImageUrl?: string }): Promise<User | undefined> {
-    const updateData: { firstName?: string; lastName?: string; email?: string; profileImageUrl?: string; updatedAt: Date } = {
+  async updateUser(id: string, updates: { firstName?: string; lastName?: string; email?: string; profileImageUrl?: string; phone?: string; jobTitle?: string }): Promise<User | undefined> {
+    const updateData: { firstName?: string; lastName?: string; email?: string; profileImageUrl?: string; phone?: string; jobTitle?: string; updatedAt: Date } = {
       updatedAt: new Date(),
     };
     if (updates.firstName) updateData.firstName = updates.firstName;
     if (updates.lastName) updateData.lastName = updates.lastName;
     if (updates.email) updateData.email = updates.email;
     if (updates.profileImageUrl !== undefined) updateData.profileImageUrl = updates.profileImageUrl;
+    if (updates.phone !== undefined) updateData.phone = updates.phone;
+    if (updates.jobTitle !== undefined) updateData.jobTitle = updates.jobTitle;
     
     const [user] = await db.update(schema.users)
       .set(updateData)
