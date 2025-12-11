@@ -18,7 +18,7 @@ import { emailApi, customersApi } from "@/lib/api";
 import { 
   Mail, FileText, Zap, RefreshCw, Clock, Send, Plus, Trash2, Edit, Eye, 
   Wand2, Copy, ChevronRight, CheckCircle, XCircle, Clock3, AlertCircle,
-  Users, Building2, FileCheck, Receipt, Calendar
+  Users, Building2, FileCheck, Receipt, Calendar, ChevronUp, ChevronDown
 } from "lucide-react";
 import { format } from "date-fns";
 
@@ -183,6 +183,16 @@ export default function EmailModule() {
     isEnabled: true,
   });
   
+  // Step Designer state
+  const [designerDialogOpen, setDesignerDialogOpen] = useState(false);
+  const [selectedSequence, setSelectedSequence] = useState<FollowUpSequence | null>(null);
+  const [stepForm, setStepForm] = useState({
+    templateId: "",
+    delayDays: 0,
+  });
+  const [editingStep, setEditingStep] = useState<FollowUpStep | null>(null);
+  const [stepOperationPending, setStepOperationPending] = useState(false);
+  
   // Preview state
   const [previewDialogOpen, setPreviewDialogOpen] = useState(false);
   const [previewContent, setPreviewContent] = useState({ subject: "", body: "" });
@@ -312,6 +322,87 @@ export default function EmailModule() {
     },
   });
 
+  const createStepMutation = useMutation({
+    mutationFn: async ({ sequenceId, data }: { sequenceId: string; data: typeof stepForm }) => {
+      setStepOperationPending(true);
+      await queryClient.refetchQueries({ queryKey: ["emailSequences"] });
+      const freshSequences = queryClient.getQueryData<FollowUpSequence[]>(["emailSequences"]);
+      const freshSequence = freshSequences?.find(s => s.id === sequenceId);
+      const maxOrder = freshSequence?.steps?.length ? Math.max(...freshSequence.steps.map(s => s.stepOrder)) : 0;
+      return emailApi.createStep(sequenceId, { ...data, stepOrder: maxOrder + 1 });
+    },
+    onSuccess: async () => {
+      toast({ title: "Step added successfully" });
+      await queryClient.refetchQueries({ queryKey: ["emailSequences"] });
+      const updatedSequences = queryClient.getQueryData<FollowUpSequence[]>(["emailSequences"]);
+      if (selectedSequence && updatedSequences) {
+        const updated = updatedSequences.find(s => s.id === selectedSequence.id);
+        if (updated) setSelectedSequence(updated);
+      }
+      setStepForm({ templateId: "", delayDays: 0 });
+      setStepOperationPending(false);
+    },
+    onError: () => {
+      setStepOperationPending(false);
+    },
+  });
+
+  const deleteStepMutation = useMutation({
+    mutationFn: async (id: string) => {
+      setStepOperationPending(true);
+      return emailApi.deleteStep(id);
+    },
+    onSuccess: async () => {
+      toast({ title: "Step removed successfully" });
+      await queryClient.refetchQueries({ queryKey: ["emailSequences"] });
+      let updatedSequences = queryClient.getQueryData<FollowUpSequence[]>(["emailSequences"]);
+      if (selectedSequence && updatedSequences) {
+        let updated = updatedSequences.find(s => s.id === selectedSequence.id);
+        if (updated) {
+          if (updated.steps && updated.steps.length > 0) {
+            const sortedSteps = [...updated.steps].sort((a, b) => a.stepOrder - b.stepOrder);
+            const needsNormalization = sortedSteps.some((step, idx) => step.stepOrder !== idx + 1);
+            if (needsNormalization) {
+              await Promise.all(sortedSteps.map((step, idx) => 
+                emailApi.updateStep(step.id, { stepOrder: idx + 1 })
+              ));
+              await queryClient.refetchQueries({ queryKey: ["emailSequences"] });
+              updatedSequences = queryClient.getQueryData<FollowUpSequence[]>(["emailSequences"]);
+              updated = updatedSequences?.find(s => s.id === selectedSequence.id);
+            }
+          }
+          if (updated) setSelectedSequence(updated);
+        }
+      }
+      setStepOperationPending(false);
+    },
+    onError: () => {
+      setStepOperationPending(false);
+    },
+  });
+
+  const updateStepMutation = useMutation({
+    mutationFn: async ({ id, data }: { id: string; data: { templateId?: string; delayDays?: number; stepOrder?: number } }) => {
+      setStepOperationPending(true);
+      return emailApi.updateStep(id, data);
+    },
+    onSuccess: async () => {
+      toast({ title: "Step updated successfully" });
+      await queryClient.refetchQueries({ queryKey: ["emailSequences"] });
+      const updatedSequences = queryClient.getQueryData<FollowUpSequence[]>(["emailSequences"]);
+      if (selectedSequence && updatedSequences) {
+        const updated = updatedSequences.find(s => s.id === selectedSequence.id);
+        if (updated) setSelectedSequence(updated);
+      }
+      setEditingStep(null);
+      setStepForm({ templateId: "", delayDays: 0 });
+      setStepOperationPending(false);
+    },
+    onError: () => {
+      setStepOperationPending(false);
+    },
+  });
+
   const aiAssistMutation = useMutation({
     mutationFn: ({ action, content }: { action: string; content: string }) =>
       emailApi.aiAssist({ action, content }),
@@ -333,6 +424,56 @@ export default function EmailModule() {
 
   const resetSequenceForm = () => {
     setSequenceForm({ name: "", description: "", purpose: "general", isEnabled: true });
+  };
+
+  const openStepDesigner = (sequence: FollowUpSequence) => {
+    setSelectedSequence(sequence);
+    setDesignerDialogOpen(true);
+    setStepForm({ templateId: "", delayDays: 0 });
+    setEditingStep(null);
+  };
+
+  const getTemplateName = (templateId: string) => {
+    const template = templates.find(t => t.id === templateId);
+    return template?.name || "Unknown Template";
+  };
+
+  const startEditingStep = (step: FollowUpStep) => {
+    setEditingStep(step);
+    setStepForm({ templateId: step.templateId, delayDays: step.delayDays });
+  };
+
+  const cancelEditingStep = () => {
+    setEditingStep(null);
+    setStepForm({ templateId: "", delayDays: 0 });
+  };
+
+  const moveStep = async (step: FollowUpStep, direction: "up" | "down") => {
+    if (!selectedSequence?.steps || stepOperationPending) return;
+    setStepOperationPending(true);
+    try {
+      const sortedSteps = [...selectedSequence.steps].sort((a, b) => a.stepOrder - b.stepOrder);
+      const currentIndex = sortedSteps.findIndex(s => s.id === step.id);
+      const targetIndex = direction === "up" ? currentIndex - 1 : currentIndex + 1;
+      if (targetIndex < 0 || targetIndex >= sortedSteps.length) {
+        setStepOperationPending(false);
+        return;
+      }
+      
+      const targetStep = sortedSteps[targetIndex];
+      await Promise.all([
+        emailApi.updateStep(step.id, { stepOrder: targetStep.stepOrder }),
+        emailApi.updateStep(targetStep.id, { stepOrder: step.stepOrder }),
+      ]);
+      await queryClient.refetchQueries({ queryKey: ["emailSequences"] });
+      const updatedSequences = queryClient.getQueryData<FollowUpSequence[]>(["emailSequences"]);
+      if (updatedSequences) {
+        const updated = updatedSequences.find(s => s.id === selectedSequence.id);
+        if (updated) setSelectedSequence(updated);
+      }
+    } finally {
+      setStepOperationPending(false);
+    }
   };
 
   const handleTemplateSelect = (templateId: string) => {
@@ -979,6 +1120,9 @@ export default function EmailModule() {
                         </div>
                         <div className="flex items-center gap-4">
                           <Badge variant="outline">{sequence.steps?.length || 0} steps</Badge>
+                          <Button variant="outline" size="sm" onClick={() => openStepDesigner(sequence)} data-testid={`button-design-sequence-${sequence.id}`}>
+                            <Edit className="w-4 h-4 mr-1" /> Design
+                          </Button>
                           <Button variant="ghost" size="sm" className="text-destructive" onClick={() => deleteSequenceMutation.mutate(sequence.id)} data-testid={`button-delete-sequence-${sequence.id}`}>
                             <Trash2 className="w-4 h-4" />
                           </Button>
@@ -989,6 +1133,125 @@ export default function EmailModule() {
                 )}
               </CardContent>
             </Card>
+
+            {/* Step Designer Dialog */}
+            <Dialog open={designerDialogOpen} onOpenChange={(open) => { setDesignerDialogOpen(open); if (!open) setSelectedSequence(null); }}>
+              <DialogContent className="max-w-2xl">
+                <DialogHeader>
+                  <DialogTitle>Design Sequence: {selectedSequence?.name}</DialogTitle>
+                  <DialogDescription>
+                    Add and arrange steps in your follow-up sequence. Each step sends an email after a specified delay.
+                  </DialogDescription>
+                </DialogHeader>
+                
+                <div className="space-y-6 py-4">
+                  {/* Current Steps */}
+                  <div className="space-y-3">
+                    <Label className="text-base font-semibold">Current Steps</Label>
+                    {(!selectedSequence?.steps || selectedSequence.steps.length === 0) ? (
+                      <p className="text-sm text-muted-foreground">No steps yet. Add your first step below.</p>
+                    ) : (
+                      <div className="space-y-2">
+                        {[...selectedSequence.steps].sort((a, b) => a.stepOrder - b.stepOrder).map((step, index, arr) => (
+                          <div key={step.id} className="flex items-center justify-between p-3 border rounded-lg bg-muted/30" data-testid={`step-${step.id}`}>
+                            <div className="flex items-center gap-3">
+                              <div className="flex flex-col gap-1">
+                                <Button variant="ghost" size="icon" className="h-5 w-5" disabled={index === 0 || stepOperationPending} onClick={() => moveStep(step, "up")} data-testid={`button-moveup-step-${step.id}`}>
+                                  <ChevronUp className="w-3 h-3" />
+                                </Button>
+                                <Button variant="ghost" size="icon" className="h-5 w-5" disabled={index === arr.length - 1 || stepOperationPending} onClick={() => moveStep(step, "down")} data-testid={`button-movedown-step-${step.id}`}>
+                                  <ChevronDown className="w-3 h-3" />
+                                </Button>
+                              </div>
+                              <div className="w-8 h-8 rounded-full bg-primary text-primary-foreground flex items-center justify-center text-sm font-medium">
+                                {index + 1}
+                              </div>
+                              <div>
+                                <p className="font-medium">{getTemplateName(step.templateId)}</p>
+                                <p className="text-sm text-muted-foreground">
+                                  {step.delayDays === 0 ? "Immediately" : `After ${step.delayDays} day${step.delayDays > 1 ? "s" : ""}`}
+                                </p>
+                              </div>
+                            </div>
+                            <div className="flex items-center gap-1">
+                              <Button variant="ghost" size="sm" disabled={stepOperationPending} onClick={() => startEditingStep(step)} data-testid={`button-edit-step-${step.id}`}>
+                                <Edit className="w-4 h-4" />
+                              </Button>
+                              <Button variant="ghost" size="sm" className="text-destructive" disabled={stepOperationPending} onClick={() => deleteStepMutation.mutate(step.id)} data-testid={`button-delete-step-${step.id}`}>
+                                <Trash2 className="w-4 h-4" />
+                              </Button>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+
+                  <Separator />
+
+                  {/* Add/Edit Step */}
+                  <div className="space-y-4">
+                    <Label className="text-base font-semibold">
+                      {editingStep ? "Edit Step" : "Add New Step"}
+                    </Label>
+                    <div className="grid grid-cols-2 gap-4">
+                      <div className="space-y-2">
+                        <Label>Email Template *</Label>
+                        <Select value={stepForm.templateId} onValueChange={(v) => setStepForm(prev => ({ ...prev, templateId: v }))}>
+                          <SelectTrigger data-testid="select-step-template">
+                            <SelectValue placeholder="Select a template" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {templates.map(template => (
+                              <SelectItem key={template.id} value={template.id}>{template.name}</SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
+                      <div className="space-y-2">
+                        <Label>Delay (Days)</Label>
+                        <Input 
+                          type="number" 
+                          min="0" 
+                          value={stepForm.delayDays} 
+                          onChange={(e) => setStepForm(prev => ({ ...prev, delayDays: parseInt(e.target.value) || 0 }))}
+                          placeholder="0 = immediately"
+                          data-testid="input-step-delay"
+                        />
+                      </div>
+                    </div>
+                    <div className="flex gap-2">
+                      {editingStep ? (
+                        <>
+                          <Button 
+                            onClick={() => updateStepMutation.mutate({ id: editingStep.id, data: { templateId: stepForm.templateId, delayDays: stepForm.delayDays } })}
+                            disabled={!stepForm.templateId || stepOperationPending}
+                            data-testid="button-save-step"
+                          >
+                            {stepOperationPending ? "Saving..." : "Save Changes"}
+                          </Button>
+                          <Button variant="outline" onClick={cancelEditingStep} disabled={stepOperationPending} data-testid="button-cancel-edit">
+                            Cancel
+                          </Button>
+                        </>
+                      ) : (
+                        <Button 
+                          onClick={() => selectedSequence && createStepMutation.mutate({ sequenceId: selectedSequence.id, data: stepForm })}
+                          disabled={!stepForm.templateId || stepOperationPending}
+                          data-testid="button-add-step"
+                        >
+                          <Plus className="w-4 h-4 mr-2" /> {stepOperationPending ? "Adding..." : "Add Step"}
+                        </Button>
+                      )}
+                    </div>
+                  </div>
+                </div>
+
+                <DialogFooter>
+                  <Button variant="outline" onClick={() => setDesignerDialogOpen(false)}>Close</Button>
+                </DialogFooter>
+              </DialogContent>
+            </Dialog>
           </TabsContent>
 
           {/* LOGS TAB */}
