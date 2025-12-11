@@ -736,3 +736,39 @@ export const insertEmailSenderAccountSchema = createInsertSchema(emailSenderAcco
 });
 export type InsertEmailSenderAccount = z.infer<typeof insertEmailSenderAccountSchema>;
 export type EmailSenderAccount = typeof emailSenderAccounts.$inferSelect;
+
+// SMTP Settings - tenant-specific email sending configuration
+export const smtpSettings = pgTable("smtp_settings", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  tenantId: varchar("tenant_id").references(() => tenants.id, { onDelete: "cascade" }).notNull().unique(),
+  provider: text("provider").notNull().default("default"), // default, smtp, sendgrid, mailgun, ses
+  // SMTP Settings
+  smtpHost: text("smtp_host"),
+  smtpPort: integer("smtp_port").default(587),
+  smtpSecure: boolean("smtp_secure").default(false), // true for 465, false for other ports
+  smtpUser: text("smtp_user"),
+  smtpPassword: text("smtp_password"), // encrypted in production
+  // From email settings
+  fromEmail: text("from_email"),
+  fromName: text("from_name"),
+  replyToEmail: text("reply_to_email"),
+  // API-based providers (optional)
+  apiKey: text("api_key"),
+  apiDomain: text("api_domain"),
+  // Settings
+  isEnabled: boolean("is_enabled").default(true).notNull(),
+  isVerified: boolean("is_verified").default(false).notNull(),
+  lastTestedAt: timestamp("last_tested_at"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+export const insertSmtpSettingsSchema = createInsertSchema(smtpSettings).omit({ 
+  id: true, 
+  createdAt: true,
+  updatedAt: true,
+  isVerified: true,
+  lastTestedAt: true,
+});
+export type InsertSmtpSettings = z.infer<typeof insertSmtpSettingsSchema>;
+export type SmtpSettings = typeof smtpSettings.$inferSelect;

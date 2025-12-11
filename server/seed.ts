@@ -320,6 +320,240 @@ async function seed() {
     );
     console.log(`Created ${activitiesData.length} activities`);
 
+    // Default Email Templates
+    const emailTemplatesData = [
+      {
+        name: "Welcome Email",
+        purpose: "welcome",
+        subject: "Welcome to {{agency.name}} - Let's Get Started!",
+        body: `<h2>Welcome, {{client.name}}!</h2>
+<p>Thank you for choosing {{agency.name}}. We're thrilled to have you on board and look forward to working with you.</p>
+<p>Here's what you can expect from us:</p>
+<ul>
+  <li>Dedicated support for all your needs</li>
+  <li>Regular updates on your projects</li>
+  <li>Access to our client portal</li>
+</ul>
+<p>If you have any questions, don't hesitate to reach out to us at {{agency.email}} or call {{agency.phone}}.</p>
+<p>Best regards,<br>{{user.name}}<br>{{agency.name}}</p>`,
+        isDefault: true,
+        defaultFor: "welcome",
+      },
+      {
+        name: "Quotation Email",
+        purpose: "quotation",
+        subject: "Your Quotation #{{quotation.number}} from {{agency.name}}",
+        body: `<h2>Hello {{client.name}},</h2>
+<p>Thank you for your interest in our services. Please find attached your quotation #{{quotation.number}}.</p>
+<p><strong>Quotation Details:</strong></p>
+<ul>
+  <li>Title: {{quotation.title}}</li>
+  <li>Amount: {{quotation.amount}}</li>
+  <li>Valid Until: {{quotation.valid_until}}</li>
+</ul>
+<p>If you have any questions or would like to discuss this quotation further, please don't hesitate to contact us.</p>
+<p>We look forward to working with you!</p>
+<p>Best regards,<br>{{user.name}}<br>{{agency.name}}</p>`,
+        isDefault: true,
+        defaultFor: "quotation",
+      },
+      {
+        name: "Invoice Email",
+        purpose: "invoice",
+        subject: "Invoice #{{invoice.number}} from {{agency.name}}",
+        body: `<h2>Hello {{client.name}},</h2>
+<p>Please find attached your invoice #{{invoice.number}}.</p>
+<p><strong>Invoice Details:</strong></p>
+<ul>
+  <li>Amount Due: {{invoice.amount}}</li>
+  <li>Due Date: {{invoice.due_date}}</li>
+</ul>
+<p>Payment can be made via bank transfer or credit card. Please reference the invoice number in your payment.</p>
+<p>If you have any questions regarding this invoice, please contact us.</p>
+<p>Thank you for your business!</p>
+<p>Best regards,<br>{{user.name}}<br>{{agency.name}}</p>`,
+        isDefault: true,
+        defaultFor: "invoice",
+      },
+      {
+        name: "Payment Reminder",
+        purpose: "payment_reminder",
+        subject: "Friendly Reminder: Invoice #{{invoice.number}} Payment Due",
+        body: `<h2>Hello {{client.name}},</h2>
+<p>This is a friendly reminder that invoice #{{invoice.number}} is due for payment.</p>
+<p><strong>Invoice Details:</strong></p>
+<ul>
+  <li>Balance Due: {{invoice.balance}}</li>
+  <li>Due Date: {{invoice.due_date}}</li>
+</ul>
+<p>If you have already made the payment, please disregard this message. Otherwise, we kindly request that you process the payment at your earliest convenience.</p>
+<p>If you have any questions or concerns, please don't hesitate to reach out to us.</p>
+<p>Best regards,<br>{{user.name}}<br>{{agency.name}}</p>`,
+        isDefault: true,
+        defaultFor: "payment_reminder",
+      },
+      {
+        name: "Follow-Up Email",
+        purpose: "follow_up",
+        subject: "Following Up on Our Recent Conversation",
+        body: `<h2>Hello {{client.name}},</h2>
+<p>I hope this email finds you well. I wanted to follow up on our recent conversation and see if you had any questions.</p>
+<p>We at {{agency.name}} are committed to providing you with the best possible service, and I'd love to hear your thoughts.</p>
+<p>Please let me know if there's anything I can help you with or if you'd like to schedule a call to discuss further.</p>
+<p>Looking forward to hearing from you!</p>
+<p>Best regards,<br>{{user.name}}<br>{{agency.name}}</p>`,
+        isDefault: true,
+        defaultFor: "follow_up",
+      },
+      {
+        name: "Thank You Email",
+        purpose: "thank_you",
+        subject: "Thank You for Your Business!",
+        body: `<h2>Hello {{client.name}},</h2>
+<p>We wanted to take a moment to thank you for choosing {{agency.name}}.</p>
+<p>Your trust in our services means a lot to us, and we are committed to delivering exceptional results.</p>
+<p>If you ever need any assistance or have feedback to share, please don't hesitate to reach out to us at {{agency.email}}.</p>
+<p>We look forward to continuing to serve you!</p>
+<p>Warm regards,<br>{{user.name}}<br>{{agency.name}}</p>`,
+        isDefault: true,
+        defaultFor: "thank_you",
+      },
+      {
+        name: "Meeting Confirmation",
+        purpose: "meeting",
+        subject: "Meeting Confirmation - {{agency.name}}",
+        body: `<h2>Hello {{client.name}},</h2>
+<p>This is to confirm our upcoming meeting.</p>
+<p>We look forward to speaking with you and discussing how we can best serve your needs.</p>
+<p>If you need to reschedule or have any questions beforehand, please let us know.</p>
+<p>Best regards,<br>{{user.name}}<br>{{agency.name}}</p>`,
+        isDefault: true,
+        defaultFor: "meeting",
+      },
+      {
+        name: "Renewal Reminder",
+        purpose: "renewal",
+        subject: "Your Subscription Renewal - {{agency.name}}",
+        body: `<h2>Hello {{client.name}},</h2>
+<p>This is a friendly reminder that your subscription/service with {{agency.name}} is coming up for renewal.</p>
+<p>To ensure uninterrupted service, please review your current plan and renew before the expiration date.</p>
+<p>If you have any questions about renewal options or would like to discuss your account, please contact us.</p>
+<p>Thank you for your continued partnership!</p>
+<p>Best regards,<br>{{user.name}}<br>{{agency.name}}</p>`,
+        isDefault: true,
+        defaultFor: "renewal",
+      },
+    ];
+
+    const emailTemplates = await db.insert(schema.emailTemplates).values(
+      emailTemplatesData.map(t => ({
+        ...t,
+        tenantId: tenant.id,
+        createdBy: adminUser.id,
+      }))
+    ).returning();
+    console.log(`Created ${emailTemplates.length} default email templates`);
+
+    // Default Automation Rules
+    const automationRulesData = [
+      {
+        name: "Invoice Payment Reminder (3 Days Before)",
+        description: "Automatically send payment reminder 3 days before invoice due date",
+        trigger: "invoice_due_3_days",
+        delayMinutes: 0,
+        isEnabled: true,
+      },
+      {
+        name: "Invoice Overdue Reminder",
+        description: "Automatically send reminder when invoice is overdue",
+        trigger: "invoice_overdue",
+        delayMinutes: 1440, // 24 hours after overdue
+        isEnabled: true,
+      },
+      {
+        name: "Quotation Follow-Up",
+        description: "Send follow-up email 3 days after sending quotation",
+        trigger: "quotation_sent",
+        delayMinutes: 4320, // 3 days
+        isEnabled: true,
+      },
+      {
+        name: "New Customer Welcome",
+        description: "Send welcome email when new customer is created",
+        trigger: "customer_created",
+        delayMinutes: 0,
+        isEnabled: true,
+      },
+      {
+        name: "Payment Received Thank You",
+        description: "Send thank you email after payment is received",
+        trigger: "payment_received",
+        delayMinutes: 0,
+        isEnabled: true,
+      },
+    ];
+
+    // Find corresponding template IDs for automations
+    const welcomeTemplate = emailTemplates.find(t => t.purpose === "welcome");
+    const quotationTemplate = emailTemplates.find(t => t.purpose === "quotation");
+    const paymentReminderTemplate = emailTemplates.find(t => t.purpose === "payment_reminder");
+    const thankYouTemplate = emailTemplates.find(t => t.purpose === "thank_you");
+    const followUpTemplate = emailTemplates.find(t => t.purpose === "follow_up");
+
+    const automationRules = await db.insert(schema.automationRules).values(
+      automationRulesData.map((a, i) => {
+        let templateId = welcomeTemplate!.id;
+        if (a.trigger === "invoice_due_3_days" || a.trigger === "invoice_overdue") {
+          templateId = paymentReminderTemplate!.id;
+        } else if (a.trigger === "quotation_sent") {
+          templateId = followUpTemplate!.id;
+        } else if (a.trigger === "customer_created") {
+          templateId = welcomeTemplate!.id;
+        } else if (a.trigger === "payment_received") {
+          templateId = thankYouTemplate!.id;
+        }
+        return {
+          ...a,
+          tenantId: tenant.id,
+          createdBy: adminUser.id,
+          templateId,
+        };
+      })
+    ).returning();
+    console.log(`Created ${automationRules.length} default automation rules`);
+
+    // Default Follow-Up Sequences
+    const [welcomeSequence] = await db.insert(schema.followUpSequences).values({
+      tenantId: tenant.id,
+      createdBy: adminUser.id,
+      name: "New Customer Onboarding",
+      description: "Welcome sequence for new customers with onboarding steps",
+      purpose: "onboarding",
+      isEnabled: true,
+    }).returning();
+
+    await db.insert(schema.followUpSteps).values([
+      { sequenceId: welcomeSequence.id, templateId: welcomeTemplate!.id, stepOrder: 1, delayDays: 0 },
+      { sequenceId: welcomeSequence.id, templateId: followUpTemplate!.id, stepOrder: 2, delayDays: 3 },
+      { sequenceId: welcomeSequence.id, templateId: thankYouTemplate!.id, stepOrder: 3, delayDays: 7 },
+    ]);
+
+    const [quotationSequence] = await db.insert(schema.followUpSequences).values({
+      tenantId: tenant.id,
+      createdBy: adminUser.id,
+      name: "Quotation Follow-Up",
+      description: "Follow up on sent quotations to encourage conversion",
+      purpose: "sales",
+      isEnabled: true,
+    }).returning();
+
+    await db.insert(schema.followUpSteps).values([
+      { sequenceId: quotationSequence.id, templateId: followUpTemplate!.id, stepOrder: 1, delayDays: 3 },
+      { sequenceId: quotationSequence.id, templateId: followUpTemplate!.id, stepOrder: 2, delayDays: 7 },
+    ]);
+
+    console.log("Created 2 default follow-up sequences with steps");
+
     console.log("\n========================================");
     console.log("Database seeded successfully!");
     console.log("========================================");

@@ -9,12 +9,13 @@ import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { getUser, setUser } from "@/lib/auth";
-import { usersApi, companyProfileApi } from "@/lib/api";
+import { usersApi, companyProfileApi, emailApi } from "@/lib/api";
+import { Badge } from "@/components/ui/badge";
 import { useState, useEffect, useRef } from "react";
 import { useToast } from "@/hooks/use-toast";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { User, Mail, Shield, Building2, Globe, Phone, MapPin, FileText, DollarSign, Upload, Camera, ImageIcon } from "lucide-react";
+import { User, Mail, Shield, Building2, Globe, Phone, MapPin, FileText, DollarSign, Upload, Camera, ImageIcon, Server, Check, X, Loader2 } from "lucide-react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 export default function Settings() {
@@ -54,6 +55,101 @@ export default function Settings() {
     invoiceNotes: "",
     quoteNotes: "",
   });
+
+  const [smtpData, setSmtpData] = useState({
+    provider: "default",
+    smtpHost: "",
+    smtpPort: 587,
+    smtpSecure: false,
+    smtpUser: "",
+    smtpPassword: "",
+    fromEmail: "",
+    fromName: "",
+    replyToEmail: "",
+    apiKey: "",
+    apiDomain: "",
+    isEnabled: true,
+  });
+
+  const { data: smtpSettings, isLoading: isLoadingSmtp } = useQuery({
+    queryKey: ["smtp-settings"],
+    queryFn: emailApi.getSmtpSettings,
+  });
+
+  useEffect(() => {
+    if (smtpSettings) {
+      setSmtpData({
+        provider: smtpSettings.provider || "default",
+        smtpHost: smtpSettings.smtpHost || "",
+        smtpPort: smtpSettings.smtpPort || 587,
+        smtpSecure: smtpSettings.smtpSecure || false,
+        smtpUser: smtpSettings.smtpUser || "",
+        smtpPassword: "",
+        fromEmail: smtpSettings.fromEmail || "",
+        fromName: smtpSettings.fromName || "",
+        replyToEmail: smtpSettings.replyToEmail || "",
+        apiKey: "",
+        apiDomain: smtpSettings.apiDomain || "",
+        isEnabled: smtpSettings.isEnabled ?? true,
+      });
+    }
+  }, [smtpSettings]);
+
+  const updateSmtpMutation = useMutation({
+    mutationFn: emailApi.updateSmtpSettings,
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["smtp-settings"] });
+      toast({
+        title: "Email settings updated",
+        description: "Your email configuration has been saved successfully.",
+      });
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Update failed",
+        description: error.message || "Failed to update email settings. Please try again.",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const testSmtpMutation = useMutation({
+    mutationFn: emailApi.testSmtpConnection,
+    onSuccess: (result: any) => {
+      queryClient.invalidateQueries({ queryKey: ["smtp-settings"] });
+      if (result.success) {
+        toast({
+          title: "Connection successful",
+          description: result.message,
+        });
+      } else {
+        toast({
+          title: "Connection failed",
+          description: result.message,
+          variant: "destructive",
+        });
+      }
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Test failed",
+        description: error.message || "Failed to test connection. Please try again.",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const handleSaveSmtpSettings = (e: React.FormEvent) => {
+    e.preventDefault();
+    const dataToSend = { ...smtpData };
+    if (!dataToSend.smtpPassword) {
+      delete (dataToSend as any).smtpPassword;
+    }
+    if (!dataToSend.apiKey) {
+      delete (dataToSend as any).apiKey;
+    }
+    updateSmtpMutation.mutate(dataToSend);
+  };
 
   const { data: companyProfile, isLoading: isLoadingProfile } = useQuery({
     queryKey: ["company-profile"],
@@ -264,9 +360,10 @@ export default function Settings() {
           </div>
 
           <Tabs defaultValue="profile" className="w-full">
-            <TabsList className="grid w-full grid-cols-3">
+            <TabsList className="grid w-full grid-cols-4">
               <TabsTrigger value="profile" data-testid="tab-profile">Personal Profile</TabsTrigger>
               <TabsTrigger value="company" data-testid="tab-company">Company Profile</TabsTrigger>
+              <TabsTrigger value="email" data-testid="tab-email">Email Settings</TabsTrigger>
               <TabsTrigger value="notifications" data-testid="tab-notifications">Notifications</TabsTrigger>
             </TabsList>
 
@@ -765,6 +862,239 @@ export default function Settings() {
                         data-testid="button-save-company"
                       >
                         {updateCompanyMutation.isPending ? "Saving..." : "Save Company Profile"}
+                      </Button>
+                    </div>
+                  </CardContent>
+                </Card>
+              </form>
+            </TabsContent>
+
+            <TabsContent value="email" className="space-y-6 mt-6">
+              <form onSubmit={handleSaveSmtpSettings}>
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="flex items-center gap-2">
+                      <Server className="h-5 w-5" />
+                      Email Configuration
+                    </CardTitle>
+                    <CardDescription>
+                      Configure how emails are sent from your account. Choose between the default provider or set up your own SMTP server.
+                    </CardDescription>
+                    {smtpSettings?.isVerified && (
+                      <Badge variant="secondary" className="w-fit flex items-center gap-1 mt-2">
+                        <Check className="h-3 w-3" /> Connection Verified
+                      </Badge>
+                    )}
+                  </CardHeader>
+                  <CardContent className="space-y-6">
+                    <div className="space-y-4">
+                      <div className="space-y-2">
+                        <Label htmlFor="provider">Email Provider</Label>
+                        <Select 
+                          value={smtpData.provider} 
+                          onValueChange={(value) => setSmtpData({ ...smtpData, provider: value })}
+                        >
+                          <SelectTrigger data-testid="select-email-provider">
+                            <SelectValue placeholder="Select provider" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="default">Default (Managed by Platform)</SelectItem>
+                            <SelectItem value="smtp">Custom SMTP Server</SelectItem>
+                            <SelectItem value="sendgrid">SendGrid</SelectItem>
+                            <SelectItem value="mailgun">Mailgun</SelectItem>
+                          </SelectContent>
+                        </Select>
+                        <p className="text-xs text-muted-foreground">
+                          {smtpData.provider === "default" 
+                            ? "Use our built-in email service with no configuration needed."
+                            : "Configure your own email provider for better deliverability and branding."}
+                        </p>
+                      </div>
+
+                      <div className="flex items-center justify-between">
+                        <div className="space-y-0.5">
+                          <Label className="text-base">Enable Email Sending</Label>
+                          <p className="text-sm text-muted-foreground">When disabled, no emails will be sent.</p>
+                        </div>
+                        <Switch 
+                          checked={smtpData.isEnabled} 
+                          onCheckedChange={(checked) => setSmtpData({ ...smtpData, isEnabled: checked })}
+                          data-testid="switch-email-enabled" 
+                        />
+                      </div>
+                    </div>
+
+                    {smtpData.provider === "smtp" && (
+                      <>
+                        <Separator />
+                        <div className="space-y-4">
+                          <h3 className="font-medium flex items-center gap-2">
+                            <Mail className="h-4 w-4" />
+                            SMTP Server Settings
+                          </h3>
+                          <div className="grid grid-cols-2 gap-4">
+                            <div className="space-y-2">
+                              <Label htmlFor="smtpHost">SMTP Host</Label>
+                              <Input 
+                                id="smtpHost" 
+                                value={smtpData.smtpHost}
+                                onChange={(e) => setSmtpData({ ...smtpData, smtpHost: e.target.value })}
+                                placeholder="smtp.example.com"
+                                data-testid="input-smtp-host" 
+                              />
+                            </div>
+                            <div className="space-y-2">
+                              <Label htmlFor="smtpPort">SMTP Port</Label>
+                              <Input 
+                                id="smtpPort" 
+                                type="number"
+                                value={smtpData.smtpPort}
+                                onChange={(e) => setSmtpData({ ...smtpData, smtpPort: parseInt(e.target.value) || 587 })}
+                                placeholder="587"
+                                data-testid="input-smtp-port" 
+                              />
+                            </div>
+                            <div className="space-y-2">
+                              <Label htmlFor="smtpUser">SMTP Username</Label>
+                              <Input 
+                                id="smtpUser" 
+                                value={smtpData.smtpUser}
+                                onChange={(e) => setSmtpData({ ...smtpData, smtpUser: e.target.value })}
+                                placeholder="username@example.com"
+                                data-testid="input-smtp-user" 
+                              />
+                            </div>
+                            <div className="space-y-2">
+                              <Label htmlFor="smtpPassword">SMTP Password</Label>
+                              <Input 
+                                id="smtpPassword" 
+                                type="password"
+                                value={smtpData.smtpPassword}
+                                onChange={(e) => setSmtpData({ ...smtpData, smtpPassword: e.target.value })}
+                                placeholder={smtpSettings?.hasPassword ? "••••••••" : "Enter password"}
+                                data-testid="input-smtp-password" 
+                              />
+                            </div>
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <Switch 
+                              id="smtpSecure"
+                              checked={smtpData.smtpSecure}
+                              onCheckedChange={(checked) => setSmtpData({ ...smtpData, smtpSecure: checked })}
+                              data-testid="switch-smtp-secure" 
+                            />
+                            <Label htmlFor="smtpSecure">Use SSL/TLS (typically for port 465)</Label>
+                          </div>
+                        </div>
+                      </>
+                    )}
+
+                    {(smtpData.provider === "sendgrid" || smtpData.provider === "mailgun") && (
+                      <>
+                        <Separator />
+                        <div className="space-y-4">
+                          <h3 className="font-medium flex items-center gap-2">
+                            <Mail className="h-4 w-4" />
+                            API Settings
+                          </h3>
+                          <div className="grid grid-cols-2 gap-4">
+                            <div className="space-y-2 col-span-2">
+                              <Label htmlFor="apiKey">API Key</Label>
+                              <Input 
+                                id="apiKey" 
+                                type="password"
+                                value={smtpData.apiKey}
+                                onChange={(e) => setSmtpData({ ...smtpData, apiKey: e.target.value })}
+                                placeholder={smtpSettings?.hasApiKey ? "••••••••" : "Enter API key"}
+                                data-testid="input-api-key" 
+                              />
+                            </div>
+                            {smtpData.provider === "mailgun" && (
+                              <div className="space-y-2 col-span-2">
+                                <Label htmlFor="apiDomain">Domain</Label>
+                                <Input 
+                                  id="apiDomain" 
+                                  value={smtpData.apiDomain}
+                                  onChange={(e) => setSmtpData({ ...smtpData, apiDomain: e.target.value })}
+                                  placeholder="mg.yourdomain.com"
+                                  data-testid="input-api-domain" 
+                                />
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      </>
+                    )}
+
+                    {smtpData.provider !== "default" && (
+                      <>
+                        <Separator />
+                        <div className="space-y-4">
+                          <h3 className="font-medium flex items-center gap-2">
+                            <User className="h-4 w-4" />
+                            Sender Information
+                          </h3>
+                          <div className="grid grid-cols-2 gap-4">
+                            <div className="space-y-2">
+                              <Label htmlFor="fromEmail">From Email</Label>
+                              <Input 
+                                id="fromEmail" 
+                                type="email"
+                                value={smtpData.fromEmail}
+                                onChange={(e) => setSmtpData({ ...smtpData, fromEmail: e.target.value })}
+                                placeholder="noreply@yourcompany.com"
+                                data-testid="input-from-email" 
+                              />
+                            </div>
+                            <div className="space-y-2">
+                              <Label htmlFor="fromName">From Name</Label>
+                              <Input 
+                                id="fromName" 
+                                value={smtpData.fromName}
+                                onChange={(e) => setSmtpData({ ...smtpData, fromName: e.target.value })}
+                                placeholder="Your Company Name"
+                                data-testid="input-from-name" 
+                              />
+                            </div>
+                            <div className="space-y-2 col-span-2">
+                              <Label htmlFor="replyToEmail">Reply-To Email (optional)</Label>
+                              <Input 
+                                id="replyToEmail" 
+                                type="email"
+                                value={smtpData.replyToEmail}
+                                onChange={(e) => setSmtpData({ ...smtpData, replyToEmail: e.target.value })}
+                                placeholder="support@yourcompany.com"
+                                data-testid="input-reply-to" 
+                              />
+                            </div>
+                          </div>
+                        </div>
+                      </>
+                    )}
+
+                    <div className="flex justify-between pt-4">
+                      <Button 
+                        type="button"
+                        variant="outline"
+                        onClick={() => testSmtpMutation.mutate()}
+                        disabled={testSmtpMutation.isPending || updateSmtpMutation.isPending}
+                        data-testid="button-test-connection"
+                      >
+                        {testSmtpMutation.isPending ? (
+                          <>
+                            <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                            Testing...
+                          </>
+                        ) : (
+                          "Test Connection"
+                        )}
+                      </Button>
+                      <Button 
+                        type="submit" 
+                        disabled={updateSmtpMutation.isPending || isLoadingSmtp}
+                        data-testid="button-save-smtp"
+                      >
+                        {updateSmtpMutation.isPending ? "Saving..." : "Save Email Settings"}
                       </Button>
                     </div>
                   </CardContent>

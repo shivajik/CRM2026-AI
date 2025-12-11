@@ -357,6 +357,11 @@ export const emailApi = {
   updateSender: (id: string, data: any) => apiRequest(`/email/senders/${id}`, { method: "PATCH", body: JSON.stringify(data) }),
   deleteSender: (id: string) => apiRequest(`/email/senders/${id}`, { method: "DELETE" }),
   
+  // SMTP Settings
+  getSmtpSettings: () => apiRequest("/email/smtp-settings"),
+  updateSmtpSettings: (data: any) => apiRequest("/email/smtp-settings", { method: "PUT", body: JSON.stringify(data) }),
+  testSmtpConnection: () => apiRequest("/email/smtp-settings/test", { method: "POST" }),
+  
   // Merge Fields
   getMergeFields: () => apiRequest("/email/merge-fields"),
   processMergeFields: (data: any) => apiRequest("/email/process-merge-fields", { method: "POST", body: JSON.stringify(data) }),

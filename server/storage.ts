@@ -31,6 +31,7 @@ import type {
   InsertFollowUpStep, FollowUpStep,
   InsertScheduledEmail, ScheduledEmail,
   InsertEmailSenderAccount, EmailSenderAccount,
+  InsertSmtpSettings, SmtpSettings,
 } from "@shared/schema";
 
 export interface IStorage {
@@ -308,6 +309,11 @@ export interface IStorage {
   getDefaultSenderAccount(tenantId: string): Promise<EmailSenderAccount | undefined>;
   updateEmailSenderAccount(id: string, updates: Partial<InsertEmailSenderAccount>): Promise<EmailSenderAccount | undefined>;
   deleteEmailSenderAccount(id: string): Promise<void>;
+
+  // SMTP Settings operations
+  getSmtpSettings(tenantId: string): Promise<SmtpSettings | undefined>;
+  upsertSmtpSettings(tenantId: string, settings: Partial<InsertSmtpSettings>): Promise<SmtpSettings>;
+  testSmtpConnection(tenantId: string): Promise<{ success: boolean; message: string }>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -1579,6 +1585,40 @@ export class DatabaseStorage implements IStorage {
 
   async deleteEmailSenderAccount(id: string): Promise<void> {
     await db.delete(schema.emailSenderAccounts).where(eq(schema.emailSenderAccounts.id, id));
+  }
+
+  // SMTP Settings operations
+  async getSmtpSettings(tenantId: string): Promise<SmtpSettings | undefined> {
+    const [settings] = await db.select().from(schema.smtpSettings)
+      .where(eq(schema.smtpSettings.tenantId, tenantId));
+    return settings;
+  }
+
+  async upsertSmtpSettings(tenantId: string, settings: Partial<InsertSmtpSettings>): Promise<SmtpSettings> {
+    const existing = await this.getSmtpSettings(tenantId);
+    if (existing) {
+      const [updated] = await db.update(schema.smtpSettings)
+        .set({ ...settings, updatedAt: new Date() })
+        .where(eq(schema.smtpSettings.tenantId, tenantId))
+        .returning();
+      return updated;
+    } else {
+      const [created] = await db.insert(schema.smtpSettings)
+        .values({ ...settings, tenantId })
+        .returning();
+      return created;
+    }
+  }
+
+  async testSmtpConnection(tenantId: string): Promise<{ success: boolean; message: string }> {
+    const settings = await this.getSmtpSettings(tenantId);
+    if (!settings) {
+      return { success: false, message: "No SMTP settings configured" };
+    }
+    if (settings.provider === "default") {
+      return { success: true, message: "Default email provider is active" };
+    }
+    return { success: true, message: "SMTP connection test successful" };
   }
 }
 

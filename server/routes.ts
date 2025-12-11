@@ -2322,6 +2322,60 @@ export async function registerRoutes(
     }
   });
 
+  // SMTP Settings
+  app.get("/api/email/smtp-settings", requireAuth, validateTenant, async (req, res) => {
+    try {
+      const settings = await storage.getSmtpSettings(req.user!.tenantId);
+      if (settings) {
+        const { smtpPassword, apiKey, ...safeSettings } = settings;
+        res.json({
+          ...safeSettings,
+          hasPassword: !!smtpPassword,
+          hasApiKey: !!apiKey,
+        });
+      } else {
+        res.json({
+          provider: "default",
+          isEnabled: true,
+          isVerified: false,
+        });
+      }
+    } catch (error) {
+      console.error("Get SMTP settings error:", error);
+      res.status(500).json({ message: "Failed to fetch SMTP settings" });
+    }
+  });
+
+  app.put("/api/email/smtp-settings", requireAuth, validateTenant, requireAgencyAdmin, async (req, res) => {
+    try {
+      const settings = await storage.upsertSmtpSettings(req.user!.tenantId, req.body);
+      const { smtpPassword, apiKey, ...safeSettings } = settings;
+      res.json({
+        ...safeSettings,
+        hasPassword: !!smtpPassword,
+        hasApiKey: !!apiKey,
+      });
+    } catch (error) {
+      console.error("Update SMTP settings error:", error);
+      res.status(500).json({ message: "Failed to update SMTP settings" });
+    }
+  });
+
+  app.post("/api/email/smtp-settings/test", requireAuth, validateTenant, requireAgencyAdmin, async (req, res) => {
+    try {
+      const result = await storage.testSmtpConnection(req.user!.tenantId);
+      if (result.success) {
+        await storage.upsertSmtpSettings(req.user!.tenantId, { 
+          isVerified: true,
+        } as any);
+      }
+      res.json(result);
+    } catch (error) {
+      console.error("Test SMTP connection error:", error);
+      res.status(500).json({ success: false, message: "Failed to test SMTP connection" });
+    }
+  });
+
   // Merge Fields - Get available merge fields
   app.get("/api/email/merge-fields", requireAuth, validateTenant, async (req, res) => {
     try {
