@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Building2, Plus, Settings, Check, ChevronDown } from "lucide-react";
+import { Building2, Plus, Settings, Check, ChevronDown, Crown, Users, Sparkles } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import {
@@ -113,68 +113,123 @@ export function WorkspaceSwitcher() {
     <>
       <DropdownMenu>
         <DropdownMenuTrigger asChild>
-          <Button variant="ghost" className="flex items-center gap-2 px-3 py-2 h-auto" data-testid="button-workspace-switcher">
-            <Avatar className="h-7 w-7">
-              <AvatarFallback className="bg-primary/10 text-xs font-semibold text-primary">
+          <Button 
+            variant="ghost" 
+            className="flex items-center gap-2.5 px-3 py-2 h-auto hover:bg-muted/50 transition-all rounded-lg border border-transparent hover:border-border/50" 
+            data-testid="button-workspace-switcher"
+          >
+            <Avatar className="h-8 w-8 ring-2 ring-primary/20">
+              <AvatarFallback className="bg-gradient-to-br from-primary to-primary/70 text-xs font-bold text-primary-foreground">
                 {initials}
               </AvatarFallback>
             </Avatar>
-            <span className="font-medium text-sm hidden sm:inline max-w-[120px] truncate">
+            <span className="font-semibold text-sm hidden sm:inline max-w-[140px] truncate">
               {workspaceName}
             </span>
-            <ChevronDown className="h-4 w-4 text-muted-foreground" />
+            <ChevronDown className="h-4 w-4 text-muted-foreground transition-transform" />
           </Button>
         </DropdownMenuTrigger>
-        <DropdownMenuContent align="start" className="w-64">
-          <DropdownMenuLabel className="flex items-center gap-2">
-            <Building2 className="h-4 w-4" />
-            Workspaces
-          </DropdownMenuLabel>
-          <DropdownMenuSeparator />
-          
-          {workspaces.map((ws) => (
-            <DropdownMenuItem
-              key={ws.workspaceId}
-              onClick={() => {
-                if (ws.workspaceId !== activeWorkspaceId) {
-                  switchWorkspaceMutation.mutate(ws.workspaceId);
-                }
-              }}
-              className="flex items-center justify-between cursor-pointer"
-              data-testid={`workspace-item-${ws.workspaceId}`}
-            >
-              <div className="flex items-center gap-2">
-                <Avatar className="h-6 w-6">
-                  <AvatarFallback className="bg-primary/10 text-xs font-semibold text-primary">
-                    {ws.workspace.name.split(" ").map((w: string) => w[0]).join("").toUpperCase().slice(0, 2)}
-                  </AvatarFallback>
-                </Avatar>
-                <span className="truncate max-w-[150px]">{ws.workspace.name}</span>
+        <DropdownMenuContent align="start" className="w-72 p-2">
+          <div className="px-2 py-2.5 mb-1">
+            <div className="flex items-center gap-2 text-sm font-semibold text-foreground">
+              <div className="p-1.5 rounded-md bg-primary/10">
+                <Building2 className="h-4 w-4 text-primary" />
               </div>
-              {ws.workspaceId === activeWorkspaceId && (
-                <Check className="h-4 w-4 text-primary" />
-              )}
-            </DropdownMenuItem>
-          ))}
+              Workspaces
+            </div>
+            <p className="text-xs text-muted-foreground mt-1 ml-8">Switch between your workspaces</p>
+          </div>
+          <DropdownMenuSeparator className="my-2" />
           
-          <DropdownMenuSeparator />
+          <div className="space-y-1 max-h-[240px] overflow-y-auto">
+            {workspaces.map((ws) => {
+              const isActive = ws.workspaceId === activeWorkspaceId;
+              const wsInitials = ws.workspace.name.split(" ").map((w: string) => w[0]).join("").toUpperCase().slice(0, 2);
+              const isOwner = ws.role === "owner" || ws.role === "admin";
+              
+              return (
+                <DropdownMenuItem
+                  key={ws.workspaceId}
+                  onClick={() => {
+                    if (!isActive) {
+                      switchWorkspaceMutation.mutate(ws.workspaceId);
+                    }
+                  }}
+                  className={`flex items-center justify-between cursor-pointer rounded-lg p-2.5 transition-all ${
+                    isActive 
+                      ? "bg-primary/5 border border-primary/20" 
+                      : "hover:bg-muted/50"
+                  }`}
+                  data-testid={`workspace-item-${ws.workspaceId}`}
+                >
+                  <div className="flex items-center gap-3">
+                    <Avatar className={`h-9 w-9 ring-2 ${isActive ? "ring-primary/30" : "ring-transparent"}`}>
+                      <AvatarFallback className={`text-xs font-bold ${
+                        isActive 
+                          ? "bg-gradient-to-br from-primary to-primary/70 text-primary-foreground" 
+                          : "bg-gradient-to-br from-slate-100 to-slate-200 text-slate-600 dark:from-slate-700 dark:to-slate-800 dark:text-slate-300"
+                      }`}>
+                        {wsInitials}
+                      </AvatarFallback>
+                    </Avatar>
+                    <div className="flex flex-col">
+                      <span className={`truncate max-w-[140px] text-sm ${isActive ? "font-semibold" : "font-medium"}`}>
+                        {ws.workspace.name}
+                      </span>
+                      <div className="flex items-center gap-1.5 mt-0.5">
+                        {isOwner ? (
+                          <span className="flex items-center gap-1 text-[10px] font-medium text-amber-600 dark:text-amber-400">
+                            <Crown className="h-3 w-3" />
+                            {ws.role.charAt(0).toUpperCase() + ws.role.slice(1)}
+                          </span>
+                        ) : (
+                          <span className="flex items-center gap-1 text-[10px] font-medium text-muted-foreground">
+                            <Users className="h-3 w-3" />
+                            {ws.role.charAt(0).toUpperCase() + ws.role.slice(1)}
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                  {isActive && (
+                    <div className="flex items-center justify-center h-5 w-5 rounded-full bg-primary">
+                      <Check className="h-3 w-3 text-primary-foreground" />
+                    </div>
+                  )}
+                </DropdownMenuItem>
+              );
+            })}
+          </div>
+          
+          <DropdownMenuSeparator className="my-2" />
           
           <DropdownMenuItem
             onClick={() => setCreateDialogOpen(true)}
-            className="flex items-center gap-2 cursor-pointer"
+            className="flex items-center gap-3 cursor-pointer rounded-lg p-2.5 text-primary hover:bg-primary/5 transition-all group"
             data-testid="button-create-workspace"
           >
-            <Plus className="h-4 w-4" />
-            Create New Workspace
+            <div className="p-1.5 rounded-md bg-primary/10 group-hover:bg-primary/20 transition-colors">
+              <Plus className="h-4 w-4" />
+            </div>
+            <div className="flex flex-col">
+              <span className="text-sm font-medium">Create New Workspace</span>
+              <span className="text-[10px] text-muted-foreground">Start a new team or project</span>
+            </div>
+            <Sparkles className="h-4 w-4 ml-auto opacity-0 group-hover:opacity-100 transition-opacity" />
           </DropdownMenuItem>
           
           <DropdownMenuItem
             onClick={() => setLocation("/settings/workspace")}
-            className="flex items-center gap-2 cursor-pointer"
+            className="flex items-center gap-3 cursor-pointer rounded-lg p-2.5 hover:bg-muted/50 transition-all"
             data-testid="button-workspace-settings"
           >
-            <Settings className="h-4 w-4" />
-            Workspace Settings
+            <div className="p-1.5 rounded-md bg-muted">
+              <Settings className="h-4 w-4 text-muted-foreground" />
+            </div>
+            <div className="flex flex-col">
+              <span className="text-sm font-medium">Workspace Settings</span>
+              <span className="text-[10px] text-muted-foreground">Manage your workspace</span>
+            </div>
           </DropdownMenuItem>
         </DropdownMenuContent>
       </DropdownMenu>
