@@ -14,6 +14,7 @@ import { useLocation } from "wouter";
 import { useQuery } from "@tanstack/react-query";
 import { authApi } from "@/lib/api";
 import { clearAuth } from "@/lib/auth";
+import { WorkspaceSwitcher } from "@/components/workspace/WorkspaceSwitcher";
 
 export function Header() {
   const [, setLocation] = useLocation();
@@ -41,6 +42,10 @@ export function Header() {
           <Menu className="w-5 h-5" />
         </Button>
         <span className="font-heading font-bold text-lg">Nexus</span>
+      </div>
+
+      <div className="hidden md:flex items-center gap-4">
+        <WorkspaceSwitcher />
       </div>
 
       <div className="hidden md:flex flex-1 max-w-md ml-4">

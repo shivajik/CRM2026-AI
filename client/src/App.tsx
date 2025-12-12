@@ -52,6 +52,7 @@ const PublicProposalView = lazy(() => import("@/pages/PublicProposalView"));
 const USLanding = lazy(() => import("@/pages/GeoLanding").then(m => ({ default: m.USLanding })));
 const UKLanding = lazy(() => import("@/pages/GeoLanding").then(m => ({ default: m.UKLanding })));
 const INLanding = lazy(() => import("@/pages/GeoLanding").then(m => ({ default: m.INLanding })));
+const WorkspaceSettings = lazy(() => import("@/pages/WorkspaceSettings"));
 
 function RoleBasedRedirect() {
   const [, setLocation] = useLocation();
@@ -146,6 +147,7 @@ function Router() {
         <Route path="/activities">{() => <ProtectedPage component={Activities} />}</Route>
         <Route path="/reports">{() => <AdminPage component={Reports} />}</Route>
         <Route path="/settings">{() => <AdminPage component={Settings} />}</Route>
+        <Route path="/settings/workspace">{() => <ProtectedPage component={WorkspaceSettings} />}</Route>
         <Route path="/profile">{() => <ProtectedPage component={Profile} />}</Route>
         <Route path="/billing">{() => <AdminPage component={Billing} />}</Route>
         <Route path="/team">{() => <AdminPage component={TeamManagement} />}</Route>
