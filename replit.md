@@ -194,8 +194,57 @@ Six comprehensive workspace management modules for enterprise-grade CRM function
 5. Send first proposal
 
 ### Component Locations
-- `client/src/pages/WorkspaceSettings.tsx` - Main settings page (6 tabs)
+- `client/src/pages/WorkspaceSettings.tsx` - Main settings page (7 tabs including Portal)
 - `client/src/components/workspace/OnboardingWizard.tsx` - Onboarding wizard
+- `client/src/pages/CustomerPortal.tsx` - Client-facing portal interface
 
 ### Storage Interface
 All storage methods defined in `server/storage.ts` with type-safe interfaces using Drizzle ORM
+
+## Customer Portal Module (December 2024)
+
+### Overview
+The Customer Portal allows clients to securely access their proposals, quotations, invoices, documents, and tasks. Access is controlled through workspace-level settings and the `customer_portal_enabled` feature flag.
+
+### Feature Flag Control
+- **Flag Name**: `customer_portal_enabled`
+- **Default State**: OFF - no customer portal access until enabled
+- **Per-Workspace Settings**: Each workspace can customize portal visibility and permissions
+
+### Database Tables
+- `customerPortalSettings` - Per-workspace portal configuration
+- `customerPortalActivityLogs` - Audit trail of customer actions
+- `customerDocuments` - Documents shared with customers
+- `passwordResetTokens` - Password reset token management for customers
+
+### API Endpoints
+**Portal Settings (Admin)**:
+- `GET /api/workspaces/:id/portal-settings` - Get workspace portal configuration
+- `PUT /api/workspaces/:id/portal-settings` - Update portal configuration
+
+**Customer Portal (Client-Facing)**:
+- `GET /api/portal/settings` - Get portal settings for customer's workspace
+- `GET /api/portal/documents` - Get documents shared with customer
+- `POST /api/portal/proposals/:id/accept` - Accept a proposal
+- `POST /api/portal/proposals/:id/reject` - Reject a proposal
+- `POST /api/portal/quotations/:id/accept` - Accept a quotation
+- `POST /api/portal/quotations/:id/reject` - Reject a quotation
+
+**Activity Logging**:
+- Customer actions (login, view, accept/reject) are logged to `customerPortalActivityLogs`
+
+### Portal Settings Configuration
+Workspace admins can configure:
+- **Content Visibility**: showProposals, showQuotations, showInvoices, showDocuments, showTasks
+- **Permissions**: allowComments, allowFileUploads, allowOnlinePayments
+- **Branding**: welcomeMessage for personalized greeting
+
+### UI Components
+- **CustomerPortal.tsx**: Tabbed interface with Proposals, Quotations, Invoices, Documents, Tasks, Profile sections
+- **WorkspaceSettings.tsx**: Portal tab with toggle switches for all configuration options
+
+### Security Model
+- Customers authenticate via JWT tokens
+- Portal access is blocked if `customer_portal_enabled` is off
+- Content visibility respects per-workspace settings
+- All customer actions are logged for audit
