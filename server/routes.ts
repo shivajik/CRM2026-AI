@@ -4165,7 +4165,7 @@ export async function registerRoutes(
       });
       
       // Get the user to generate new tokens with active workspace
-      const user = await storage.getUser(req.user!.userId);
+      const user = await storage.getUserById(req.user!.userId);
       if (!user) {
         return res.status(404).json({ message: "User not found" });
       }
