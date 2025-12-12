@@ -2774,13 +2774,25 @@ export async function registerRoutes(
     }
   });
 
-  app.post("/api/email/templates", requireAuth, validateTenant, resolveWorkspaceContext, requireAgencyAdmin, async (req, res) => {
+  app.post("/api/email/templates", requireAuth, validateTenant, resolveWorkspaceContext, async (req, res) => {
     try {
       const workspaceId = req.workspaceId || req.user!.tenantId;
+      const { ownerType = 'user', isShared = false, ...rest } = req.body;
+      
+      if (ownerType === 'system') {
+        return res.status(403).json({ message: "Cannot create system templates" });
+      }
+      if (ownerType === 'workspace' && !req.user!.isAdmin) {
+        return res.status(403).json({ message: "Only admins can create workspace templates" });
+      }
+      
       const template = await storage.createEmailTemplate({
-        ...req.body,
+        ...rest,
         tenantId: workspaceId,
         createdBy: req.user!.userId,
+        ownerType,
+        ownerId: ownerType === 'user' ? req.user!.userId : workspaceId,
+        isShared,
       });
       res.status(201).json(template);
     } catch (error) {
@@ -2806,11 +2818,63 @@ export async function registerRoutes(
   app.delete("/api/email/templates/:id", requireAuth, validateTenant, resolveWorkspaceContext, requireAgencyAdmin, async (req, res) => {
     try {
       const workspaceId = req.workspaceId || req.user!.tenantId;
+      const template = await storage.getEmailTemplateById(req.params.id, workspaceId);
+      if (!template) {
+        return res.status(404).json({ message: "Template not found" });
+      }
+      if (template.ownerType === 'system') {
+        return res.status(403).json({ message: "System templates cannot be deleted" });
+      }
+      const canDelete = await storage.canDeleteEmailTemplate(template, req.user!.userId, req.user!.isAdmin || false);
+      if (!canDelete) {
+        return res.status(403).json({ message: "You don't have permission to delete this template" });
+      }
       await storage.deleteEmailTemplate(req.params.id, workspaceId);
       res.json({ message: "Template deleted successfully" });
     } catch (error) {
       console.error("Delete email template error:", error);
       res.status(500).json({ message: "Failed to delete email template" });
+    }
+  });
+
+  app.get("/api/email/templates-grouped", requireAuth, validateTenant, resolveWorkspaceContext, async (req, res) => {
+    try {
+      const workspaceId = req.workspaceId || req.user!.tenantId;
+      const userId = req.user!.userId;
+      const templates = await storage.getEmailTemplatesWithOwnership(workspaceId, userId, workspaceId);
+      res.json(templates);
+    } catch (error) {
+      console.error("Get grouped email templates error:", error);
+      res.status(500).json({ message: "Failed to fetch email templates" });
+    }
+  });
+
+  app.post("/api/email/templates/:id/duplicate", requireAuth, validateTenant, resolveWorkspaceContext, async (req, res) => {
+    try {
+      const workspaceId = req.workspaceId || req.user!.tenantId;
+      const duplicate = await storage.duplicateEmailTemplate(req.params.id, workspaceId, req.user!.userId);
+      if (!duplicate) {
+        return res.status(404).json({ message: "Template not found" });
+      }
+      res.status(201).json(duplicate);
+    } catch (error) {
+      console.error("Duplicate email template error:", error);
+      res.status(500).json({ message: "Failed to duplicate email template" });
+    }
+  });
+
+  app.patch("/api/email/templates/:id/share", requireAuth, validateTenant, resolveWorkspaceContext, async (req, res) => {
+    try {
+      const workspaceId = req.workspaceId || req.user!.tenantId;
+      const { isShared } = req.body;
+      const template = await storage.toggleEmailTemplateShare(req.params.id, workspaceId, req.user!.userId, isShared);
+      if (!template) {
+        return res.status(404).json({ message: "Template not found or you don't have permission to share it" });
+      }
+      res.json(template);
+    } catch (error) {
+      console.error("Share email template error:", error);
+      res.status(500).json({ message: "Failed to share email template" });
     }
   });
 

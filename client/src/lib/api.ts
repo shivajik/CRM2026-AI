@@ -383,10 +383,13 @@ export const packagesApi = {
 export const emailApi = {
   // Templates
   getTemplates: () => apiRequest("/email/templates"),
+  getTemplatesGrouped: () => apiRequest("/email/templates-grouped"),
   getTemplateById: (id: string) => apiRequest(`/email/templates/${id}`),
   createTemplate: (data: any) => apiRequest("/email/templates", { method: "POST", body: JSON.stringify(data) }),
   updateTemplate: (id: string, data: any) => apiRequest(`/email/templates/${id}`, { method: "PATCH", body: JSON.stringify(data) }),
   deleteTemplate: (id: string) => apiRequest(`/email/templates/${id}`, { method: "DELETE" }),
+  duplicateTemplate: (id: string) => apiRequest(`/email/templates/${id}/duplicate`, { method: "POST" }),
+  shareTemplate: (id: string, isShared: boolean) => apiRequest(`/email/templates/${id}/share`, { method: "PATCH", body: JSON.stringify({ isShared }) }),
   
   // Logs
   getLogs: () => apiRequest("/email/logs"),
