@@ -89,6 +89,32 @@ function hexToRgb(hex: string): { r: number; g: number; b: number } {
   } : { r: 59, g: 130, b: 246 };
 }
 
+function replaceTemplatePlaceholders(content: string, proposal: Proposal): string {
+  if (!content) return content;
+  
+  const today = new Date();
+  const replacements: Record<string, string> = {
+    '{{proposal.title}}': proposal.title || '',
+    '{{proposal.date}}': format(today, 'MMMM d, yyyy'),
+    '{{proposal.number}}': proposal.proposalNumber || '',
+    '{{proposal.validUntil}}': proposal.validUntil ? format(new Date(proposal.validUntil), 'MMMM d, yyyy') : '',
+    '{{proposal.total}}': proposal.totalAmount || '0',
+    '{{client.name}}': proposal.customer?.name || '',
+    '{{client.company}}': proposal.customer?.company || '',
+    '{{client.email}}': proposal.customer?.email || '',
+    '{{agency.name}}': proposal.company?.name || 'Our Agency',
+    '{{agency.email}}': proposal.company?.email || '',
+    '{{agency.phone}}': proposal.company?.phone || '',
+  };
+  
+  let result = content;
+  for (const [placeholder, value] of Object.entries(replacements)) {
+    result = result.replace(new RegExp(placeholder.replace(/[{}]/g, '\\$&'), 'g'), value);
+  }
+  
+  return result;
+}
+
 export default function PublicProposalView() {
   const [, params] = useRoute("/proposal/view/:accessToken");
   const accessToken = params?.accessToken;
@@ -394,7 +420,7 @@ export default function PublicProposalView() {
                     prose-li:text-slate-600
                     prose-strong:text-slate-800
                     prose-a:text-blue-600 prose-a:no-underline hover:prose-a:underline"
-                  dangerouslySetInnerHTML={{ __html: section.content }}
+                  dangerouslySetInnerHTML={{ __html: replaceTemplatePlaceholders(section.content, proposal) }}
                 />
               </CardContent>
             </Card>
