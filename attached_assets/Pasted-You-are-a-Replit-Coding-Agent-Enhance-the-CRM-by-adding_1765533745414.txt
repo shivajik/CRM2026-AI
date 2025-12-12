@@ -1,0 +1,197 @@
+You are a Replit Coding Agent.  
+Enhance the CRM by adding a complete Workspace Management Module.  
+IMPORTANT: The existing CRM is fully functional and must not be broken.  
+All enhancements must be non-destructive, backward-compatible, and safe.
+
+===========================================================
+PRIMARY OBJECTIVE
+===========================================================
+Enable users to fully manage multiple workspaces (agencies).  
+A single user can create, switch, join, leave, and configure multiple workspaces.  
+All UI changes MUST be feature-flagged and off for existing users unless enabled.
+
+===========================================================
+HARD REQUIREMENTS — DO NOT BREAK CURRENT SYSTEM
+===========================================================
+1. No regression for existing single-workspace users.  
+2. All multi-workspace features MUST be behind a feature flag `multi_workspace_enabled`.  
+3. Default experience for existing tenants should remain unchanged.  
+4. Database migrations must be additive only. No column drops or renames.  
+5. Backward compatibility is mandatory; all core flows must continue to work.  
+6. All new UI must remain hidden unless the feature flag is ON.  
+7. Existing tenantId logic must continue working exactly as before.
+
+===========================================================
+FEATURES TO BUILD
+===========================================================
+
+-----------------------------------------------------------
+1. WORKSPACE SWITCHER (UI + Flow)
+-----------------------------------------------------------
+- Add a switcher UI in the header.  
+- Only visible if user has more than 1 workspace or feature flag is ON.  
+- Show list of workspaces (logo + name + role).  
+- Allow selecting another workspace → reload context and refresh all client-side data.  
+- Store active workspace in session/local storage.  
+- Update API client to include active workspace ID in requests when feature flag is ON.
+
+-----------------------------------------------------------
+2. CREATE NEW WORKSPACE FLOW
+-----------------------------------------------------------
+- Add a “Create Workspace” button inside switcher and settings.  
+- Form fields:
+  - Workspace Name  
+  - Business/Agency type  
+  - Logo (optional)  
+  - Default Currency  
+  - Time Zone  
+- When created:
+  - Insert into tenants table (existing behavior).  
+  - Create new entry in `workspace_users` linking current user as Admin.  
+  - Redirect to Workspace onboarding (feature flag ON only).
+
+-----------------------------------------------------------
+3. WORKSPACE SETTINGS PAGE
+-----------------------------------------------------------
+Add a new page under `/settings/workspace` including:
+
+A. Workspace Info  
+- Name  
+- Logo  
+- Industry  
+- Address, Email, Phone  
+
+B. Branding  
+- Logo upload  
+- Primary & secondary colors  
+- PDF header/footer styling  
+- Email signature template  
+
+C. Team Management  
+- List workspace members  
+- Add/Remove/Update roles  
+- Resend invitations  
+- Prevent removing last Admin  
+
+D. Danger Zone  
+- Soft-delete workspace (confirmation required)  
+- Show 30-day restore policy (data not permanently deleted immediately)
+
+All of the above must only appear if the workspace feature flag is ON.
+
+-----------------------------------------------------------
+4. WORKSPACE INVITATION SYSTEM
+-----------------------------------------------------------
+- Implement invitations for joining workspaces.  
+- Admin invites via email → role → token link generated.  
+- Invitation table: workspaceId, email, roleId, token, status.  
+- Accept flow:
+  - Existing users → join workspace  
+  - New users → register → join  
+- Update `workspace_users` table accordingly.  
+- Add options: resend invite, revoke invite.
+
+-----------------------------------------------------------
+5. USER ROLE MANAGEMENT PER WORKSPACE
+-----------------------------------------------------------
+- Add role assignment via workspace_users table.  
+- Roles: Admin, Manager, Team Member, Finance, Viewer.  
+- Allow custom roles with granular permissions (optional but recommended).  
+- Permissions apply ONLY inside the current workspace.  
+- Enforce:
+  - At least one Admin must always exist.  
+  - Only Admin can delete workspace or change workspace-wide settings.
+
+-----------------------------------------------------------
+6. DATA ISOLATION (MANDATORY)
+-----------------------------------------------------------
+- All queries must use activeWorkspaceId when feature flag ON.  
+- When flag OFF: continue using tenantId exactly as before.  
+- Middleware: ensure user belongs to workspace before any access.  
+- Audit logs for workspace changes.
+
+-----------------------------------------------------------
+7. ONBOARDING FLOW (Optional but recommended)
+-----------------------------------------------------------
+After creating a workspace (flag ON):
+- Step 1: Add branding  
+- Step 2: Add team members  
+- Step 3: Add first client  
+- Step 4: Create first project or proposal  
+
+Track onboarding completion in workspace settings.
+
+-----------------------------------------------------------
+8. WORKSPACE LIST PAGE
+-----------------------------------------------------------
+Under user profile → “My Workspaces” page:
+- Show list of all workspaces user has access to  
+- Show role + status  
+- Buttons:
+  - Switch
+  - Leave (if not Admin)
+  - View Settings (if Admin)
+  - Create New Workspace
+
+-----------------------------------------------------------
+9. BACKEND REQUIREMENTS
+-----------------------------------------------------------
+- Update endpoints to use workspaceId parameter when feature flag ON.  
+- Keep existing tenantId behavior intact when flag OFF.  
+- Add membership check middleware:
+  - User must exist in workspace_users  
+  - User’s role must allow action  
+
+- Add logging:
+  - Workspace created  
+  - Workspace switched  
+  - Member invited/removed  
+  - Workspace deleted/restored  
+  - Ownership transferred  
+
+-----------------------------------------------------------
+10. SAFETY MEASURES
+-----------------------------------------------------------
+- Soft-delete workspace → don't permanently delete data.  
+- Deleting workspace must not break user login or other workspaces.  
+- Prevent deletion if this is the user’s ONLY workspace (unless account deletion requested).  
+- Provide reversible migration scripts for workspace_users  
+- Add tests:
+  - Workspace creation  
+  - Workspace switching  
+  - Invitation acceptance  
+  - Role updates  
+  - Regression tests for existing flows (quotations, proposals, invoices, tasks)
+
+-----------------------------------------------------------
+11. DELIVERABLES
+-----------------------------------------------------------
+Produce:
+
+1. Workspace Switcher Component  
+2. Workspace Settings Page  
+3. Workspace Creation UI  
+4. Invitation Flow (UI + backend)  
+5. Workspace Users table migrations (additive only)  
+6. Middleware for workspace validation  
+7. Updated API usage with workspace context  
+8. Onboarding Wizard (optional)  
+9. Updated docs:
+   - Multi-workspace usage guide  
+   - How switching works  
+   - How roles work per workspace  
+   - Safety & deletion behavior  
+10. `FINAL_REPORT.md` with design explanation, diagrams, and assumptions.
+
+-----------------------------------------------------------
+ACCEPTANCE RULES
+-----------------------------------------------------------
+- Existing users with single-workspace must see no UI change unless flag is ON  
+- No existing code path should break or regress  
+- All migrations must be safe and reversible  
+- All new UI must be hidden by default  
+- Workspace switch must refresh all context data properly  
+- Full documentation must be included  
+- All tests must pass
+
+Begin implementing now. Document assumptions in `ASSUMPTIONS.md`. Use small commits with clear messages.
