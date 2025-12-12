@@ -56,6 +56,18 @@ import type {
   InsertWorkspaceUser, WorkspaceUser,
   InsertWorkspaceInvitation, WorkspaceInvitation,
   InsertWorkspaceActivityLog, WorkspaceActivityLog,
+  InsertWorkspacePlan, WorkspacePlan,
+  InsertWorkspaceSubscription, WorkspaceSubscription,
+  InsertWorkspaceUsage, WorkspaceUsage,
+  InsertWorkspaceInvoice, WorkspaceInvoice,
+  InsertWorkspacePaymentMethod, WorkspacePaymentMethod,
+  InsertWorkspaceBranding, WorkspaceBranding,
+  InsertWorkspacePdfSettings, WorkspacePdfSettings,
+  InsertWorkspaceCustomRole, WorkspaceCustomRole,
+  InsertWorkspaceRolePermission, WorkspaceRolePermission,
+  InsertWorkspaceAnalyticsCache, WorkspaceAnalyticsCache,
+  InsertWorkspaceDeletionLog, WorkspaceDeletionLog,
+  InsertWorkspaceOnboardingProgress, WorkspaceOnboardingProgress,
 } from "@shared/schema";
 
 export interface IStorage {
@@ -3330,6 +3342,484 @@ export class DatabaseStorage implements IStorage {
     });
 
     return tenant;
+  }
+
+  // ==================== MODULE 1: WORKSPACE BILLING OPERATIONS ====================
+
+  async getAllWorkspacePlans(): Promise<WorkspacePlan[]> {
+    return db.select()
+      .from(schema.workspacePlans)
+      .where(eq(schema.workspacePlans.isActive, true))
+      .orderBy(schema.workspacePlans.sortOrder);
+  }
+
+  async getWorkspacePlanById(id: string): Promise<WorkspacePlan | undefined> {
+    const [plan] = await db.select()
+      .from(schema.workspacePlans)
+      .where(eq(schema.workspacePlans.id, id));
+    return plan;
+  }
+
+  async getWorkspacePlanByName(name: string): Promise<WorkspacePlan | undefined> {
+    const [plan] = await db.select()
+      .from(schema.workspacePlans)
+      .where(eq(schema.workspacePlans.name, name));
+    return plan;
+  }
+
+  async getWorkspaceSubscription(workspaceId: string): Promise<(WorkspaceSubscription & { plan?: WorkspacePlan }) | undefined> {
+    const [result] = await db.select({
+      subscription: schema.workspaceSubscriptions,
+      plan: schema.workspacePlans,
+    })
+    .from(schema.workspaceSubscriptions)
+    .leftJoin(schema.workspacePlans, eq(schema.workspaceSubscriptions.planId, schema.workspacePlans.id))
+    .where(eq(schema.workspaceSubscriptions.workspaceId, workspaceId));
+    
+    if (!result) return undefined;
+    return { ...result.subscription, plan: result.plan || undefined };
+  }
+
+  async createWorkspaceSubscription(data: InsertWorkspaceSubscription): Promise<WorkspaceSubscription> {
+    const [subscription] = await db.insert(schema.workspaceSubscriptions)
+      .values(data)
+      .returning();
+    return subscription;
+  }
+
+  async updateWorkspaceSubscription(workspaceId: string, updates: Partial<InsertWorkspaceSubscription>): Promise<WorkspaceSubscription | undefined> {
+    const [updated] = await db.update(schema.workspaceSubscriptions)
+      .set({ ...updates, updatedAt: new Date() })
+      .where(eq(schema.workspaceSubscriptions.workspaceId, workspaceId))
+      .returning();
+    return updated;
+  }
+
+  async getWorkspaceUsage(workspaceId: string): Promise<WorkspaceUsage | undefined> {
+    const now = new Date();
+    const [usage] = await db.select()
+      .from(schema.workspaceUsage)
+      .where(and(
+        eq(schema.workspaceUsage.workspaceId, workspaceId),
+        lte(schema.workspaceUsage.periodStart, now),
+        gte(schema.workspaceUsage.periodEnd, now)
+      ));
+    return usage;
+  }
+
+  async upsertWorkspaceUsage(workspaceId: string, periodStart: Date, periodEnd: Date, updates: Partial<InsertWorkspaceUsage>): Promise<WorkspaceUsage> {
+    const existing = await this.getWorkspaceUsage(workspaceId);
+    if (existing) {
+      const [updated] = await db.update(schema.workspaceUsage)
+        .set({ ...updates, updatedAt: new Date() })
+        .where(eq(schema.workspaceUsage.id, existing.id))
+        .returning();
+      return updated;
+    }
+    const [created] = await db.insert(schema.workspaceUsage)
+      .values({ workspaceId, periodStart, periodEnd, ...updates })
+      .returning();
+    return created;
+  }
+
+  async incrementWorkspaceUsage(workspaceId: string, field: 'emailsSent' | 'proposalsCreated' | 'automationsUsed'): Promise<void> {
+    const usage = await this.getWorkspaceUsage(workspaceId);
+    if (usage) {
+      await db.update(schema.workspaceUsage)
+        .set({ [field]: sql`${schema.workspaceUsage[field]} + 1`, updatedAt: new Date() })
+        .where(eq(schema.workspaceUsage.id, usage.id));
+    }
+  }
+
+  async getWorkspaceInvoices(workspaceId: string): Promise<WorkspaceInvoice[]> {
+    return db.select()
+      .from(schema.workspaceInvoices)
+      .where(eq(schema.workspaceInvoices.workspaceId, workspaceId))
+      .orderBy(desc(schema.workspaceInvoices.createdAt));
+  }
+
+  async getWorkspacePaymentMethods(workspaceId: string): Promise<WorkspacePaymentMethod[]> {
+    return db.select()
+      .from(schema.workspacePaymentMethods)
+      .where(eq(schema.workspacePaymentMethods.workspaceId, workspaceId))
+      .orderBy(desc(schema.workspacePaymentMethods.isDefault));
+  }
+
+  async checkBillingLimits(workspaceId: string): Promise<{ withinLimits: boolean; usage: any; limits: any }> {
+    const subscription = await this.getWorkspaceSubscription(workspaceId);
+    const usage = await this.getWorkspaceUsage(workspaceId);
+    
+    if (!subscription?.plan) {
+      return { withinLimits: true, usage: null, limits: null };
+    }
+
+    const plan = subscription.plan;
+    const memberCount = await this.getWorkspaceMemberCount(workspaceId);
+    
+    const limits = {
+      maxMembers: plan.maxMembers,
+      maxAutomations: plan.maxAutomations,
+      maxEmailsPerMonth: plan.maxEmailsPerMonth,
+      maxProposals: plan.maxProposals,
+      maxStorageMb: plan.maxStorageMb,
+    };
+
+    const currentUsage = {
+      memberCount,
+      automationsUsed: usage?.automationsUsed || 0,
+      emailsSent: usage?.emailsSent || 0,
+      proposalsCreated: usage?.proposalsCreated || 0,
+      storageMbUsed: usage?.storageMbUsed || 0,
+    };
+
+    const withinLimits = 
+      (plan.maxMembers === -1 || memberCount <= plan.maxMembers) &&
+      (plan.maxAutomations === -1 || currentUsage.automationsUsed <= plan.maxAutomations) &&
+      (plan.maxEmailsPerMonth === -1 || currentUsage.emailsSent <= plan.maxEmailsPerMonth) &&
+      (plan.maxProposals === -1 || currentUsage.proposalsCreated <= plan.maxProposals);
+
+    return { withinLimits, usage: currentUsage, limits };
+  }
+
+  async getWorkspaceMemberCount(workspaceId: string): Promise<number> {
+    const [result] = await db.select({ count: sql<number>`count(*)` })
+      .from(schema.workspaceUsers)
+      .where(eq(schema.workspaceUsers.workspaceId, workspaceId));
+    return Number(result?.count || 0);
+  }
+
+  // ==================== MODULE 2: WORKSPACE BRANDING OPERATIONS ====================
+
+  async getWorkspaceBranding(workspaceId: string): Promise<WorkspaceBranding | undefined> {
+    const [branding] = await db.select()
+      .from(schema.workspaceBranding)
+      .where(eq(schema.workspaceBranding.workspaceId, workspaceId));
+    return branding;
+  }
+
+  async upsertWorkspaceBranding(workspaceId: string, data: Partial<InsertWorkspaceBranding>): Promise<WorkspaceBranding> {
+    const existing = await this.getWorkspaceBranding(workspaceId);
+    if (existing) {
+      const [updated] = await db.update(schema.workspaceBranding)
+        .set({ ...data, updatedAt: new Date() })
+        .where(eq(schema.workspaceBranding.workspaceId, workspaceId))
+        .returning();
+      return updated;
+    }
+    const [created] = await db.insert(schema.workspaceBranding)
+      .values({ workspaceId, ...data })
+      .returning();
+    return created;
+  }
+
+  async getWorkspacePdfSettings(workspaceId: string): Promise<WorkspacePdfSettings | undefined> {
+    const [settings] = await db.select()
+      .from(schema.workspacePdfSettings)
+      .where(eq(schema.workspacePdfSettings.workspaceId, workspaceId));
+    return settings;
+  }
+
+  async upsertWorkspacePdfSettings(workspaceId: string, data: Partial<InsertWorkspacePdfSettings>): Promise<WorkspacePdfSettings> {
+    const existing = await this.getWorkspacePdfSettings(workspaceId);
+    if (existing) {
+      const [updated] = await db.update(schema.workspacePdfSettings)
+        .set({ ...data, updatedAt: new Date() })
+        .where(eq(schema.workspacePdfSettings.workspaceId, workspaceId))
+        .returning();
+      return updated;
+    }
+    const [created] = await db.insert(schema.workspacePdfSettings)
+      .values({ workspaceId, ...data })
+      .returning();
+    return created;
+  }
+
+  // ==================== MODULE 3: CUSTOM ROLES OPERATIONS ====================
+
+  async getWorkspaceCustomRoles(workspaceId: string): Promise<WorkspaceCustomRole[]> {
+    return db.select()
+      .from(schema.workspaceCustomRoles)
+      .where(eq(schema.workspaceCustomRoles.workspaceId, workspaceId))
+      .orderBy(schema.workspaceCustomRoles.name);
+  }
+
+  async getWorkspaceCustomRoleById(id: string): Promise<WorkspaceCustomRole | undefined> {
+    const [role] = await db.select()
+      .from(schema.workspaceCustomRoles)
+      .where(eq(schema.workspaceCustomRoles.id, id));
+    return role;
+  }
+
+  async createWorkspaceCustomRole(data: InsertWorkspaceCustomRole): Promise<WorkspaceCustomRole> {
+    const [role] = await db.insert(schema.workspaceCustomRoles)
+      .values(data)
+      .returning();
+    return role;
+  }
+
+  async updateWorkspaceCustomRole(id: string, updates: Partial<InsertWorkspaceCustomRole>): Promise<WorkspaceCustomRole | undefined> {
+    const [updated] = await db.update(schema.workspaceCustomRoles)
+      .set({ ...updates, updatedAt: new Date() })
+      .where(eq(schema.workspaceCustomRoles.id, id))
+      .returning();
+    return updated;
+  }
+
+  async deleteWorkspaceCustomRole(id: string): Promise<void> {
+    await db.delete(schema.workspaceRolePermissions)
+      .where(eq(schema.workspaceRolePermissions.roleId, id));
+    await db.delete(schema.workspaceCustomRoles)
+      .where(eq(schema.workspaceCustomRoles.id, id));
+  }
+
+  async getRolePermissions(roleId: string): Promise<WorkspaceRolePermission[]> {
+    return db.select()
+      .from(schema.workspaceRolePermissions)
+      .where(eq(schema.workspaceRolePermissions.roleId, roleId));
+  }
+
+  async setRolePermissions(roleId: string, permissions: { module: string; action: string; allowed: boolean }[]): Promise<void> {
+    await db.delete(schema.workspaceRolePermissions)
+      .where(eq(schema.workspaceRolePermissions.roleId, roleId));
+    
+    if (permissions.length > 0) {
+      await db.insert(schema.workspaceRolePermissions)
+        .values(permissions.map(p => ({ roleId, ...p })));
+    }
+  }
+
+  async getCustomRoleWithPermissions(id: string): Promise<(WorkspaceCustomRole & { permissions: WorkspaceRolePermission[] }) | undefined> {
+    const role = await this.getWorkspaceCustomRoleById(id);
+    if (!role) return undefined;
+    const permissions = await this.getRolePermissions(id);
+    return { ...role, permissions };
+  }
+
+  // ==================== MODULE 4: ANALYTICS OPERATIONS ====================
+
+  async getWorkspaceAnalytics(workspaceId: string, metricType?: string, startDate?: Date, endDate?: Date): Promise<WorkspaceAnalyticsCache[]> {
+    const conditions = [eq(schema.workspaceAnalyticsCache.workspaceId, workspaceId)];
+    if (metricType) {
+      conditions.push(eq(schema.workspaceAnalyticsCache.metricType, metricType));
+    }
+    if (startDate) {
+      conditions.push(gte(schema.workspaceAnalyticsCache.metricDate, startDate));
+    }
+    if (endDate) {
+      conditions.push(lte(schema.workspaceAnalyticsCache.metricDate, endDate));
+    }
+
+    return db.select()
+      .from(schema.workspaceAnalyticsCache)
+      .where(and(...conditions))
+      .orderBy(desc(schema.workspaceAnalyticsCache.metricDate));
+  }
+
+  async upsertWorkspaceAnalytics(workspaceId: string, metricType: string, metricDate: Date, value: number, metadata?: string): Promise<WorkspaceAnalyticsCache> {
+    const dateStart = new Date(metricDate);
+    dateStart.setHours(0, 0, 0, 0);
+    const dateEnd = new Date(dateStart);
+    dateEnd.setDate(dateEnd.getDate() + 1);
+
+    const [existing] = await db.select()
+      .from(schema.workspaceAnalyticsCache)
+      .where(and(
+        eq(schema.workspaceAnalyticsCache.workspaceId, workspaceId),
+        eq(schema.workspaceAnalyticsCache.metricType, metricType),
+        gte(schema.workspaceAnalyticsCache.metricDate, dateStart),
+        lte(schema.workspaceAnalyticsCache.metricDate, dateEnd)
+      ));
+
+    if (existing) {
+      const [updated] = await db.update(schema.workspaceAnalyticsCache)
+        .set({ value: value.toString(), metadata, updatedAt: new Date() })
+        .where(eq(schema.workspaceAnalyticsCache.id, existing.id))
+        .returning();
+      return updated;
+    }
+
+    const [created] = await db.insert(schema.workspaceAnalyticsCache)
+      .values({ workspaceId, metricType, metricDate, value: value.toString(), metadata })
+      .returning();
+    return created;
+  }
+
+  async getWorkspaceAnalyticsSummary(workspaceId: string): Promise<{
+    totalRevenue: number;
+    unpaidInvoices: number;
+    proposalsSent: number;
+    proposalAcceptRate: number;
+    leadsCreated: number;
+    leadsConverted: number;
+    tasksCompleted: number;
+  }> {
+    const [invoiceStats] = await db.select({
+      totalPaid: sql<number>`COALESCE(SUM(CASE WHEN status = 'paid' THEN total_amount ELSE 0 END), 0)`,
+      totalUnpaid: sql<number>`COALESCE(SUM(CASE WHEN status NOT IN ('paid', 'cancelled') THEN balance_due ELSE 0 END), 0)`,
+    })
+    .from(schema.invoices)
+    .where(eq(schema.invoices.tenantId, workspaceId));
+
+    const [proposalStats] = await db.select({
+      total: sql<number>`count(*)`,
+      accepted: sql<number>`SUM(CASE WHEN status = 'accepted' THEN 1 ELSE 0 END)`,
+    })
+    .from(schema.proposals)
+    .where(eq(schema.proposals.tenantId, workspaceId));
+
+    const [customerStats] = await db.select({
+      leads: sql<number>`SUM(CASE WHEN customer_type = 'lead' THEN 1 ELSE 0 END)`,
+      converted: sql<number>`SUM(CASE WHEN customer_type = 'customer' THEN 1 ELSE 0 END)`,
+    })
+    .from(schema.customers)
+    .where(eq(schema.customers.tenantId, workspaceId));
+
+    const [taskStats] = await db.select({
+      completed: sql<number>`SUM(CASE WHEN status = 'completed' THEN 1 ELSE 0 END)`,
+    })
+    .from(schema.tasks)
+    .where(eq(schema.tasks.tenantId, workspaceId));
+
+    return {
+      totalRevenue: Number(invoiceStats?.totalPaid || 0),
+      unpaidInvoices: Number(invoiceStats?.totalUnpaid || 0),
+      proposalsSent: Number(proposalStats?.total || 0),
+      proposalAcceptRate: proposalStats?.total ? (Number(proposalStats.accepted) / Number(proposalStats.total)) * 100 : 0,
+      leadsCreated: Number(customerStats?.leads || 0),
+      leadsConverted: Number(customerStats?.converted || 0),
+      tasksCompleted: Number(taskStats?.completed || 0),
+    };
+  }
+
+  // ==================== MODULE 5: WORKSPACE DELETION OPERATIONS ====================
+
+  async softDeleteWorkspace(workspaceId: string, deletedBy: string, reason?: string): Promise<Tenant | undefined> {
+    const scheduledPurgeAt = new Date();
+    scheduledPurgeAt.setDate(scheduledPurgeAt.getDate() + 30);
+
+    const [updated] = await db.update(schema.tenants)
+      .set({ deletedAt: new Date() })
+      .where(eq(schema.tenants.id, workspaceId))
+      .returning();
+
+    if (updated) {
+      await db.insert(schema.workspaceDeletionLogs)
+        .values({
+          workspaceId,
+          action: 'deleted',
+          deletedBy,
+          reason,
+          scheduledPurgeAt,
+        });
+    }
+
+    return updated;
+  }
+
+  async restoreWorkspace(workspaceId: string, restoredBy: string): Promise<Tenant | undefined> {
+    const [updated] = await db.update(schema.tenants)
+      .set({ deletedAt: null })
+      .where(eq(schema.tenants.id, workspaceId))
+      .returning();
+
+    if (updated) {
+      await db.insert(schema.workspaceDeletionLogs)
+        .values({
+          workspaceId,
+          action: 'restored',
+          restoredBy,
+        });
+    }
+
+    return updated;
+  }
+
+  async getDeletedWorkspaces(): Promise<Tenant[]> {
+    return db.select()
+      .from(schema.tenants)
+      .where(sql`${schema.tenants.deletedAt} IS NOT NULL`);
+  }
+
+  async getWorkspaceDeletionLogs(workspaceId: string): Promise<WorkspaceDeletionLog[]> {
+    return db.select()
+      .from(schema.workspaceDeletionLogs)
+      .where(eq(schema.workspaceDeletionLogs.workspaceId, workspaceId))
+      .orderBy(desc(schema.workspaceDeletionLogs.createdAt));
+  }
+
+  async canDeleteWorkspace(workspaceId: string, userId: string): Promise<{ canDelete: boolean; reason?: string }> {
+    const subscription = await this.getWorkspaceSubscription(workspaceId);
+    if (subscription && subscription.status === 'active') {
+      return { canDelete: false, reason: 'Cannot delete workspace with active subscription' };
+    }
+
+    const userWorkspaces = await this.getUserWorkspaces(userId);
+    if (userWorkspaces.length <= 1) {
+      return { canDelete: false, reason: 'Cannot delete your only workspace' };
+    }
+
+    return { canDelete: true };
+  }
+
+  // ==================== MODULE 6: ONBOARDING OPERATIONS ====================
+
+  async getWorkspaceOnboardingProgress(workspaceId: string): Promise<WorkspaceOnboardingProgress | undefined> {
+    const [progress] = await db.select()
+      .from(schema.workspaceOnboardingProgress)
+      .where(eq(schema.workspaceOnboardingProgress.workspaceId, workspaceId));
+    return progress;
+  }
+
+  async createWorkspaceOnboardingProgress(workspaceId: string): Promise<WorkspaceOnboardingProgress> {
+    const [created] = await db.insert(schema.workspaceOnboardingProgress)
+      .values({ workspaceId })
+      .returning();
+    return created;
+  }
+
+  async updateOnboardingStep(workspaceId: string, step: string, status: string): Promise<WorkspaceOnboardingProgress | undefined> {
+    const updates: any = { [step]: status, updatedAt: new Date() };
+    
+    const progress = await this.getWorkspaceOnboardingProgress(workspaceId);
+    if (!progress) {
+      await this.createWorkspaceOnboardingProgress(workspaceId);
+    }
+
+    const allSteps = ['step1AddBranding', 'step2AddTeamMembers', 'step3AddFirstClient', 'step4CreateProject', 'step5CreateProposal'];
+    const stepIndex = allSteps.indexOf(step);
+    if (stepIndex !== -1 && status === 'completed') {
+      updates.currentStep = Math.min(stepIndex + 2, 5);
+    }
+
+    const [updated] = await db.update(schema.workspaceOnboardingProgress)
+      .set(updates)
+      .where(eq(schema.workspaceOnboardingProgress.workspaceId, workspaceId))
+      .returning();
+    return updated;
+  }
+
+  async completeOnboarding(workspaceId: string): Promise<WorkspaceOnboardingProgress | undefined> {
+    const [updated] = await db.update(schema.workspaceOnboardingProgress)
+      .set({ isCompleted: true, completedAt: new Date(), updatedAt: new Date() })
+      .where(eq(schema.workspaceOnboardingProgress.workspaceId, workspaceId))
+      .returning();
+    return updated;
+  }
+
+  async dismissOnboarding(workspaceId: string): Promise<WorkspaceOnboardingProgress | undefined> {
+    const [updated] = await db.update(schema.workspaceOnboardingProgress)
+      .set({ isDismissed: true, updatedAt: new Date() })
+      .where(eq(schema.workspaceOnboardingProgress.workspaceId, workspaceId))
+      .returning();
+    return updated;
+  }
+
+  async reopenOnboarding(workspaceId: string): Promise<WorkspaceOnboardingProgress | undefined> {
+    const [updated] = await db.update(schema.workspaceOnboardingProgress)
+      .set({ isDismissed: false, updatedAt: new Date() })
+      .where(eq(schema.workspaceOnboardingProgress.workspaceId, workspaceId))
+      .returning();
+    return updated;
   }
 }
 
