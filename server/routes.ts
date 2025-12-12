@@ -4514,6 +4514,386 @@ export async function registerRoutes(
     }
   });
 
+  // ==================== MODULE 1: WORKSPACE BILLING ROUTES ====================
+
+  // Get all available workspace plans
+  app.get("/api/workspace/plans", requireAuth, async (req, res) => {
+    try {
+      const plans = await storage.getAllWorkspacePlans();
+      res.json(plans);
+    } catch (error) {
+      console.error("Get workspace plans error:", error);
+      res.status(500).json({ message: "Failed to get workspace plans" });
+    }
+  });
+
+  // Get current workspace subscription
+  app.get("/api/workspace/:workspaceId/subscription", requireAuth, async (req, res) => {
+    try {
+      const { workspaceId } = req.params;
+      const subscription = await storage.getWorkspaceSubscription(workspaceId);
+      res.json(subscription || null);
+    } catch (error) {
+      console.error("Get workspace subscription error:", error);
+      res.status(500).json({ message: "Failed to get subscription" });
+    }
+  });
+
+  // Get workspace usage
+  app.get("/api/workspace/:workspaceId/usage", requireAuth, async (req, res) => {
+    try {
+      const { workspaceId } = req.params;
+      const usage = await storage.getWorkspaceUsage(workspaceId);
+      res.json(usage || null);
+    } catch (error) {
+      console.error("Get workspace usage error:", error);
+      res.status(500).json({ message: "Failed to get usage" });
+    }
+  });
+
+  // Check billing limits
+  app.get("/api/workspace/:workspaceId/billing-limits", requireAuth, async (req, res) => {
+    try {
+      const { workspaceId } = req.params;
+      const limits = await storage.checkBillingLimits(workspaceId);
+      res.json(limits);
+    } catch (error) {
+      console.error("Check billing limits error:", error);
+      res.status(500).json({ message: "Failed to check billing limits" });
+    }
+  });
+
+  // Get workspace invoices
+  app.get("/api/workspace/:workspaceId/invoices", requireAuth, async (req, res) => {
+    try {
+      const { workspaceId } = req.params;
+      const invoices = await storage.getWorkspaceInvoices(workspaceId);
+      res.json(invoices);
+    } catch (error) {
+      console.error("Get workspace invoices error:", error);
+      res.status(500).json({ message: "Failed to get invoices" });
+    }
+  });
+
+  // Get workspace payment methods
+  app.get("/api/workspace/:workspaceId/payment-methods", requireAuth, async (req, res) => {
+    try {
+      const { workspaceId } = req.params;
+      const paymentMethods = await storage.getWorkspacePaymentMethods(workspaceId);
+      res.json(paymentMethods);
+    } catch (error) {
+      console.error("Get payment methods error:", error);
+      res.status(500).json({ message: "Failed to get payment methods" });
+    }
+  });
+
+  // ==================== MODULE 2: WORKSPACE BRANDING ROUTES ====================
+
+  // Get workspace branding
+  app.get("/api/workspace/:workspaceId/branding", requireAuth, async (req, res) => {
+    try {
+      const { workspaceId } = req.params;
+      const branding = await storage.getWorkspaceBranding(workspaceId);
+      res.json(branding || {
+        workspaceId,
+        primaryColor: '#3b82f6',
+        secondaryColor: '#64748b',
+        accentColor: '#f59e0b',
+      });
+    } catch (error) {
+      console.error("Get workspace branding error:", error);
+      res.status(500).json({ message: "Failed to get branding" });
+    }
+  });
+
+  // Update workspace branding
+  app.put("/api/workspace/:workspaceId/branding", requireAuth, async (req, res) => {
+    try {
+      const { workspaceId } = req.params;
+      const branding = await storage.upsertWorkspaceBranding(workspaceId, req.body);
+      res.json(branding);
+    } catch (error) {
+      console.error("Update workspace branding error:", error);
+      res.status(500).json({ message: "Failed to update branding" });
+    }
+  });
+
+  // Get workspace PDF settings
+  app.get("/api/workspace/:workspaceId/pdf-settings", requireAuth, async (req, res) => {
+    try {
+      const { workspaceId } = req.params;
+      const settings = await storage.getWorkspacePdfSettings(workspaceId);
+      res.json(settings || { workspaceId });
+    } catch (error) {
+      console.error("Get PDF settings error:", error);
+      res.status(500).json({ message: "Failed to get PDF settings" });
+    }
+  });
+
+  // Update workspace PDF settings
+  app.put("/api/workspace/:workspaceId/pdf-settings", requireAuth, async (req, res) => {
+    try {
+      const { workspaceId } = req.params;
+      const settings = await storage.upsertWorkspacePdfSettings(workspaceId, req.body);
+      res.json(settings);
+    } catch (error) {
+      console.error("Update PDF settings error:", error);
+      res.status(500).json({ message: "Failed to update PDF settings" });
+    }
+  });
+
+  // ==================== MODULE 3: CUSTOM ROLES ROUTES ====================
+
+  // Get workspace custom roles
+  app.get("/api/workspace/:workspaceId/roles", requireAuth, async (req, res) => {
+    try {
+      const { workspaceId } = req.params;
+      const roles = await storage.getWorkspaceCustomRoles(workspaceId);
+      res.json(roles);
+    } catch (error) {
+      console.error("Get workspace roles error:", error);
+      res.status(500).json({ message: "Failed to get roles" });
+    }
+  });
+
+  // Get custom role with permissions
+  app.get("/api/workspace/:workspaceId/roles/:roleId", requireAuth, async (req, res) => {
+    try {
+      const { roleId } = req.params;
+      const role = await storage.getCustomRoleWithPermissions(roleId);
+      if (!role) {
+        return res.status(404).json({ message: "Role not found" });
+      }
+      res.json(role);
+    } catch (error) {
+      console.error("Get role error:", error);
+      res.status(500).json({ message: "Failed to get role" });
+    }
+  });
+
+  // Create custom role
+  app.post("/api/workspace/:workspaceId/roles", requireAuth, async (req, res) => {
+    try {
+      const { workspaceId } = req.params;
+      const userId = (req.user as any)?.id;
+      const role = await storage.createWorkspaceCustomRole({
+        ...req.body,
+        workspaceId,
+        createdBy: userId,
+      });
+      res.json(role);
+    } catch (error) {
+      console.error("Create role error:", error);
+      res.status(500).json({ message: "Failed to create role" });
+    }
+  });
+
+  // Update custom role
+  app.put("/api/workspace/:workspaceId/roles/:roleId", requireAuth, async (req, res) => {
+    try {
+      const { roleId } = req.params;
+      const { permissions, ...roleData } = req.body;
+      
+      const role = await storage.updateWorkspaceCustomRole(roleId, roleData);
+      if (!role) {
+        return res.status(404).json({ message: "Role not found" });
+      }
+
+      if (permissions) {
+        await storage.setRolePermissions(roleId, permissions);
+      }
+
+      res.json(role);
+    } catch (error) {
+      console.error("Update role error:", error);
+      res.status(500).json({ message: "Failed to update role" });
+    }
+  });
+
+  // Delete custom role
+  app.delete("/api/workspace/:workspaceId/roles/:roleId", requireAuth, async (req, res) => {
+    try {
+      const { roleId } = req.params;
+      await storage.deleteWorkspaceCustomRole(roleId);
+      res.json({ message: "Role deleted" });
+    } catch (error) {
+      console.error("Delete role error:", error);
+      res.status(500).json({ message: "Failed to delete role" });
+    }
+  });
+
+  // ==================== MODULE 4: WORKSPACE ANALYTICS ROUTES ====================
+
+  // Get workspace analytics summary
+  app.get("/api/workspace/:workspaceId/analytics/summary", requireAuth, async (req, res) => {
+    try {
+      const { workspaceId } = req.params;
+      const summary = await storage.getWorkspaceAnalyticsSummary(workspaceId);
+      res.json(summary);
+    } catch (error) {
+      console.error("Get analytics summary error:", error);
+      res.status(500).json({ message: "Failed to get analytics" });
+    }
+  });
+
+  // Get workspace analytics history
+  app.get("/api/workspace/:workspaceId/analytics", requireAuth, async (req, res) => {
+    try {
+      const { workspaceId } = req.params;
+      const { metricType, startDate, endDate } = req.query;
+      
+      const analytics = await storage.getWorkspaceAnalytics(
+        workspaceId,
+        metricType as string,
+        startDate ? new Date(startDate as string) : undefined,
+        endDate ? new Date(endDate as string) : undefined
+      );
+      res.json(analytics);
+    } catch (error) {
+      console.error("Get analytics error:", error);
+      res.status(500).json({ message: "Failed to get analytics" });
+    }
+  });
+
+  // ==================== MODULE 5: WORKSPACE DELETION ROUTES ====================
+
+  // Soft delete workspace
+  app.delete("/api/workspace/:workspaceId", requireAuth, async (req, res) => {
+    try {
+      const { workspaceId } = req.params;
+      const userId = (req.user as any)?.id;
+      const { reason } = req.body;
+
+      const canDelete = await storage.canDeleteWorkspace(workspaceId, userId);
+      if (!canDelete.canDelete) {
+        return res.status(400).json({ message: canDelete.reason });
+      }
+
+      const deleted = await storage.softDeleteWorkspace(workspaceId, userId, reason);
+      if (!deleted) {
+        return res.status(404).json({ message: "Workspace not found" });
+      }
+
+      res.json({ 
+        message: "Workspace scheduled for deletion",
+        recoveryDeadline: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000),
+      });
+    } catch (error) {
+      console.error("Delete workspace error:", error);
+      res.status(500).json({ message: "Failed to delete workspace" });
+    }
+  });
+
+  // Restore deleted workspace
+  app.post("/api/workspace/:workspaceId/restore", requireAuth, async (req, res) => {
+    try {
+      const { workspaceId } = req.params;
+      const userId = (req.user as any)?.id;
+
+      const restored = await storage.restoreWorkspace(workspaceId, userId);
+      if (!restored) {
+        return res.status(404).json({ message: "Workspace not found" });
+      }
+
+      res.json({ message: "Workspace restored successfully" });
+    } catch (error) {
+      console.error("Restore workspace error:", error);
+      res.status(500).json({ message: "Failed to restore workspace" });
+    }
+  });
+
+  // Get deleted workspaces (admin only)
+  app.get("/api/workspace/deleted", requireAuth, async (req, res) => {
+    try {
+      const deleted = await storage.getDeletedWorkspaces();
+      res.json(deleted);
+    } catch (error) {
+      console.error("Get deleted workspaces error:", error);
+      res.status(500).json({ message: "Failed to get deleted workspaces" });
+    }
+  });
+
+  // Get workspace deletion logs
+  app.get("/api/workspace/:workspaceId/deletion-logs", requireAuth, async (req, res) => {
+    try {
+      const { workspaceId } = req.params;
+      const logs = await storage.getWorkspaceDeletionLogs(workspaceId);
+      res.json(logs);
+    } catch (error) {
+      console.error("Get deletion logs error:", error);
+      res.status(500).json({ message: "Failed to get deletion logs" });
+    }
+  });
+
+  // ==================== MODULE 6: ONBOARDING ROUTES ====================
+
+  // Get onboarding progress
+  app.get("/api/workspace/:workspaceId/onboarding", requireAuth, async (req, res) => {
+    try {
+      const { workspaceId } = req.params;
+      let progress = await storage.getWorkspaceOnboardingProgress(workspaceId);
+      
+      if (!progress) {
+        progress = await storage.createWorkspaceOnboardingProgress(workspaceId);
+      }
+      
+      res.json(progress);
+    } catch (error) {
+      console.error("Get onboarding progress error:", error);
+      res.status(500).json({ message: "Failed to get onboarding progress" });
+    }
+  });
+
+  // Update onboarding step
+  app.put("/api/workspace/:workspaceId/onboarding/:step", requireAuth, async (req, res) => {
+    try {
+      const { workspaceId, step } = req.params;
+      const { status } = req.body;
+      
+      const progress = await storage.updateOnboardingStep(workspaceId, step, status);
+      res.json(progress);
+    } catch (error) {
+      console.error("Update onboarding step error:", error);
+      res.status(500).json({ message: "Failed to update onboarding" });
+    }
+  });
+
+  // Complete onboarding
+  app.post("/api/workspace/:workspaceId/onboarding/complete", requireAuth, async (req, res) => {
+    try {
+      const { workspaceId } = req.params;
+      const progress = await storage.completeOnboarding(workspaceId);
+      res.json(progress);
+    } catch (error) {
+      console.error("Complete onboarding error:", error);
+      res.status(500).json({ message: "Failed to complete onboarding" });
+    }
+  });
+
+  // Dismiss onboarding
+  app.post("/api/workspace/:workspaceId/onboarding/dismiss", requireAuth, async (req, res) => {
+    try {
+      const { workspaceId } = req.params;
+      const progress = await storage.dismissOnboarding(workspaceId);
+      res.json(progress);
+    } catch (error) {
+      console.error("Dismiss onboarding error:", error);
+      res.status(500).json({ message: "Failed to dismiss onboarding" });
+    }
+  });
+
+  // Reopen onboarding
+  app.post("/api/workspace/:workspaceId/onboarding/reopen", requireAuth, async (req, res) => {
+    try {
+      const { workspaceId } = req.params;
+      const progress = await storage.reopenOnboarding(workspaceId);
+      res.json(progress);
+    } catch (error) {
+      console.error("Reopen onboarding error:", error);
+      res.status(500).json({ message: "Failed to reopen onboarding" });
+    }
+  });
+
   return httpServer;
 }
 
