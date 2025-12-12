@@ -582,6 +582,62 @@ export const workspacesApi = {
     const params = limit ? `?limit=${limit}` : '';
     return apiRequest(`/workspaces/${workspaceId}/activity${params}`);
   },
+  
+  // ==== MODULE 1: BILLING ====
+  getPlans: () => apiRequest("/workspace/plans"),
+  getSubscription: (workspaceId: string) => apiRequest(`/workspace/${workspaceId}/subscription`),
+  getUsage: (workspaceId: string) => apiRequest(`/workspace/${workspaceId}/usage`),
+  getBillingLimits: (workspaceId: string) => apiRequest(`/workspace/${workspaceId}/billing-limits`),
+  getInvoices: (workspaceId: string) => apiRequest(`/workspace/${workspaceId}/invoices`),
+  getPaymentMethods: (workspaceId: string) => apiRequest(`/workspace/${workspaceId}/payment-methods`),
+  
+  // ==== MODULE 2: BRANDING ====
+  getBranding: (workspaceId: string) => apiRequest(`/workspace/${workspaceId}/branding`),
+  updateBranding: (workspaceId: string, data: any) => 
+    apiRequest(`/workspace/${workspaceId}/branding`, { method: "PUT", body: JSON.stringify(data) }),
+  getPdfSettings: (workspaceId: string) => apiRequest(`/workspace/${workspaceId}/pdf-settings`),
+  updatePdfSettings: (workspaceId: string, data: any) => 
+    apiRequest(`/workspace/${workspaceId}/pdf-settings`, { method: "PUT", body: JSON.stringify(data) }),
+  
+  // ==== MODULE 3: CUSTOM ROLES ====
+  getCustomRoles: (workspaceId: string) => apiRequest(`/workspace/${workspaceId}/roles`),
+  getCustomRole: (workspaceId: string, roleId: string) => apiRequest(`/workspace/${workspaceId}/roles/${roleId}`),
+  createCustomRole: (workspaceId: string, data: any) => 
+    apiRequest(`/workspace/${workspaceId}/roles`, { method: "POST", body: JSON.stringify(data) }),
+  updateCustomRole: (workspaceId: string, roleId: string, data: any) => 
+    apiRequest(`/workspace/${workspaceId}/roles/${roleId}`, { method: "PUT", body: JSON.stringify(data) }),
+  deleteCustomRole: (workspaceId: string, roleId: string) => 
+    apiRequest(`/workspace/${workspaceId}/roles/${roleId}`, { method: "DELETE" }),
+  
+  // ==== MODULE 4: ANALYTICS ====
+  getAnalyticsSummary: (workspaceId: string) => apiRequest(`/workspace/${workspaceId}/analytics/summary`),
+  getAnalytics: (workspaceId: string, metricType?: string, startDate?: string, endDate?: string) => {
+    const params = new URLSearchParams();
+    if (metricType) params.append("metricType", metricType);
+    if (startDate) params.append("startDate", startDate);
+    if (endDate) params.append("endDate", endDate);
+    const query = params.toString();
+    return apiRequest(`/workspace/${workspaceId}/analytics${query ? `?${query}` : ""}`);
+  },
+  
+  // ==== MODULE 5: DELETION ====
+  deleteWorkspace: (workspaceId: string, reason?: string) => 
+    apiRequest(`/workspace/${workspaceId}`, { method: "DELETE", body: JSON.stringify({ reason }) }),
+  restoreWorkspace: (workspaceId: string) => 
+    apiRequest(`/workspace/${workspaceId}/restore`, { method: "POST" }),
+  getDeletedWorkspaces: () => apiRequest("/workspace/deleted"),
+  getDeletionLogs: (workspaceId: string) => apiRequest(`/workspace/${workspaceId}/deletion-logs`),
+  
+  // ==== MODULE 6: ONBOARDING ====
+  getOnboardingProgress: (workspaceId: string) => apiRequest(`/workspace/${workspaceId}/onboarding`),
+  updateOnboardingStep: (workspaceId: string, step: string, status: string) => 
+    apiRequest(`/workspace/${workspaceId}/onboarding/${step}`, { method: "PUT", body: JSON.stringify({ status }) }),
+  completeOnboarding: (workspaceId: string) => 
+    apiRequest(`/workspace/${workspaceId}/onboarding/complete`, { method: "POST" }),
+  dismissOnboarding: (workspaceId: string) => 
+    apiRequest(`/workspace/${workspaceId}/onboarding/dismiss`, { method: "POST" }),
+  reopenOnboarding: (workspaceId: string) => 
+    apiRequest(`/workspace/${workspaceId}/onboarding/reopen`, { method: "POST" }),
 };
 
 // User Invitations API (for accepting/declining invitations)

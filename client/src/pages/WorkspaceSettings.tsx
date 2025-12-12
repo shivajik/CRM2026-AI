@@ -4,7 +4,8 @@ import { useLocation } from "wouter";
 import { 
   Building2, Users, Palette, AlertTriangle, Trash2, 
   Mail, UserPlus, MoreVertical, Shield, Eye, UserMinus,
-  Send, XCircle, Clock, Check
+  Send, XCircle, Clock, Check, CreditCard, BarChart3,
+  TrendingUp, DollarSign, FileText, Zap
 } from "lucide-react";
 import { Layout } from "@/components/layout/Layout";
 import { Button } from "@/components/ui/button";
@@ -300,10 +301,10 @@ export default function WorkspaceSettings() {
         </div>
 
         <Tabs defaultValue={defaultTab} className="space-y-6">
-          <TabsList className="grid w-full grid-cols-4">
+          <TabsList className="grid w-full grid-cols-3 sm:grid-cols-6">
             <TabsTrigger value="info" className="flex items-center gap-2" data-testid="tab-workspace-info">
               <Building2 className="h-4 w-4" />
-              <span className="hidden sm:inline">Workspace Info</span>
+              <span className="hidden sm:inline">Info</span>
             </TabsTrigger>
             <TabsTrigger value="team" className="flex items-center gap-2" data-testid="tab-workspace-team">
               <Users className="h-4 w-4" />
@@ -313,9 +314,17 @@ export default function WorkspaceSettings() {
               <Palette className="h-4 w-4" />
               <span className="hidden sm:inline">Branding</span>
             </TabsTrigger>
+            <TabsTrigger value="billing" className="flex items-center gap-2" data-testid="tab-workspace-billing">
+              <CreditCard className="h-4 w-4" />
+              <span className="hidden sm:inline">Billing</span>
+            </TabsTrigger>
+            <TabsTrigger value="analytics" className="flex items-center gap-2" data-testid="tab-workspace-analytics">
+              <BarChart3 className="h-4 w-4" />
+              <span className="hidden sm:inline">Analytics</span>
+            </TabsTrigger>
             <TabsTrigger value="danger" className="flex items-center gap-2" data-testid="tab-workspace-danger">
               <AlertTriangle className="h-4 w-4" />
-              <span className="hidden sm:inline">Danger Zone</span>
+              <span className="hidden sm:inline">Danger</span>
             </TabsTrigger>
           </TabsList>
 
@@ -620,6 +629,185 @@ export default function WorkspaceSettings() {
                   </div>
 
                   <Button data-testid="button-save-branding">Save Branding Settings</Button>
+                </div>
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          <TabsContent value="billing" className="space-y-6">
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <CreditCard className="h-5 w-5" />
+                  Billing & Subscription
+                </CardTitle>
+                <CardDescription>
+                  Manage your workspace plan, usage limits, and payment methods.
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-6">
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  <div className="p-4 border rounded-lg bg-muted/50">
+                    <div className="flex items-center gap-2 text-muted-foreground mb-2">
+                      <Zap className="h-4 w-4" />
+                      <span className="text-sm font-medium">Current Plan</span>
+                    </div>
+                    <div className="text-2xl font-bold">Free</div>
+                    <p className="text-sm text-muted-foreground mt-1">Perfect for getting started</p>
+                  </div>
+                  <div className="p-4 border rounded-lg bg-muted/50">
+                    <div className="flex items-center gap-2 text-muted-foreground mb-2">
+                      <Users className="h-4 w-4" />
+                      <span className="text-sm font-medium">Team Members</span>
+                    </div>
+                    <div className="text-2xl font-bold">{members.length} / 2</div>
+                    <p className="text-sm text-muted-foreground mt-1">Seats used</p>
+                  </div>
+                  <div className="p-4 border rounded-lg bg-muted/50">
+                    <div className="flex items-center gap-2 text-muted-foreground mb-2">
+                      <TrendingUp className="h-4 w-4" />
+                      <span className="text-sm font-medium">Usage This Month</span>
+                    </div>
+                    <div className="text-2xl font-bold">0%</div>
+                    <p className="text-sm text-muted-foreground mt-1">Of email quota</p>
+                  </div>
+                </div>
+
+                <Separator />
+
+                <div>
+                  <h4 className="font-medium mb-4">Available Plans</h4>
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    <div className="p-4 border rounded-lg border-primary bg-primary/5">
+                      <div className="font-medium text-lg">Free</div>
+                      <div className="text-2xl font-bold mt-2">$0<span className="text-sm font-normal text-muted-foreground">/mo</span></div>
+                      <ul className="text-sm text-muted-foreground mt-4 space-y-2">
+                        <li>2 team members</li>
+                        <li>50 emails/month</li>
+                        <li>5 proposals</li>
+                        <li>Basic CRM</li>
+                      </ul>
+                      <Button variant="outline" className="w-full mt-4" disabled>Current Plan</Button>
+                    </div>
+                    <div className="p-4 border-2 rounded-lg border-primary relative">
+                      <Badge className="absolute -top-2 right-4">Popular</Badge>
+                      <div className="font-medium text-lg">Pro</div>
+                      <div className="text-2xl font-bold mt-2">$29<span className="text-sm font-normal text-muted-foreground">/mo</span></div>
+                      <ul className="text-sm text-muted-foreground mt-4 space-y-2">
+                        <li>10 team members</li>
+                        <li>1,000 emails/month</li>
+                        <li>50 proposals</li>
+                        <li>Custom branding</li>
+                        <li>Priority support</li>
+                      </ul>
+                      <Button className="w-full mt-4" data-testid="button-upgrade-pro">Upgrade to Pro</Button>
+                    </div>
+                    <div className="p-4 border rounded-lg">
+                      <div className="font-medium text-lg">Agency</div>
+                      <div className="text-2xl font-bold mt-2">$99<span className="text-sm font-normal text-muted-foreground">/mo</span></div>
+                      <ul className="text-sm text-muted-foreground mt-4 space-y-2">
+                        <li>Unlimited members</li>
+                        <li>Unlimited emails</li>
+                        <li>Unlimited proposals</li>
+                        <li>White-label</li>
+                        <li>Dedicated support</li>
+                      </ul>
+                      <Button variant="outline" className="w-full mt-4" data-testid="button-upgrade-agency">Upgrade to Agency</Button>
+                    </div>
+                  </div>
+                </div>
+
+                <Separator />
+
+                <div>
+                  <h4 className="font-medium mb-4 flex items-center gap-2">
+                    <FileText className="h-4 w-4" />
+                    Billing History
+                  </h4>
+                  <div className="text-muted-foreground text-center py-8 border rounded-lg">
+                    No invoices yet. Your billing history will appear here.
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          <TabsContent value="analytics" className="space-y-6">
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <BarChart3 className="h-5 w-5" />
+                  Workspace Analytics
+                </CardTitle>
+                <CardDescription>
+                  Track your workspace performance and team activity.
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-6">
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                  <div className="p-4 border rounded-lg bg-muted/50 text-center">
+                    <DollarSign className="h-8 w-8 mx-auto text-green-500 mb-2" />
+                    <div className="text-2xl font-bold">$0</div>
+                    <p className="text-sm text-muted-foreground">Total Revenue</p>
+                  </div>
+                  <div className="p-4 border rounded-lg bg-muted/50 text-center">
+                    <FileText className="h-8 w-8 mx-auto text-blue-500 mb-2" />
+                    <div className="text-2xl font-bold">0</div>
+                    <p className="text-sm text-muted-foreground">Proposals Sent</p>
+                  </div>
+                  <div className="p-4 border rounded-lg bg-muted/50 text-center">
+                    <Users className="h-8 w-8 mx-auto text-purple-500 mb-2" />
+                    <div className="text-2xl font-bold">0</div>
+                    <p className="text-sm text-muted-foreground">Leads Converted</p>
+                  </div>
+                  <div className="p-4 border rounded-lg bg-muted/50 text-center">
+                    <Check className="h-8 w-8 mx-auto text-green-500 mb-2" />
+                    <div className="text-2xl font-bold">0</div>
+                    <p className="text-sm text-muted-foreground">Tasks Completed</p>
+                  </div>
+                </div>
+
+                <Separator />
+
+                <div>
+                  <h4 className="font-medium mb-4">Team Performance</h4>
+                  <div className="space-y-4">
+                    {members.length === 0 ? (
+                      <div className="text-muted-foreground text-center py-8 border rounded-lg">
+                        Add team members to see their performance metrics.
+                      </div>
+                    ) : (
+                      members.slice(0, 5).map((member) => (
+                        <div key={member.id} className="flex items-center justify-between p-3 border rounded-lg">
+                          <div className="flex items-center gap-3">
+                            <Avatar className="h-8 w-8">
+                              <AvatarFallback className="text-xs">
+                                {getInitials(member.user.firstName, member.user.lastName)}
+                              </AvatarFallback>
+                            </Avatar>
+                            <div>
+                              <div className="font-medium text-sm">{member.user.firstName} {member.user.lastName}</div>
+                              <div className="text-xs text-muted-foreground">{member.role}</div>
+                            </div>
+                          </div>
+                          <div className="flex gap-4 text-sm text-muted-foreground">
+                            <span>0 deals</span>
+                            <span>0 tasks</span>
+                            <span>0 proposals</span>
+                          </div>
+                        </div>
+                      ))
+                    )}
+                  </div>
+                </div>
+
+                <Separator />
+
+                <div>
+                  <h4 className="font-medium mb-4">Activity Overview</h4>
+                  <div className="h-40 border rounded-lg flex items-center justify-center text-muted-foreground">
+                    Activity chart will appear here as you use the workspace
+                  </div>
                 </div>
               </CardContent>
             </Card>
