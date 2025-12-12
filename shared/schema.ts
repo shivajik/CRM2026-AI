@@ -1870,3 +1870,81 @@ export const loginAttempts = pgTable("login_attempts", {
 export const insertLoginAttemptSchema = createInsertSchema(loginAttempts).omit({ id: true, createdAt: true });
 export type InsertLoginAttempt = z.infer<typeof insertLoginAttemptSchema>;
 export type LoginAttempt = typeof loginAttempts.$inferSelect;
+
+// ==================== MODULE 7: CUSTOMER PORTAL ====================
+
+// Customer Portal Settings - workspace-level settings for client portal
+export const customerPortalSettings = pgTable("customer_portal_settings", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  workspaceId: varchar("workspace_id").references(() => tenants.id, { onDelete: "cascade" }).notNull().unique(),
+  portalEnabled: boolean("portal_enabled").default(false).notNull(),
+  showProposals: boolean("show_proposals").default(true).notNull(),
+  showQuotations: boolean("show_quotations").default(true).notNull(),
+  showInvoices: boolean("show_invoices").default(true).notNull(),
+  showTasks: boolean("show_tasks").default(false).notNull(),
+  showDocuments: boolean("show_documents").default(false).notNull(),
+  allowComments: boolean("allow_comments").default(true).notNull(),
+  allowFileUploads: boolean("allow_file_uploads").default(false).notNull(),
+  allowOnlinePayments: boolean("allow_online_payments").default(false).notNull(),
+  welcomeMessage: text("welcome_message"),
+  customCss: text("custom_css"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+export const insertCustomerPortalSettingsSchema = createInsertSchema(customerPortalSettings).omit({ id: true, createdAt: true, updatedAt: true });
+export type InsertCustomerPortalSettings = z.infer<typeof insertCustomerPortalSettingsSchema>;
+export type CustomerPortalSettings = typeof customerPortalSettings.$inferSelect;
+
+// Customer Portal Activity Logs - track client portal activities
+export const customerPortalActivityLogs = pgTable("customer_portal_activity_logs", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  workspaceId: varchar("workspace_id").references(() => tenants.id, { onDelete: "cascade" }).notNull(),
+  customerId: varchar("customer_id").references(() => users.id, { onDelete: "cascade" }).notNull(),
+  action: text("action").notNull(), // login, proposal_viewed, invoice_viewed, quotation_viewed, document_downloaded, comment_added, proposal_accepted, invoice_paid
+  resourceType: text("resource_type"), // proposal, invoice, quotation, document
+  resourceId: varchar("resource_id"),
+  ipAddress: text("ip_address"),
+  userAgent: text("user_agent"),
+  metadata: text("metadata"), // JSON for additional context
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+export const insertCustomerPortalActivityLogSchema = createInsertSchema(customerPortalActivityLogs).omit({ id: true, createdAt: true });
+export type InsertCustomerPortalActivityLog = z.infer<typeof insertCustomerPortalActivityLogSchema>;
+export type CustomerPortalActivityLog = typeof customerPortalActivityLogs.$inferSelect;
+
+// Password Reset Tokens - for forgot password flow
+export const passwordResetTokens = pgTable("password_reset_tokens", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  userId: varchar("user_id").references(() => users.id, { onDelete: "cascade" }).notNull(),
+  token: text("token").notNull().unique(),
+  expiresAt: timestamp("expires_at").notNull(),
+  usedAt: timestamp("used_at"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+export const insertPasswordResetTokenSchema = createInsertSchema(passwordResetTokens).omit({ id: true, createdAt: true });
+export type InsertPasswordResetToken = z.infer<typeof insertPasswordResetTokenSchema>;
+export type PasswordResetToken = typeof passwordResetTokens.$inferSelect;
+
+// Client Documents - shared files between agency and client
+export const clientDocuments = pgTable("client_documents", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  tenantId: varchar("tenant_id").references(() => tenants.id, { onDelete: "cascade" }).notNull(),
+  customerId: varchar("customer_id").references(() => customers.id, { onDelete: "cascade" }).notNull(),
+  uploadedBy: varchar("uploaded_by").references(() => users.id, { onDelete: "set null" }),
+  name: text("name").notNull(),
+  description: text("description"),
+  fileUrl: text("file_url").notNull(),
+  fileType: text("file_type"),
+  fileSize: integer("file_size"),
+  isVisibleToClient: boolean("is_visible_to_client").default(true).notNull(),
+  uploadedByClient: boolean("uploaded_by_client").default(false).notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+export const insertClientDocumentSchema = createInsertSchema(clientDocuments).omit({ id: true, createdAt: true, updatedAt: true });
+export type InsertClientDocument = z.infer<typeof insertClientDocumentSchema>;
+export type ClientDocument = typeof clientDocuments.$inferSelect;

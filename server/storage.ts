@@ -70,6 +70,10 @@ import type {
   InsertWorkspaceOnboardingProgress, WorkspaceOnboardingProgress,
   InsertAuditLog, AuditLog,
   InsertLoginAttempt, LoginAttempt,
+  InsertCustomerPortalSettings, CustomerPortalSettings,
+  InsertCustomerPortalActivityLog, CustomerPortalActivityLog,
+  InsertPasswordResetToken, PasswordResetToken,
+  InsertClientDocument, ClientDocument,
 } from "@shared/schema";
 
 export interface IStorage {
@@ -570,6 +574,29 @@ export interface IStorage {
 
   // Workspace creation (extends tenant creation for multi-workspace)
   createWorkspace(tenantData: InsertTenant, ownerId: string): Promise<Tenant>;
+
+  // ==================== CUSTOMER PORTAL ====================
+  // Portal Settings
+  getCustomerPortalSettings(workspaceId: string): Promise<CustomerPortalSettings | undefined>;
+  upsertCustomerPortalSettings(workspaceId: string, data: Partial<InsertCustomerPortalSettings>): Promise<CustomerPortalSettings>;
+  
+  // Portal Activity Logs
+  createPortalActivityLog(log: InsertCustomerPortalActivityLog): Promise<CustomerPortalActivityLog>;
+  getPortalActivityLogs(workspaceId: string, options?: { customerId?: string; limit?: number }): Promise<CustomerPortalActivityLog[]>;
+  
+  // Password Reset Tokens
+  createPasswordResetToken(data: InsertPasswordResetToken): Promise<PasswordResetToken>;
+  getPasswordResetToken(token: string): Promise<PasswordResetToken | undefined>;
+  markPasswordResetTokenUsed(id: string): Promise<void>;
+  
+  // Client Documents
+  createClientDocument(doc: InsertClientDocument): Promise<ClientDocument>;
+  getClientDocuments(tenantId: string, customerId: string): Promise<ClientDocument[]>;
+  getClientDocumentById(id: string, tenantId: string): Promise<ClientDocument | undefined>;
+  deleteClientDocument(id: string, tenantId: string): Promise<void>;
+  
+  // Portal-specific queries
+  getProposalsByCustomerForPortal(customerId: string, tenantId: string): Promise<schema.Proposal[]>;
 }
 
 export class DatabaseStorage implements IStorage {
