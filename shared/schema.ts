@@ -1047,6 +1047,19 @@ export const TEMPLATE_PURPOSES = {
 
 export type TemplatePurpose = typeof TEMPLATE_PURPOSES[keyof typeof TEMPLATE_PURPOSES];
 
+// Proposal theme presets
+export const PROPOSAL_THEMES = {
+  MODERN_BLUE: 'modern_blue',
+  CORPORATE_DARK: 'corporate_dark',
+  ELEGANT_GOLD: 'elegant_gold',
+  FRESH_GREEN: 'fresh_green',
+  BOLD_RED: 'bold_red',
+  MINIMAL_GRAY: 'minimal_gray',
+  CUSTOM: 'custom',
+} as const;
+
+export type ProposalTheme = typeof PROPOSAL_THEMES[keyof typeof PROPOSAL_THEMES];
+
 // Proposal Templates - reusable proposal structures
 export const proposalTemplates = pgTable("proposal_templates", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
@@ -1055,6 +1068,12 @@ export const proposalTemplates = pgTable("proposal_templates", {
   name: text("name").notNull(),
   description: text("description"),
   purpose: text("purpose").notNull().default("custom"),
+  themePreset: text("theme_preset").default("modern_blue"),
+  primaryColor: text("primary_color").default("#3B82F6"),
+  secondaryColor: text("secondary_color").default("#1E40AF"),
+  accentColor: text("accent_color").default("#10B981"),
+  headerStyle: text("header_style").default("gradient"),
+  fontFamily: text("font_family").default("Inter"),
   isActive: boolean("is_active").default(true).notNull(),
   isDefault: boolean("is_default").default(false).notNull(),
   isSystemTemplate: boolean("is_system_template").default(false).notNull(),
@@ -1102,6 +1121,12 @@ export const proposals = pgTable("proposals", {
   selectedPackage: text("selected_package"),
   clientComments: text("client_comments"),
   internalNotes: text("internal_notes"),
+  themePreset: text("theme_preset").default("modern_blue"),
+  primaryColor: text("primary_color").default("#3B82F6"),
+  secondaryColor: text("secondary_color").default("#1E40AF"),
+  accentColor: text("accent_color").default("#10B981"),
+  headerStyle: text("header_style").default("gradient"),
+  fontFamily: text("font_family").default("Inter"),
   currentVersion: integer("current_version").default(1).notNull(),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
