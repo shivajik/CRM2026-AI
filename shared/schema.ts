@@ -8,10 +8,11 @@ export const tenants = pgTable("tenants", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   name: text("name").notNull(),
   packageId: varchar("package_id"),
+  deletedAt: timestamp("deleted_at"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 
-export const insertTenantSchema = createInsertSchema(tenants).omit({ id: true, createdAt: true });
+export const insertTenantSchema = createInsertSchema(tenants).omit({ id: true, createdAt: true, deletedAt: true });
 export type InsertTenant = z.infer<typeof insertTenantSchema>;
 export type Tenant = typeof tenants.$inferSelect;
 
@@ -1469,3 +1470,323 @@ export const insertWorkspaceActivityLogSchema = createInsertSchema(workspaceActi
 });
 export type InsertWorkspaceActivityLog = z.infer<typeof insertWorkspaceActivityLogSchema>;
 export type WorkspaceActivityLog = typeof workspaceActivityLogs.$inferSelect;
+
+// ==================== MODULE 1: WORKSPACE BILLING SYSTEM ====================
+
+// Workspace Plan Types
+export const WORKSPACE_PLAN_TYPES = {
+  FREE: 'free',
+  PRO: 'pro',
+  AGENCY: 'agency',
+} as const;
+
+export type WorkspacePlanType = typeof WORKSPACE_PLAN_TYPES[keyof typeof WORKSPACE_PLAN_TYPES];
+
+// Subscription Status
+export const SUBSCRIPTION_STATUSES = {
+  ACTIVE: 'active',
+  TRIAL: 'trial',
+  PAST_DUE: 'past_due',
+  CANCELLED: 'cancelled',
+  EXPIRED: 'expired',
+} as const;
+
+export type SubscriptionStatus = typeof SUBSCRIPTION_STATUSES[keyof typeof SUBSCRIPTION_STATUSES];
+
+// Workspace Plans - defines available subscription plans
+export const workspacePlans = pgTable("workspace_plans", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  name: text("name").notNull().unique(),
+  displayName: text("display_name").notNull(),
+  description: text("description"),
+  monthlyPrice: decimal("monthly_price", { precision: 10, scale: 2 }).notNull().default("0"),
+  yearlyPrice: decimal("yearly_price", { precision: 10, scale: 2 }).notNull().default("0"),
+  maxMembers: integer("max_members").notNull().default(1),
+  maxAutomations: integer("max_automations").notNull().default(5),
+  maxEmailsPerMonth: integer("max_emails_per_month").notNull().default(100),
+  maxProposals: integer("max_proposals").notNull().default(10),
+  maxStorageMb: integer("max_storage_mb").notNull().default(100),
+  features: text("features").array().default(sql`'{}'::text[]`),
+  isActive: boolean("is_active").default(true).notNull(),
+  sortOrder: integer("sort_order").default(0).notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+export const insertWorkspacePlanSchema = createInsertSchema(workspacePlans, {
+  features: z.array(z.string()).optional().default([]),
+}).omit({ id: true, createdAt: true, updatedAt: true });
+export type InsertWorkspacePlan = z.infer<typeof insertWorkspacePlanSchema>;
+export type WorkspacePlan = typeof workspacePlans.$inferSelect;
+
+// Workspace Subscriptions - tracks each workspace's subscription
+export const workspaceSubscriptions = pgTable("workspace_subscriptions", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  workspaceId: varchar("workspace_id").references(() => tenants.id, { onDelete: "cascade" }).notNull().unique(),
+  planId: varchar("plan_id").references(() => workspacePlans.id, { onDelete: "set null" }),
+  status: text("status").notNull().default("trial"),
+  billingCycle: text("billing_cycle").notNull().default("monthly"), // monthly, yearly
+  trialEndsAt: timestamp("trial_ends_at"),
+  currentPeriodStart: timestamp("current_period_start"),
+  currentPeriodEnd: timestamp("current_period_end"),
+  cancelledAt: timestamp("cancelled_at"),
+  cancelReason: text("cancel_reason"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+export const insertWorkspaceSubscriptionSchema = createInsertSchema(workspaceSubscriptions, {
+  trialEndsAt: z.union([z.string(), z.date(), z.null()]).optional().transform(val => {
+    if (!val) return null;
+    if (val instanceof Date) return val;
+    return new Date(val);
+  }),
+  currentPeriodStart: z.union([z.string(), z.date(), z.null()]).optional().transform(val => {
+    if (!val) return null;
+    if (val instanceof Date) return val;
+    return new Date(val);
+  }),
+  currentPeriodEnd: z.union([z.string(), z.date(), z.null()]).optional().transform(val => {
+    if (!val) return null;
+    if (val instanceof Date) return val;
+    return new Date(val);
+  }),
+}).omit({ id: true, createdAt: true, updatedAt: true });
+export type InsertWorkspaceSubscription = z.infer<typeof insertWorkspaceSubscriptionSchema>;
+export type WorkspaceSubscription = typeof workspaceSubscriptions.$inferSelect;
+
+// Workspace Usage - tracks resource usage per workspace
+export const workspaceUsage = pgTable("workspace_usage", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  workspaceId: varchar("workspace_id").references(() => tenants.id, { onDelete: "cascade" }).notNull(),
+  periodStart: timestamp("period_start").notNull(),
+  periodEnd: timestamp("period_end").notNull(),
+  memberCount: integer("member_count").default(0).notNull(),
+  automationsUsed: integer("automations_used").default(0).notNull(),
+  emailsSent: integer("emails_sent").default(0).notNull(),
+  proposalsCreated: integer("proposals_created").default(0).notNull(),
+  storageMbUsed: decimal("storage_mb_used", { precision: 10, scale: 2 }).default("0").notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+export const insertWorkspaceUsageSchema = createInsertSchema(workspaceUsage, {
+  periodStart: z.union([z.string(), z.date()]).transform(val => {
+    if (val instanceof Date) return val;
+    return new Date(val);
+  }),
+  periodEnd: z.union([z.string(), z.date()]).transform(val => {
+    if (val instanceof Date) return val;
+    return new Date(val);
+  }),
+}).omit({ id: true, createdAt: true, updatedAt: true });
+export type InsertWorkspaceUsage = z.infer<typeof insertWorkspaceUsageSchema>;
+export type WorkspaceUsage = typeof workspaceUsage.$inferSelect;
+
+// Workspace Invoices (placeholder) - billing invoices
+export const workspaceInvoices = pgTable("workspace_invoices", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  workspaceId: varchar("workspace_id").references(() => tenants.id, { onDelete: "cascade" }).notNull(),
+  subscriptionId: varchar("subscription_id").references(() => workspaceSubscriptions.id, { onDelete: "set null" }),
+  invoiceNumber: text("invoice_number").notNull(),
+  amount: decimal("amount", { precision: 10, scale: 2 }).notNull(),
+  currency: text("currency").default("USD").notNull(),
+  status: text("status").notNull().default("pending"), // pending, paid, failed, refunded
+  periodStart: timestamp("period_start"),
+  periodEnd: timestamp("period_end"),
+  paidAt: timestamp("paid_at"),
+  dueDate: timestamp("due_date"),
+  pdfUrl: text("pdf_url"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+export const insertWorkspaceInvoiceSchema = createInsertSchema(workspaceInvoices).omit({ id: true, createdAt: true });
+export type InsertWorkspaceInvoice = z.infer<typeof insertWorkspaceInvoiceSchema>;
+export type WorkspaceInvoice = typeof workspaceInvoices.$inferSelect;
+
+// Workspace Payment Methods (placeholder) - stored payment methods
+export const workspacePaymentMethods = pgTable("workspace_payment_methods", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  workspaceId: varchar("workspace_id").references(() => tenants.id, { onDelete: "cascade" }).notNull(),
+  type: text("type").notNull().default("card"), // card, bank_account
+  last4: text("last4"),
+  brand: text("brand"),
+  expiryMonth: integer("expiry_month"),
+  expiryYear: integer("expiry_year"),
+  isDefault: boolean("is_default").default(false).notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+export const insertWorkspacePaymentMethodSchema = createInsertSchema(workspacePaymentMethods).omit({ id: true, createdAt: true, updatedAt: true });
+export type InsertWorkspacePaymentMethod = z.infer<typeof insertWorkspacePaymentMethodSchema>;
+export type WorkspacePaymentMethod = typeof workspacePaymentMethods.$inferSelect;
+
+// ==================== MODULE 2: WHITE-LABEL BRANDING SYSTEM ====================
+
+// Workspace Branding - custom branding settings
+export const workspaceBranding = pgTable("workspace_branding", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  workspaceId: varchar("workspace_id").references(() => tenants.id, { onDelete: "cascade" }).notNull().unique(),
+  logoUrl: text("logo_url"),
+  logoLightUrl: text("logo_light_url"),
+  faviconUrl: text("favicon_url"),
+  primaryColor: text("primary_color").default("#3b82f6"),
+  secondaryColor: text("secondary_color").default("#64748b"),
+  accentColor: text("accent_color").default("#f59e0b"),
+  emailSignature: text("email_signature"),
+  customDomain: text("custom_domain"),
+  customDomainVerified: boolean("custom_domain_verified").default(false).notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+export const insertWorkspaceBrandingSchema = createInsertSchema(workspaceBranding).omit({ id: true, createdAt: true, updatedAt: true });
+export type InsertWorkspaceBranding = z.infer<typeof insertWorkspaceBrandingSchema>;
+export type WorkspaceBranding = typeof workspaceBranding.$inferSelect;
+
+// Workspace PDF Settings - branding for PDFs
+export const workspacePdfSettings = pgTable("workspace_pdf_settings", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  workspaceId: varchar("workspace_id").references(() => tenants.id, { onDelete: "cascade" }).notNull().unique(),
+  headerLogoUrl: text("header_logo_url"),
+  footerText: text("footer_text"),
+  showCompanyAddress: boolean("show_company_address").default(true).notNull(),
+  showCompanyPhone: boolean("show_company_phone").default(true).notNull(),
+  showCompanyEmail: boolean("show_company_email").default(true).notNull(),
+  proposalTemplate: text("proposal_template"), // JSON template settings
+  invoiceTemplate: text("invoice_template"), // JSON template settings
+  quotationTemplate: text("quotation_template"), // JSON template settings
+  termsAndConditions: text("terms_and_conditions"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+export const insertWorkspacePdfSettingsSchema = createInsertSchema(workspacePdfSettings).omit({ id: true, createdAt: true, updatedAt: true });
+export type InsertWorkspacePdfSettings = z.infer<typeof insertWorkspacePdfSettingsSchema>;
+export type WorkspacePdfSettings = typeof workspacePdfSettings.$inferSelect;
+
+// ==================== MODULE 3: CUSTOM ROLE & PERMISSION BUILDER ====================
+
+// Module permission types
+export const PERMISSION_MODULES = [
+  'clients', 'projects', 'tasks', 'invoices', 'proposals', 
+  'automations', 'email', 'billing', 'reports', 'settings', 'team'
+] as const;
+
+export const PERMISSION_ACTIONS = ['view', 'create', 'edit', 'delete', 'manage'] as const;
+
+export type PermissionModule = typeof PERMISSION_MODULES[number];
+export type PermissionAction = typeof PERMISSION_ACTIONS[number];
+
+// Workspace Custom Roles - user-defined roles
+export const workspaceCustomRoles = pgTable("workspace_custom_roles", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  workspaceId: varchar("workspace_id").references(() => tenants.id, { onDelete: "cascade" }).notNull(),
+  name: text("name").notNull(),
+  description: text("description"),
+  color: text("color").default("#6b7280"),
+  isDefault: boolean("is_default").default(false).notNull(),
+  createdBy: varchar("created_by").references(() => users.id, { onDelete: "set null" }),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+export const insertWorkspaceCustomRoleSchema = createInsertSchema(workspaceCustomRoles).omit({ id: true, createdAt: true, updatedAt: true });
+export type InsertWorkspaceCustomRole = z.infer<typeof insertWorkspaceCustomRoleSchema>;
+export type WorkspaceCustomRole = typeof workspaceCustomRoles.$inferSelect;
+
+// Workspace Role Permissions - permissions for custom roles
+export const workspaceRolePermissions = pgTable("workspace_role_permissions", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  roleId: varchar("role_id").references(() => workspaceCustomRoles.id, { onDelete: "cascade" }).notNull(),
+  module: text("module").notNull(),
+  action: text("action").notNull(),
+  allowed: boolean("allowed").default(true).notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+export const insertWorkspaceRolePermissionSchema = createInsertSchema(workspaceRolePermissions).omit({ id: true, createdAt: true });
+export type InsertWorkspaceRolePermission = z.infer<typeof insertWorkspaceRolePermissionSchema>;
+export type WorkspaceRolePermission = typeof workspaceRolePermissions.$inferSelect;
+
+// ==================== MODULE 4: WORKSPACE ANALYTICS DASHBOARD ====================
+
+// Workspace Analytics Cache - cached analytics data
+export const workspaceAnalyticsCache = pgTable("workspace_analytics_cache", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  workspaceId: varchar("workspace_id").references(() => tenants.id, { onDelete: "cascade" }).notNull(),
+  metricType: text("metric_type").notNull(), // revenue, invoices, proposals, leads, tasks, etc.
+  metricDate: timestamp("metric_date").notNull(),
+  value: decimal("value", { precision: 15, scale: 2 }).notNull().default("0"),
+  metadata: text("metadata"), // JSON for additional context
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+export const insertWorkspaceAnalyticsCacheSchema = createInsertSchema(workspaceAnalyticsCache, {
+  metricDate: z.union([z.string(), z.date()]).transform(val => {
+    if (val instanceof Date) return val;
+    return new Date(val);
+  }),
+}).omit({ id: true, createdAt: true, updatedAt: true });
+export type InsertWorkspaceAnalyticsCache = z.infer<typeof insertWorkspaceAnalyticsCacheSchema>;
+export type WorkspaceAnalyticsCache = typeof workspaceAnalyticsCache.$inferSelect;
+
+// ==================== MODULE 5: WORKSPACE DELETION & RESTORE ====================
+
+// Workspace Deletion Logs - audit trail for deletion/restore events
+export const workspaceDeletionLogs = pgTable("workspace_deletion_logs", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  workspaceId: varchar("workspace_id").references(() => tenants.id, { onDelete: "cascade" }).notNull(),
+  action: text("action").notNull(), // deleted, restored, purged
+  deletedBy: varchar("deleted_by").references(() => users.id, { onDelete: "set null" }),
+  restoredBy: varchar("restored_by").references(() => users.id, { onDelete: "set null" }),
+  reason: text("reason"),
+  scheduledPurgeAt: timestamp("scheduled_purge_at"),
+  ipAddress: text("ip_address"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+export const insertWorkspaceDeletionLogSchema = createInsertSchema(workspaceDeletionLogs, {
+  scheduledPurgeAt: z.union([z.string(), z.date(), z.null()]).optional().transform(val => {
+    if (!val) return null;
+    if (val instanceof Date) return val;
+    return new Date(val);
+  }),
+}).omit({ id: true, createdAt: true });
+export type InsertWorkspaceDeletionLog = z.infer<typeof insertWorkspaceDeletionLogSchema>;
+export type WorkspaceDeletionLog = typeof workspaceDeletionLogs.$inferSelect;
+
+// ==================== MODULE 6: WORKSPACE ONBOARDING WIZARD ====================
+
+// Onboarding step statuses
+export const ONBOARDING_STEP_STATUSES = {
+  NOT_STARTED: 'not_started',
+  IN_PROGRESS: 'in_progress',
+  COMPLETED: 'completed',
+  SKIPPED: 'skipped',
+} as const;
+
+export type OnboardingStepStatus = typeof ONBOARDING_STEP_STATUSES[keyof typeof ONBOARDING_STEP_STATUSES];
+
+// Workspace Onboarding Progress - tracks onboarding wizard progress
+export const workspaceOnboardingProgress = pgTable("workspace_onboarding_progress", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  workspaceId: varchar("workspace_id").references(() => tenants.id, { onDelete: "cascade" }).notNull().unique(),
+  isCompleted: boolean("is_completed").default(false).notNull(),
+  isDismissed: boolean("is_dismissed").default(false).notNull(),
+  currentStep: integer("current_step").default(1).notNull(),
+  step1AddBranding: text("step1_add_branding").default("not_started").notNull(),
+  step2AddTeamMembers: text("step2_add_team_members").default("not_started").notNull(),
+  step3AddFirstClient: text("step3_add_first_client").default("not_started").notNull(),
+  step4CreateProject: text("step4_create_project").default("not_started").notNull(),
+  step5CreateProposal: text("step5_create_proposal").default("not_started").notNull(),
+  completedAt: timestamp("completed_at"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+export const insertWorkspaceOnboardingProgressSchema = createInsertSchema(workspaceOnboardingProgress).omit({ id: true, createdAt: true, updatedAt: true, completedAt: true });
+export type InsertWorkspaceOnboardingProgress = z.infer<typeof insertWorkspaceOnboardingProgressSchema>;
+export type WorkspaceOnboardingProgress = typeof workspaceOnboardingProgress.$inferSelect;
