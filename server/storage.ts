@@ -1687,9 +1687,15 @@ export class DatabaseStorage implements IStorage {
   }
 
   async getEmailTemplateById(id: string, tenantId: string): Promise<EmailTemplate | undefined> {
+    // First try to find tenant-specific template
     const [template] = await db.select().from(schema.emailTemplates)
       .where(and(eq(schema.emailTemplates.id, id), eq(schema.emailTemplates.tenantId, tenantId)));
-    return template;
+    if (template) return template;
+    
+    // If not found, check for system template (null tenantId)
+    const [systemTemplate] = await db.select().from(schema.emailTemplates)
+      .where(and(eq(schema.emailTemplates.id, id), eq(schema.emailTemplates.ownerType, 'system')));
+    return systemTemplate;
   }
 
   async updateEmailTemplate(id: string, tenantId: string, updates: Partial<InsertEmailTemplate>): Promise<EmailTemplate | undefined> {
@@ -1706,13 +1712,23 @@ export class DatabaseStorage implements IStorage {
   }
 
   async getDefaultTemplateForPurpose(tenantId: string, purpose: string): Promise<EmailTemplate | undefined> {
+    // First check for tenant-specific default template
     const [template] = await db.select().from(schema.emailTemplates)
       .where(and(
         eq(schema.emailTemplates.tenantId, tenantId),
         eq(schema.emailTemplates.isDefault, true),
         eq(schema.emailTemplates.defaultFor, purpose)
       ));
-    return template;
+    if (template) return template;
+    
+    // Fall back to system default template
+    const [systemTemplate] = await db.select().from(schema.emailTemplates)
+      .where(and(
+        eq(schema.emailTemplates.ownerType, 'system'),
+        eq(schema.emailTemplates.isDefault, true),
+        eq(schema.emailTemplates.defaultFor, purpose)
+      ));
+    return systemTemplate;
   }
 
   async getEmailTemplatesWithOwnership(tenantId: string, userId: string, workspaceId?: string): Promise<{
@@ -1721,24 +1737,26 @@ export class DatabaseStorage implements IStorage {
     workspaceTemplates: EmailTemplate[];
     systemTemplates: EmailTemplate[];
   }> {
-    const allTemplates = await db.select().from(schema.emailTemplates)
+    // Get tenant-specific templates
+    const tenantTemplates = await db.select().from(schema.emailTemplates)
       .where(eq(schema.emailTemplates.tenantId, tenantId))
       .orderBy(desc(schema.emailTemplates.createdAt));
 
-    const userTemplates = allTemplates.filter(t => 
+    // Get system templates (ownerType = 'system', which may have null tenantId or be global)
+    const systemTemplates = await db.select().from(schema.emailTemplates)
+      .where(eq(schema.emailTemplates.ownerType, 'system'))
+      .orderBy(desc(schema.emailTemplates.createdAt));
+
+    const userTemplates = tenantTemplates.filter(t => 
       t.ownerType === 'user' && t.ownerId === userId && !t.isShared
     );
     
-    const sharedTemplates = allTemplates.filter(t => 
+    const sharedTemplates = tenantTemplates.filter(t => 
       t.ownerType === 'user' && t.isShared
     );
     
-    const workspaceTemplates = allTemplates.filter(t => 
+    const workspaceTemplates = tenantTemplates.filter(t => 
       t.ownerType === 'workspace' && (!workspaceId || t.ownerId === workspaceId)
-    );
-    
-    const systemTemplates = allTemplates.filter(t => 
-      t.ownerType === 'system'
     );
 
     return { userTemplates, sharedTemplates, workspaceTemplates, systemTemplates };
@@ -1754,6 +1772,7 @@ export class DatabaseStorage implements IStorage {
       ownerType: 'user',
       ownerId: userId,
       isShared: false,
+      isSystemTemplate: false, // Duplicates are always user-owned, not system templates
       name: `${original.name} (Copy)`,
       purpose: original.purpose,
       subject: original.subject,

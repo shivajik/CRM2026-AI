@@ -786,11 +786,12 @@ export type PackageModule = typeof packageModules.$inferSelect;
 // ownerType: 'system' (global, locked), 'workspace' (shared in workspace), 'user' (private unless shared)
 export const emailTemplates = pgTable("email_templates", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
-  tenantId: varchar("tenant_id").references(() => tenants.id, { onDelete: "cascade" }).notNull(),
-  createdBy: varchar("created_by").references(() => users.id).notNull(),
+  tenantId: varchar("tenant_id").references(() => tenants.id, { onDelete: "cascade" }), // nullable for system templates
+  createdBy: varchar("created_by").references(() => users.id), // nullable for system templates
   ownerType: text("owner_type").notNull().default("user"), // system, workspace, user
   ownerId: varchar("owner_id"), // user id for 'user' type, workspace id for 'workspace', null for 'system'
   isShared: boolean("is_shared").default(false).notNull(), // user templates can be shared to workspace
+  isSystemTemplate: boolean("is_system_template").default(false).notNull(), // true for global system templates
   name: text("name").notNull(),
   purpose: text("purpose").notNull().default("custom"), // quotation, invoice, follow_up, meeting, payment_reminder, welcome, renewal, feedback, custom
   subject: text("subject").notNull(),
