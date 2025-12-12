@@ -1523,10 +1523,11 @@ export async function registerRoutes(
 
   // ==================== NOTIFICATION ROUTES ====================
 
-  app.get("/api/notifications", requireAuth, validateTenant, async (req, res) => {
+  app.get("/api/notifications", requireAuth, validateTenant, resolveWorkspaceContext, async (req, res) => {
     try {
+      const workspaceId = req.workspaceId || req.user!.tenantId;
       const unreadOnly = req.query.unreadOnly === 'true';
-      const notifications = await storage.getTaskNotifications(req.user!.userId, req.user!.tenantId, unreadOnly);
+      const notifications = await storage.getTaskNotifications(req.user!.userId, workspaceId, unreadOnly);
       res.json(notifications);
     } catch (error) {
       console.error("Get notifications error:", error);
@@ -1534,9 +1535,10 @@ export async function registerRoutes(
     }
   });
 
-  app.get("/api/notifications/count", requireAuth, validateTenant, async (req, res) => {
+  app.get("/api/notifications/count", requireAuth, validateTenant, resolveWorkspaceContext, async (req, res) => {
     try {
-      const count = await storage.getUnreadNotificationCount(req.user!.userId, req.user!.tenantId);
+      const workspaceId = req.workspaceId || req.user!.tenantId;
+      const count = await storage.getUnreadNotificationCount(req.user!.userId, workspaceId);
       res.json({ count });
     } catch (error) {
       console.error("Get notification count error:", error);
@@ -1554,9 +1556,10 @@ export async function registerRoutes(
     }
   });
 
-  app.post("/api/notifications/read-all", requireAuth, validateTenant, async (req, res) => {
+  app.post("/api/notifications/read-all", requireAuth, validateTenant, resolveWorkspaceContext, async (req, res) => {
     try {
-      await storage.markAllNotificationsAsRead(req.user!.userId, req.user!.tenantId);
+      const workspaceId = req.workspaceId || req.user!.tenantId;
+      await storage.markAllNotificationsAsRead(req.user!.userId, workspaceId);
       res.json({ message: "All notifications marked as read" });
     } catch (error) {
       console.error("Mark all notifications read error:", error);
@@ -2718,19 +2721,20 @@ export async function registerRoutes(
   });
 
   // Send Email
-  app.post("/api/email/send", requireAuth, validateTenant, denyCustomerAccess, async (req, res) => {
+  app.post("/api/email/send", requireAuth, validateTenant, resolveWorkspaceContext, denyCustomerAccess, async (req, res) => {
     try {
+      const workspaceId = req.workspaceId || req.user!.tenantId;
       const { toEmail, ccEmails, bccEmails, subject, body, templateId, customerId, quotationId, invoiceId, attachments, scheduledAt } = req.body;
       
       if (!toEmail || !subject || !body) {
         return res.status(400).json({ message: "To, subject, and body are required" });
       }
 
-      const senderAccount = await storage.getDefaultSenderAccount(req.user!.tenantId);
+      const senderAccount = await storage.getDefaultSenderAccount(workspaceId);
       const fromEmail = senderAccount?.email || 'noreply@nexuscrm.com';
 
       const log = await storage.createEmailLog({
-        tenantId: req.user!.tenantId,
+        tenantId: workspaceId,
         sentBy: req.user!.userId,
         templateId: templateId || null,
         customerId: customerId || null,
@@ -2760,9 +2764,10 @@ export async function registerRoutes(
   });
 
   // Automation Rules
-  app.get("/api/email/automations", requireAuth, validateTenant, async (req, res) => {
+  app.get("/api/email/automations", requireAuth, validateTenant, resolveWorkspaceContext, async (req, res) => {
     try {
-      const rules = await storage.getAutomationRulesByTenant(req.user!.tenantId);
+      const workspaceId = req.workspaceId || req.user!.tenantId;
+      const rules = await storage.getAutomationRulesByTenant(workspaceId);
       res.json(rules);
     } catch (error) {
       console.error("Get automation rules error:", error);
@@ -2770,9 +2775,10 @@ export async function registerRoutes(
     }
   });
 
-  app.get("/api/email/automations/:id", requireAuth, validateTenant, async (req, res) => {
+  app.get("/api/email/automations/:id", requireAuth, validateTenant, resolveWorkspaceContext, async (req, res) => {
     try {
-      const rule = await storage.getAutomationRuleById(req.params.id, req.user!.tenantId);
+      const workspaceId = req.workspaceId || req.user!.tenantId;
+      const rule = await storage.getAutomationRuleById(req.params.id, workspaceId);
       if (!rule) {
         return res.status(404).json({ message: "Automation rule not found" });
       }
@@ -2783,11 +2789,12 @@ export async function registerRoutes(
     }
   });
 
-  app.post("/api/email/automations", requireAuth, validateTenant, requireAgencyAdmin, async (req, res) => {
+  app.post("/api/email/automations", requireAuth, validateTenant, resolveWorkspaceContext, requireAgencyAdmin, async (req, res) => {
     try {
+      const workspaceId = req.workspaceId || req.user!.tenantId;
       const rule = await storage.createAutomationRule({
         ...req.body,
-        tenantId: req.user!.tenantId,
+        tenantId: workspaceId,
         createdBy: req.user!.userId,
       });
       res.status(201).json(rule);
@@ -2797,9 +2804,10 @@ export async function registerRoutes(
     }
   });
 
-  app.patch("/api/email/automations/:id", requireAuth, validateTenant, requireAgencyAdmin, async (req, res) => {
+  app.patch("/api/email/automations/:id", requireAuth, validateTenant, resolveWorkspaceContext, requireAgencyAdmin, async (req, res) => {
     try {
-      const rule = await storage.updateAutomationRule(req.params.id, req.user!.tenantId, req.body);
+      const workspaceId = req.workspaceId || req.user!.tenantId;
+      const rule = await storage.updateAutomationRule(req.params.id, workspaceId, req.body);
       if (!rule) {
         return res.status(404).json({ message: "Automation rule not found" });
       }
@@ -2810,9 +2818,10 @@ export async function registerRoutes(
     }
   });
 
-  app.delete("/api/email/automations/:id", requireAuth, validateTenant, requireAgencyAdmin, async (req, res) => {
+  app.delete("/api/email/automations/:id", requireAuth, validateTenant, resolveWorkspaceContext, requireAgencyAdmin, async (req, res) => {
     try {
-      await storage.deleteAutomationRule(req.params.id, req.user!.tenantId);
+      const workspaceId = req.workspaceId || req.user!.tenantId;
+      await storage.deleteAutomationRule(req.params.id, workspaceId);
       res.json({ message: "Automation rule deleted successfully" });
     } catch (error) {
       console.error("Delete automation rule error:", error);
@@ -2821,9 +2830,10 @@ export async function registerRoutes(
   });
 
   // Follow-up Sequences
-  app.get("/api/email/sequences", requireAuth, validateTenant, async (req, res) => {
+  app.get("/api/email/sequences", requireAuth, validateTenant, resolveWorkspaceContext, async (req, res) => {
     try {
-      const sequences = await storage.getFollowUpSequencesByTenant(req.user!.tenantId);
+      const workspaceId = req.workspaceId || req.user!.tenantId;
+      const sequences = await storage.getFollowUpSequencesByTenant(workspaceId);
       res.json(sequences);
     } catch (error) {
       console.error("Get follow-up sequences error:", error);
@@ -2831,9 +2841,10 @@ export async function registerRoutes(
     }
   });
 
-  app.get("/api/email/sequences/:id", requireAuth, validateTenant, async (req, res) => {
+  app.get("/api/email/sequences/:id", requireAuth, validateTenant, resolveWorkspaceContext, async (req, res) => {
     try {
-      const sequence = await storage.getFollowUpSequenceById(req.params.id, req.user!.tenantId);
+      const workspaceId = req.workspaceId || req.user!.tenantId;
+      const sequence = await storage.getFollowUpSequenceById(req.params.id, workspaceId);
       if (!sequence) {
         return res.status(404).json({ message: "Follow-up sequence not found" });
       }
@@ -2845,12 +2856,13 @@ export async function registerRoutes(
     }
   });
 
-  app.post("/api/email/sequences", requireAuth, validateTenant, requireAgencyAdmin, async (req, res) => {
+  app.post("/api/email/sequences", requireAuth, validateTenant, resolveWorkspaceContext, requireAgencyAdmin, async (req, res) => {
     try {
+      const workspaceId = req.workspaceId || req.user!.tenantId;
       const { steps, ...sequenceData } = req.body;
       const sequence = await storage.createFollowUpSequence({
         ...sequenceData,
-        tenantId: req.user!.tenantId,
+        tenantId: workspaceId,
         createdBy: req.user!.userId,
       });
       
@@ -2871,10 +2883,11 @@ export async function registerRoutes(
     }
   });
 
-  app.patch("/api/email/sequences/:id", requireAuth, validateTenant, requireAgencyAdmin, async (req, res) => {
+  app.patch("/api/email/sequences/:id", requireAuth, validateTenant, resolveWorkspaceContext, requireAgencyAdmin, async (req, res) => {
     try {
+      const workspaceId = req.workspaceId || req.user!.tenantId;
       const { steps, ...sequenceData } = req.body;
-      const sequence = await storage.updateFollowUpSequence(req.params.id, req.user!.tenantId, sequenceData);
+      const sequence = await storage.updateFollowUpSequence(req.params.id, workspaceId, sequenceData);
       if (!sequence) {
         return res.status(404).json({ message: "Follow-up sequence not found" });
       }
@@ -2887,9 +2900,10 @@ export async function registerRoutes(
     }
   });
 
-  app.delete("/api/email/sequences/:id", requireAuth, validateTenant, requireAgencyAdmin, async (req, res) => {
+  app.delete("/api/email/sequences/:id", requireAuth, validateTenant, resolveWorkspaceContext, requireAgencyAdmin, async (req, res) => {
     try {
-      await storage.deleteFollowUpSequence(req.params.id, req.user!.tenantId);
+      const workspaceId = req.workspaceId || req.user!.tenantId;
+      await storage.deleteFollowUpSequence(req.params.id, workspaceId);
       res.json({ message: "Follow-up sequence deleted successfully" });
     } catch (error) {
       console.error("Delete follow-up sequence error:", error);
@@ -2935,9 +2949,10 @@ export async function registerRoutes(
   });
 
   // Scheduled Emails
-  app.get("/api/email/scheduled", requireAuth, validateTenant, async (req, res) => {
+  app.get("/api/email/scheduled", requireAuth, validateTenant, resolveWorkspaceContext, async (req, res) => {
     try {
-      const emails = await storage.getPendingScheduledEmails(req.user!.tenantId);
+      const workspaceId = req.workspaceId || req.user!.tenantId;
+      const emails = await storage.getPendingScheduledEmails(workspaceId);
       res.json(emails);
     } catch (error) {
       console.error("Get scheduled emails error:", error);
@@ -2956,9 +2971,10 @@ export async function registerRoutes(
   });
 
   // Email Sender Accounts
-  app.get("/api/email/senders", requireAuth, validateTenant, async (req, res) => {
+  app.get("/api/email/senders", requireAuth, validateTenant, resolveWorkspaceContext, async (req, res) => {
     try {
-      const accounts = await storage.getEmailSenderAccountsByTenant(req.user!.tenantId);
+      const workspaceId = req.workspaceId || req.user!.tenantId;
+      const accounts = await storage.getEmailSenderAccountsByTenant(workspaceId);
       res.json(accounts);
     } catch (error) {
       console.error("Get sender accounts error:", error);
@@ -2966,11 +2982,12 @@ export async function registerRoutes(
     }
   });
 
-  app.post("/api/email/senders", requireAuth, validateTenant, requireAgencyAdmin, async (req, res) => {
+  app.post("/api/email/senders", requireAuth, validateTenant, resolveWorkspaceContext, requireAgencyAdmin, async (req, res) => {
     try {
+      const workspaceId = req.workspaceId || req.user!.tenantId;
       const account = await storage.createEmailSenderAccount({
         ...req.body,
-        tenantId: req.user!.tenantId,
+        tenantId: workspaceId,
       });
       res.status(201).json(account);
     } catch (error) {
@@ -3003,9 +3020,10 @@ export async function registerRoutes(
   });
 
   // SMTP Settings
-  app.get("/api/email/smtp-settings", requireAuth, validateTenant, async (req, res) => {
+  app.get("/api/email/smtp-settings", requireAuth, validateTenant, resolveWorkspaceContext, async (req, res) => {
     try {
-      const settings = await storage.getSmtpSettings(req.user!.tenantId);
+      const workspaceId = req.workspaceId || req.user!.tenantId;
+      const settings = await storage.getSmtpSettings(workspaceId);
       if (settings) {
         const { smtpPassword, apiKey, ...safeSettings } = settings;
         res.json({
@@ -3026,9 +3044,10 @@ export async function registerRoutes(
     }
   });
 
-  app.put("/api/email/smtp-settings", requireAuth, validateTenant, requireAgencyAdmin, async (req, res) => {
+  app.put("/api/email/smtp-settings", requireAuth, validateTenant, resolveWorkspaceContext, requireAgencyAdmin, async (req, res) => {
     try {
-      const settings = await storage.upsertSmtpSettings(req.user!.tenantId, req.body);
+      const workspaceId = req.workspaceId || req.user!.tenantId;
+      const settings = await storage.upsertSmtpSettings(workspaceId, req.body);
       const { smtpPassword, apiKey, ...safeSettings } = settings;
       res.json({
         ...safeSettings,
@@ -3041,11 +3060,12 @@ export async function registerRoutes(
     }
   });
 
-  app.post("/api/email/smtp-settings/test", requireAuth, validateTenant, requireAgencyAdmin, async (req, res) => {
+  app.post("/api/email/smtp-settings/test", requireAuth, validateTenant, resolveWorkspaceContext, requireAgencyAdmin, async (req, res) => {
     try {
-      const result = await storage.testSmtpConnection(req.user!.tenantId);
+      const workspaceId = req.workspaceId || req.user!.tenantId;
+      const result = await storage.testSmtpConnection(workspaceId);
       if (result.success) {
-        await storage.upsertSmtpSettings(req.user!.tenantId, { 
+        await storage.upsertSmtpSettings(workspaceId, { 
           isVerified: true,
         } as any);
       }
