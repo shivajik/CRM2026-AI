@@ -80,3 +80,43 @@ Preferred communication style: Simple, everyday language.
 - **Vite**: Frontend build and development server
 - **tsx**: TypeScript execution for server
 - **drizzle-kit**: Database migration tooling
+
+## Multi-Workspace Feature (December 2024)
+
+### Overview
+Multi-workspace support allows users to access multiple agencies/tenants from a single account. This feature is fully backward-compatible and controlled by the `multi_workspace_enabled` feature flag.
+
+### Feature Flag Control
+- **Default State**: OFF - no impact on existing users
+- **Storage**: `feature_flags` table with global and per-tenant overrides
+- **SaaS Admin API**: Enable/disable via `/api/admin/tenants/:id/enable-multi-workspace`
+
+### Database Tables Added
+- `feature_flags` - Feature toggle storage
+- `workspace_users` - User-to-workspace membership linking
+- `workspace_invitations` - Pending invitations with expiry
+- `workspace_activity_logs` - Audit trail
+
+### API Endpoints (Flag-Gated)
+- `GET /api/features` - Feature flags status
+- `GET /api/workspaces` - User's workspaces
+- `POST /api/workspaces` - Create workspace
+- `POST /api/workspaces/:id/switch` - Switch workspace (returns new JWT)
+- `GET/PATCH/DELETE /api/workspaces/:id/members/*` - Member management
+- `GET/POST/DELETE /api/workspaces/:id/invitations/*` - Invitation management
+
+### JWT Token Flow
+When multi-workspace is enabled:
+- Login includes `activeWorkspaceId` in JWT payload
+- Workspace switch returns new tokens with updated `activeWorkspaceId`
+- Refresh preserves and validates `activeWorkspaceId`
+
+### Documentation
+- `docs/feature_flags.md` - How to toggle features
+- `docs/STAGING_DEPLOYMENT.md` - Staging deployment checklist
+- `docs/PRODUCTION_ROLLOUT.md` - Phased production rollout plan
+- `docs/FINAL_REPORT.md` - Comprehensive implementation summary
+
+### Migration Files
+- `migrations/0001_add_multi_workspace_support.sql` - Up migration
+- `migrations/0001_add_multi_workspace_support_down.sql` - Rollback migration

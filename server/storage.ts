@@ -96,6 +96,7 @@ export interface IStorage {
   createAuthToken(token: InsertAuthToken): Promise<AuthToken>;
   getAuthToken(refreshToken: string): Promise<AuthToken | undefined>;
   deleteAuthToken(id: string): Promise<void>;
+  deleteUserAuthTokens(userId: string): Promise<void>;
   
   // Module operations
   createModule(module: InsertModule): Promise<Module>;
@@ -734,6 +735,10 @@ export class DatabaseStorage implements IStorage {
   
   async deleteAuthToken(id: string): Promise<void> {
     await db.delete(schema.authTokens).where(eq(schema.authTokens.id, id));
+  }
+
+  async deleteUserAuthTokens(userId: string): Promise<void> {
+    await db.delete(schema.authTokens).where(eq(schema.authTokens.userId, userId));
   }
   
   // Module operations

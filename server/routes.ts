@@ -4261,6 +4261,10 @@ export async function registerRoutes(
       
       await storage.removeUserFromWorkspace(userId, workspaceId);
       
+      // Invalidate all auth tokens for the removed user to force re-authentication
+      // This ensures they can't continue using tokens with the old workspace context
+      await storage.deleteUserAuthTokens(userId);
+      
       await storage.logWorkspaceActivity({
         workspaceId,
         userId: req.user!.userId,
