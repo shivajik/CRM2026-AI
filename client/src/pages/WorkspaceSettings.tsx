@@ -1,12 +1,13 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useLocation } from "wouter";
 import { 
   Building2, Users, Palette, AlertTriangle, Trash2, 
   Mail, UserPlus, MoreVertical, Shield, Eye, UserMinus,
   Send, XCircle, Clock, Check, CreditCard, BarChart3,
-  TrendingUp, DollarSign, FileText, Zap
+  TrendingUp, DollarSign, FileText, Zap, Globe
 } from "lucide-react";
+import { Switch } from "@/components/ui/switch";
 import { Layout } from "@/components/layout/Layout";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -319,7 +320,7 @@ export default function WorkspaceSettings() {
         </div>
 
         <Tabs defaultValue={defaultTab} className="space-y-6">
-          <TabsList className="grid w-full grid-cols-3 sm:grid-cols-6">
+          <TabsList className="grid w-full grid-cols-4 sm:grid-cols-7">
             <TabsTrigger value="info" className="flex items-center gap-2" data-testid="tab-workspace-info">
               <Building2 className="h-4 w-4" />
               <span className="hidden sm:inline">Info</span>
@@ -331,6 +332,10 @@ export default function WorkspaceSettings() {
             <TabsTrigger value="branding" className="flex items-center gap-2" data-testid="tab-workspace-branding">
               <Palette className="h-4 w-4" />
               <span className="hidden sm:inline">Branding</span>
+            </TabsTrigger>
+            <TabsTrigger value="portal" className="flex items-center gap-2" data-testid="tab-workspace-portal">
+              <Globe className="h-4 w-4" />
+              <span className="hidden sm:inline">Portal</span>
             </TabsTrigger>
             <TabsTrigger value="billing" className="flex items-center gap-2" data-testid="tab-workspace-billing">
               <CreditCard className="h-4 w-4" />
@@ -857,6 +862,10 @@ export default function WorkspaceSettings() {
             </Card>
           </TabsContent>
 
+          <TabsContent value="portal" className="space-y-6">
+            <PortalSettingsTab workspaceId={workspaceId} />
+          </TabsContent>
+
           <TabsContent value="danger" className="space-y-6">
             <Card className="border-destructive/50">
               <CardHeader>
@@ -983,5 +992,235 @@ export default function WorkspaceSettings() {
         </AlertDialogContent>
       </AlertDialog>
     </Layout>
+  );
+}
+
+function PortalSettingsTab({ workspaceId }: { workspaceId?: string }) {
+  const { toast } = useToast();
+  const queryClient = useQueryClient();
+  
+  const { data: portalSettings, isLoading } = useQuery({
+    queryKey: ["portal-settings", workspaceId],
+    queryFn: () => workspacesApi.getPortalSettings(workspaceId!),
+    enabled: !!workspaceId,
+  });
+
+  const updateMutation = useMutation({
+    mutationFn: (data: any) => workspacesApi.updatePortalSettings(workspaceId!, data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["portal-settings", workspaceId] });
+      toast({ title: "Settings saved", description: "Customer portal settings have been updated." });
+    },
+    onError: () => {
+      toast({ title: "Error", description: "Failed to save settings", variant: "destructive" });
+    },
+  });
+
+  const [settings, setSettings] = useState({
+    portalEnabled: false,
+    showProposals: true,
+    showQuotations: true,
+    showInvoices: true,
+    showTasks: false,
+    showDocuments: false,
+    allowComments: true,
+    allowFileUploads: false,
+    allowOnlinePayments: false,
+    welcomeMessage: "",
+  });
+
+  useEffect(() => {
+    if (portalSettings) {
+      setSettings({
+        portalEnabled: portalSettings.portalEnabled ?? false,
+        showProposals: portalSettings.showProposals ?? true,
+        showQuotations: portalSettings.showQuotations ?? true,
+        showInvoices: portalSettings.showInvoices ?? true,
+        showTasks: portalSettings.showTasks ?? false,
+        showDocuments: portalSettings.showDocuments ?? false,
+        allowComments: portalSettings.allowComments ?? true,
+        allowFileUploads: portalSettings.allowFileUploads ?? false,
+        allowOnlinePayments: portalSettings.allowOnlinePayments ?? false,
+        welcomeMessage: portalSettings.welcomeMessage ?? "",
+      });
+    }
+  }, [portalSettings]);
+
+  const handleSave = () => {
+    updateMutation.mutate(settings);
+  };
+
+  if (isLoading) {
+    return <div className="text-muted-foreground">Loading...</div>;
+  }
+
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle className="flex items-center gap-2">
+          <Globe className="h-5 w-5" />
+          Customer Portal Settings
+        </CardTitle>
+        <CardDescription>
+          Configure what your customers can see and do in their portal.
+        </CardDescription>
+      </CardHeader>
+      <CardContent className="space-y-6">
+        <div className="flex items-center justify-between">
+          <div>
+            <Label htmlFor="portal-enabled" className="text-base font-medium">Enable Customer Portal</Label>
+            <p className="text-sm text-muted-foreground">Allow customers to access their portal</p>
+          </div>
+          <Switch
+            id="portal-enabled"
+            checked={settings.portalEnabled}
+            onCheckedChange={(checked) => setSettings({ ...settings, portalEnabled: checked })}
+            data-testid="switch-portal-enabled"
+          />
+        </div>
+
+        <Separator />
+
+        <div className="space-y-4">
+          <h4 className="font-medium">Content Visibility</h4>
+          
+          <div className="grid gap-4 md:grid-cols-2">
+            <div className="flex items-center justify-between p-3 border rounded-lg">
+              <div>
+                <Label htmlFor="show-proposals">Show Proposals</Label>
+                <p className="text-xs text-muted-foreground">Customers can view proposals</p>
+              </div>
+              <Switch
+                id="show-proposals"
+                checked={settings.showProposals}
+                onCheckedChange={(checked) => setSettings({ ...settings, showProposals: checked })}
+                data-testid="switch-show-proposals"
+              />
+            </div>
+            
+            <div className="flex items-center justify-between p-3 border rounded-lg">
+              <div>
+                <Label htmlFor="show-quotations">Show Quotations</Label>
+                <p className="text-xs text-muted-foreground">Customers can view quotations</p>
+              </div>
+              <Switch
+                id="show-quotations"
+                checked={settings.showQuotations}
+                onCheckedChange={(checked) => setSettings({ ...settings, showQuotations: checked })}
+                data-testid="switch-show-quotations"
+              />
+            </div>
+            
+            <div className="flex items-center justify-between p-3 border rounded-lg">
+              <div>
+                <Label htmlFor="show-invoices">Show Invoices</Label>
+                <p className="text-xs text-muted-foreground">Customers can view invoices</p>
+              </div>
+              <Switch
+                id="show-invoices"
+                checked={settings.showInvoices}
+                onCheckedChange={(checked) => setSettings({ ...settings, showInvoices: checked })}
+                data-testid="switch-show-invoices"
+              />
+            </div>
+            
+            <div className="flex items-center justify-between p-3 border rounded-lg">
+              <div>
+                <Label htmlFor="show-documents">Show Documents</Label>
+                <p className="text-xs text-muted-foreground">Customers can view shared documents</p>
+              </div>
+              <Switch
+                id="show-documents"
+                checked={settings.showDocuments}
+                onCheckedChange={(checked) => setSettings({ ...settings, showDocuments: checked })}
+                data-testid="switch-show-documents"
+              />
+            </div>
+            
+            <div className="flex items-center justify-between p-3 border rounded-lg">
+              <div>
+                <Label htmlFor="show-tasks">Show Tasks</Label>
+                <p className="text-xs text-muted-foreground">Customers can view assigned tasks</p>
+              </div>
+              <Switch
+                id="show-tasks"
+                checked={settings.showTasks}
+                onCheckedChange={(checked) => setSettings({ ...settings, showTasks: checked })}
+                data-testid="switch-show-tasks"
+              />
+            </div>
+          </div>
+        </div>
+
+        <Separator />
+
+        <div className="space-y-4">
+          <h4 className="font-medium">Permissions</h4>
+          
+          <div className="grid gap-4 md:grid-cols-2">
+            <div className="flex items-center justify-between p-3 border rounded-lg">
+              <div>
+                <Label htmlFor="allow-comments">Allow Comments</Label>
+                <p className="text-xs text-muted-foreground">Customers can leave comments</p>
+              </div>
+              <Switch
+                id="allow-comments"
+                checked={settings.allowComments}
+                onCheckedChange={(checked) => setSettings({ ...settings, allowComments: checked })}
+                data-testid="switch-allow-comments"
+              />
+            </div>
+            
+            <div className="flex items-center justify-between p-3 border rounded-lg">
+              <div>
+                <Label htmlFor="allow-uploads">Allow File Uploads</Label>
+                <p className="text-xs text-muted-foreground">Customers can upload files</p>
+              </div>
+              <Switch
+                id="allow-uploads"
+                checked={settings.allowFileUploads}
+                onCheckedChange={(checked) => setSettings({ ...settings, allowFileUploads: checked })}
+                data-testid="switch-allow-uploads"
+              />
+            </div>
+            
+            <div className="flex items-center justify-between p-3 border rounded-lg">
+              <div>
+                <Label htmlFor="allow-payments">Allow Online Payments</Label>
+                <p className="text-xs text-muted-foreground">Customers can pay invoices online</p>
+              </div>
+              <Switch
+                id="allow-payments"
+                checked={settings.allowOnlinePayments}
+                onCheckedChange={(checked) => setSettings({ ...settings, allowOnlinePayments: checked })}
+                data-testid="switch-allow-payments"
+              />
+            </div>
+          </div>
+        </div>
+
+        <Separator />
+
+        <div className="space-y-2">
+          <Label htmlFor="welcome-message">Welcome Message</Label>
+          <Textarea
+            id="welcome-message"
+            placeholder="Enter a welcome message for your customers..."
+            value={settings.welcomeMessage}
+            onChange={(e) => setSettings({ ...settings, welcomeMessage: e.target.value })}
+            rows={3}
+            data-testid="input-welcome-message"
+          />
+        </div>
+
+        <Button 
+          onClick={handleSave} 
+          disabled={updateMutation.isPending}
+          data-testid="button-save-portal-settings"
+        >
+          {updateMutation.isPending ? "Saving..." : "Save Settings"}
+        </Button>
+      </CardContent>
+    </Card>
   );
 }

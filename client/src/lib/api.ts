@@ -645,6 +645,15 @@ export const workspacesApi = {
     apiRequest(`/workspace/${workspaceId}/onboarding/dismiss`, { method: "POST" }),
   reopenOnboarding: (workspaceId: string) => 
     apiRequest(`/workspace/${workspaceId}/onboarding/reopen`, { method: "POST" }),
+  
+  // ==== MODULE 7: CUSTOMER PORTAL ====
+  getPortalSettings: (workspaceId: string) => apiRequest(`/workspace/${workspaceId}/portal-settings`),
+  updatePortalSettings: (workspaceId: string, data: any) => 
+    apiRequest(`/workspace/${workspaceId}/portal-settings`, { method: "PUT", body: JSON.stringify(data) }),
+  getPortalActivityLogs: (workspaceId: string, limit?: number) => {
+    const params = limit ? `?limit=${limit}` : '';
+    return apiRequest(`/workspace/${workspaceId}/portal-activity${params}`);
+  },
 };
 
 // User Invitations API (for accepting/declining invitations)
