@@ -52,6 +52,10 @@ import type {
   InsertProposalStatusHistory, ProposalStatusHistory,
   InsertTemplateSection, TemplateSection,
   InsertProposalComment, ProposalComment,
+  InsertFeatureFlag, FeatureFlag,
+  InsertWorkspaceUser, WorkspaceUser,
+  InsertWorkspaceInvitation, WorkspaceInvitation,
+  InsertWorkspaceActivityLog, WorkspaceActivityLog,
 } from "@shared/schema";
 
 export interface IStorage {
@@ -515,6 +519,42 @@ export interface IStorage {
 
   // Create proposal from template
   createProposalFromTemplate(templateId: string, proposalData: InsertProposal): Promise<Proposal | undefined>;
+
+  // ==================== FEATURE FLAGS ====================
+  getFeatureFlag(key: string, tenantId?: string): Promise<boolean>;
+  getFeatureFlagRecord(key: string, tenantId?: string): Promise<FeatureFlag | undefined>;
+  setFeatureFlag(key: string, enabled: boolean, tenantId?: string, description?: string): Promise<FeatureFlag>;
+  getAllFeatureFlags(tenantId?: string): Promise<FeatureFlag[]>;
+
+  // ==================== WORKSPACE OPERATIONS (Multi-Workspace Support) ====================
+  // These operations are only active when multi_workspace_enabled flag is ON
+  
+  // Workspace user membership
+  getUserWorkspaces(userId: string): Promise<(WorkspaceUser & { workspace: Tenant })[]>;
+  getWorkspaceUsers(workspaceId: string): Promise<(WorkspaceUser & { user: Omit<User, 'passwordHash'> })[]>;
+  addUserToWorkspace(data: InsertWorkspaceUser): Promise<WorkspaceUser>;
+  updateWorkspaceUser(userId: string, workspaceId: string, updates: { role?: string; isPrimary?: boolean }): Promise<WorkspaceUser | undefined>;
+  removeUserFromWorkspace(userId: string, workspaceId: string): Promise<void>;
+  isUserInWorkspace(userId: string, workspaceId: string): Promise<boolean>;
+  getUserWorkspaceRole(userId: string, workspaceId: string): Promise<string | undefined>;
+  setActiveWorkspace(userId: string, workspaceId: string): Promise<void>;
+
+  // Workspace invitations
+  createWorkspaceInvitation(invitation: InsertWorkspaceInvitation): Promise<WorkspaceInvitation>;
+  getWorkspaceInvitations(workspaceId: string, status?: string): Promise<WorkspaceInvitation[]>;
+  getInvitationByToken(token: string): Promise<WorkspaceInvitation | undefined>;
+  getInvitationsByEmail(email: string, status?: string): Promise<(WorkspaceInvitation & { workspace: Tenant })[]>;
+  updateInvitationStatus(id: string, status: string): Promise<WorkspaceInvitation | undefined>;
+  acceptInvitation(token: string, userId: string): Promise<WorkspaceUser | undefined>;
+  revokeInvitation(id: string): Promise<void>;
+  cleanupExpiredInvitations(): Promise<number>;
+
+  // Workspace activity logging
+  logWorkspaceActivity(log: InsertWorkspaceActivityLog): Promise<WorkspaceActivityLog>;
+  getWorkspaceActivityLogs(workspaceId: string, limit?: number): Promise<WorkspaceActivityLog[]>;
+
+  // Workspace creation (extends tenant creation for multi-workspace)
+  createWorkspace(tenantData: InsertTenant, ownerId: string): Promise<Tenant>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -2927,6 +2967,364 @@ export class DatabaseStorage implements IStorage {
     }
 
     return proposal;
+  }
+
+  // ==================== FEATURE FLAGS ====================
+  
+  async getFeatureFlag(key: string, tenantId?: string): Promise<boolean> {
+    // First check tenant-specific flag, then global
+    if (tenantId) {
+      const [tenantFlag] = await db.select()
+        .from(schema.featureFlags)
+        .where(and(
+          eq(schema.featureFlags.key, key),
+          eq(schema.featureFlags.tenantId, tenantId)
+        ));
+      if (tenantFlag) return tenantFlag.enabled;
+    }
+    
+    // Check global flag (tenantId is null)
+    const [globalFlag] = await db.select()
+      .from(schema.featureFlags)
+      .where(and(
+        eq(schema.featureFlags.key, key),
+        isNull(schema.featureFlags.tenantId)
+      ));
+    return globalFlag?.enabled ?? false;
+  }
+
+  async getFeatureFlagRecord(key: string, tenantId?: string): Promise<FeatureFlag | undefined> {
+    if (tenantId) {
+      const [tenantFlag] = await db.select()
+        .from(schema.featureFlags)
+        .where(and(
+          eq(schema.featureFlags.key, key),
+          eq(schema.featureFlags.tenantId, tenantId)
+        ));
+      if (tenantFlag) return tenantFlag;
+    }
+    
+    const [globalFlag] = await db.select()
+      .from(schema.featureFlags)
+      .where(and(
+        eq(schema.featureFlags.key, key),
+        isNull(schema.featureFlags.tenantId)
+      ));
+    return globalFlag;
+  }
+
+  async setFeatureFlag(key: string, enabled: boolean, tenantId?: string, description?: string): Promise<FeatureFlag> {
+    const existing = await this.getFeatureFlagRecord(key, tenantId);
+    
+    if (existing) {
+      const [updated] = await db.update(schema.featureFlags)
+        .set({ enabled, updatedAt: new Date(), description: description || existing.description })
+        .where(eq(schema.featureFlags.id, existing.id))
+        .returning();
+      return updated;
+    }
+    
+    const [created] = await db.insert(schema.featureFlags)
+      .values({
+        key,
+        tenantId: tenantId || null,
+        enabled,
+        description,
+      })
+      .returning();
+    return created;
+  }
+
+  async getAllFeatureFlags(tenantId?: string): Promise<FeatureFlag[]> {
+    if (tenantId) {
+      return db.select()
+        .from(schema.featureFlags)
+        .where(or(
+          eq(schema.featureFlags.tenantId, tenantId),
+          isNull(schema.featureFlags.tenantId)
+        ))
+        .orderBy(schema.featureFlags.key);
+    }
+    return db.select()
+      .from(schema.featureFlags)
+      .where(isNull(schema.featureFlags.tenantId))
+      .orderBy(schema.featureFlags.key);
+  }
+
+  // ==================== WORKSPACE OPERATIONS ====================
+
+  async getUserWorkspaces(userId: string): Promise<(WorkspaceUser & { workspace: Tenant })[]> {
+    const results = await db.select({
+      id: schema.workspaceUsers.id,
+      userId: schema.workspaceUsers.userId,
+      workspaceId: schema.workspaceUsers.workspaceId,
+      role: schema.workspaceUsers.role,
+      isPrimary: schema.workspaceUsers.isPrimary,
+      invitedBy: schema.workspaceUsers.invitedBy,
+      joinedAt: schema.workspaceUsers.joinedAt,
+      lastAccessedAt: schema.workspaceUsers.lastAccessedAt,
+      createdAt: schema.workspaceUsers.createdAt,
+      workspace: schema.tenants,
+    })
+    .from(schema.workspaceUsers)
+    .innerJoin(schema.tenants, eq(schema.workspaceUsers.workspaceId, schema.tenants.id))
+    .where(eq(schema.workspaceUsers.userId, userId))
+    .orderBy(desc(schema.workspaceUsers.isPrimary), schema.tenants.name);
+
+    return results.map(r => ({
+      id: r.id,
+      userId: r.userId,
+      workspaceId: r.workspaceId,
+      role: r.role,
+      isPrimary: r.isPrimary,
+      invitedBy: r.invitedBy,
+      joinedAt: r.joinedAt,
+      lastAccessedAt: r.lastAccessedAt,
+      createdAt: r.createdAt,
+      workspace: r.workspace,
+    }));
+  }
+
+  async getWorkspaceUsers(workspaceId: string): Promise<(WorkspaceUser & { user: Omit<User, 'passwordHash'> })[]> {
+    const results = await db.select({
+      id: schema.workspaceUsers.id,
+      userId: schema.workspaceUsers.userId,
+      workspaceId: schema.workspaceUsers.workspaceId,
+      role: schema.workspaceUsers.role,
+      isPrimary: schema.workspaceUsers.isPrimary,
+      invitedBy: schema.workspaceUsers.invitedBy,
+      joinedAt: schema.workspaceUsers.joinedAt,
+      lastAccessedAt: schema.workspaceUsers.lastAccessedAt,
+      createdAt: schema.workspaceUsers.createdAt,
+      user: schema.users,
+    })
+    .from(schema.workspaceUsers)
+    .innerJoin(schema.users, eq(schema.workspaceUsers.userId, schema.users.id))
+    .where(eq(schema.workspaceUsers.workspaceId, workspaceId))
+    .orderBy(desc(schema.workspaceUsers.role), schema.users.firstName);
+
+    return results.map(r => {
+      const { passwordHash, ...userWithoutPassword } = r.user;
+      return {
+        id: r.id,
+        userId: r.userId,
+        workspaceId: r.workspaceId,
+        role: r.role,
+        isPrimary: r.isPrimary,
+        invitedBy: r.invitedBy,
+        joinedAt: r.joinedAt,
+        lastAccessedAt: r.lastAccessedAt,
+        createdAt: r.createdAt,
+        user: userWithoutPassword,
+      };
+    });
+  }
+
+  async addUserToWorkspace(data: InsertWorkspaceUser): Promise<WorkspaceUser> {
+    const [workspaceUser] = await db.insert(schema.workspaceUsers)
+      .values(data)
+      .returning();
+    return workspaceUser;
+  }
+
+  async updateWorkspaceUser(userId: string, workspaceId: string, updates: { role?: string; isPrimary?: boolean }): Promise<WorkspaceUser | undefined> {
+    const [updated] = await db.update(schema.workspaceUsers)
+      .set(updates)
+      .where(and(
+        eq(schema.workspaceUsers.userId, userId),
+        eq(schema.workspaceUsers.workspaceId, workspaceId)
+      ))
+      .returning();
+    return updated;
+  }
+
+  async removeUserFromWorkspace(userId: string, workspaceId: string): Promise<void> {
+    await db.delete(schema.workspaceUsers)
+      .where(and(
+        eq(schema.workspaceUsers.userId, userId),
+        eq(schema.workspaceUsers.workspaceId, workspaceId)
+      ));
+  }
+
+  async isUserInWorkspace(userId: string, workspaceId: string): Promise<boolean> {
+    const [result] = await db.select()
+      .from(schema.workspaceUsers)
+      .where(and(
+        eq(schema.workspaceUsers.userId, userId),
+        eq(schema.workspaceUsers.workspaceId, workspaceId)
+      ));
+    return !!result;
+  }
+
+  async getUserWorkspaceRole(userId: string, workspaceId: string): Promise<string | undefined> {
+    const [result] = await db.select({ role: schema.workspaceUsers.role })
+      .from(schema.workspaceUsers)
+      .where(and(
+        eq(schema.workspaceUsers.userId, userId),
+        eq(schema.workspaceUsers.workspaceId, workspaceId)
+      ));
+    return result?.role;
+  }
+
+  async setActiveWorkspace(userId: string, workspaceId: string): Promise<void> {
+    await db.update(schema.workspaceUsers)
+      .set({ lastAccessedAt: new Date() })
+      .where(and(
+        eq(schema.workspaceUsers.userId, userId),
+        eq(schema.workspaceUsers.workspaceId, workspaceId)
+      ));
+  }
+
+  // Workspace Invitations
+  async createWorkspaceInvitation(invitation: InsertWorkspaceInvitation): Promise<WorkspaceInvitation> {
+    const [created] = await db.insert(schema.workspaceInvitations)
+      .values(invitation)
+      .returning();
+    return created;
+  }
+
+  async getWorkspaceInvitations(workspaceId: string, status?: string): Promise<WorkspaceInvitation[]> {
+    const conditions = [eq(schema.workspaceInvitations.workspaceId, workspaceId)];
+    if (status) {
+      conditions.push(eq(schema.workspaceInvitations.status, status));
+    }
+    return db.select()
+      .from(schema.workspaceInvitations)
+      .where(and(...conditions))
+      .orderBy(desc(schema.workspaceInvitations.createdAt));
+  }
+
+  async getInvitationByToken(token: string): Promise<WorkspaceInvitation | undefined> {
+    const [invitation] = await db.select()
+      .from(schema.workspaceInvitations)
+      .where(eq(schema.workspaceInvitations.token, token));
+    return invitation;
+  }
+
+  async getInvitationsByEmail(email: string, status?: string): Promise<(WorkspaceInvitation & { workspace: Tenant })[]> {
+    const conditions = [eq(schema.workspaceInvitations.email, email.toLowerCase())];
+    if (status) {
+      conditions.push(eq(schema.workspaceInvitations.status, status));
+    }
+
+    const results = await db.select({
+      invitation: schema.workspaceInvitations,
+      workspace: schema.tenants,
+    })
+    .from(schema.workspaceInvitations)
+    .innerJoin(schema.tenants, eq(schema.workspaceInvitations.workspaceId, schema.tenants.id))
+    .where(and(...conditions))
+    .orderBy(desc(schema.workspaceInvitations.createdAt));
+
+    return results.map(r => ({
+      ...r.invitation,
+      workspace: r.workspace,
+    }));
+  }
+
+  async updateInvitationStatus(id: string, status: string): Promise<WorkspaceInvitation | undefined> {
+    const updates: any = { status };
+    if (status === 'accepted') {
+      updates.acceptedAt = new Date();
+    }
+    const [updated] = await db.update(schema.workspaceInvitations)
+      .set(updates)
+      .where(eq(schema.workspaceInvitations.id, id))
+      .returning();
+    return updated;
+  }
+
+  async acceptInvitation(token: string, userId: string): Promise<WorkspaceUser | undefined> {
+    const invitation = await this.getInvitationByToken(token);
+    if (!invitation || invitation.status !== 'pending') return undefined;
+    if (new Date() > new Date(invitation.expiresAt)) {
+      await this.updateInvitationStatus(invitation.id, 'expired');
+      return undefined;
+    }
+
+    // Check if user is already in workspace
+    const existing = await this.isUserInWorkspace(userId, invitation.workspaceId);
+    if (existing) {
+      await this.updateInvitationStatus(invitation.id, 'accepted');
+      const [workspaceUser] = await db.select()
+        .from(schema.workspaceUsers)
+        .where(and(
+          eq(schema.workspaceUsers.userId, userId),
+          eq(schema.workspaceUsers.workspaceId, invitation.workspaceId)
+        ));
+      return workspaceUser;
+    }
+
+    // Add user to workspace
+    const workspaceUser = await this.addUserToWorkspace({
+      userId,
+      workspaceId: invitation.workspaceId,
+      role: invitation.role,
+      isPrimary: false,
+      invitedBy: invitation.invitedBy,
+    });
+
+    // Mark invitation as accepted
+    await this.updateInvitationStatus(invitation.id, 'accepted');
+
+    return workspaceUser;
+  }
+
+  async revokeInvitation(id: string): Promise<void> {
+    await db.update(schema.workspaceInvitations)
+      .set({ status: 'revoked' })
+      .where(eq(schema.workspaceInvitations.id, id));
+  }
+
+  async cleanupExpiredInvitations(): Promise<number> {
+    const result = await db.update(schema.workspaceInvitations)
+      .set({ status: 'expired' })
+      .where(and(
+        eq(schema.workspaceInvitations.status, 'pending'),
+        lte(schema.workspaceInvitations.expiresAt, new Date())
+      ))
+      .returning();
+    return result.length;
+  }
+
+  // Workspace Activity Logging
+  async logWorkspaceActivity(log: InsertWorkspaceActivityLog): Promise<WorkspaceActivityLog> {
+    const [created] = await db.insert(schema.workspaceActivityLogs)
+      .values(log)
+      .returning();
+    return created;
+  }
+
+  async getWorkspaceActivityLogs(workspaceId: string, limit: number = 100): Promise<WorkspaceActivityLog[]> {
+    return db.select()
+      .from(schema.workspaceActivityLogs)
+      .where(eq(schema.workspaceActivityLogs.workspaceId, workspaceId))
+      .orderBy(desc(schema.workspaceActivityLogs.createdAt))
+      .limit(limit);
+  }
+
+  // Create workspace with owner
+  async createWorkspace(tenantData: InsertTenant, ownerId: string): Promise<Tenant> {
+    const tenant = await this.createTenant(tenantData);
+    
+    // Add creator as workspace owner
+    await this.addUserToWorkspace({
+      userId: ownerId,
+      workspaceId: tenant.id,
+      role: 'owner',
+      isPrimary: false,
+      invitedBy: null,
+    });
+
+    // Log workspace creation
+    await this.logWorkspaceActivity({
+      workspaceId: tenant.id,
+      userId: ownerId,
+      action: 'workspace_created',
+      details: JSON.stringify({ name: tenantData.name }),
+    });
+
+    return tenant;
   }
 }
 

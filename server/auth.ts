@@ -12,6 +12,7 @@ export interface JWTPayload {
   email: string;
   userType: UserType;
   isAdmin: boolean;
+  activeWorkspaceId?: string; // Optional: only set when multi_workspace_enabled is ON
 }
 
 export async function hashPassword(password: string): Promise<string> {
@@ -23,7 +24,11 @@ export async function verifyPassword(password: string, hash: string): Promise<bo
   return bcrypt.compare(password, hash);
 }
 
-export function generateAccessToken(user: User): string {
+export interface TokenOptions {
+  activeWorkspaceId?: string;
+}
+
+export function generateAccessToken(user: User, options?: TokenOptions): string {
   const payload: JWTPayload = {
     userId: user.id,
     tenantId: user.tenantId,
@@ -32,10 +37,14 @@ export function generateAccessToken(user: User): string {
     isAdmin: user.isAdmin,
   };
   
+  if (options?.activeWorkspaceId) {
+    payload.activeWorkspaceId = options.activeWorkspaceId;
+  }
+  
   return jwt.sign(payload, JWT_SECRET, { expiresIn: JWT_EXPIRES_IN });
 }
 
-export function generateRefreshToken(user: User): string {
+export function generateRefreshToken(user: User, options?: TokenOptions): string {
   const payload: JWTPayload = {
     userId: user.id,
     tenantId: user.tenantId,
@@ -43,6 +52,10 @@ export function generateRefreshToken(user: User): string {
     userType: user.userType as UserType,
     isAdmin: user.isAdmin,
   };
+  
+  if (options?.activeWorkspaceId) {
+    payload.activeWorkspaceId = options.activeWorkspaceId;
+  }
   
   return jwt.sign(payload, JWT_SECRET, { expiresIn: REFRESH_TOKEN_EXPIRES_IN });
 }

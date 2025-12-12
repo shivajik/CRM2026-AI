@@ -2,7 +2,8 @@ import type { Express } from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
 import { hashPassword, verifyPassword, generateAccessToken, generateRefreshToken, getRefreshTokenExpiry, verifyToken } from "./auth";
-import { requireAuth, validateTenant, requireAgencyAdmin, requireSaasAdmin, denyCustomerAccess } from "./middleware";
+import { requireAuth, validateTenant, requireAgencyAdmin, requireSaasAdmin, denyCustomerAccess, resolveWorkspaceContext, requireMultiWorkspaceEnabled, requireWorkspaceAdmin } from "./middleware";
+import crypto from "crypto";
 import { z } from "zod";
 import { insertContactSchema, insertDealSchema, insertTaskSchema, insertProductSchema, insertCustomerSchema, insertQuotationSchema, insertQuotationItemSchema, insertInvoiceSchema, insertInvoiceItemSchema, insertPaymentSchema, insertActivitySchema, insertProposalSchema, insertProposalTemplateSchema, insertProposalSectionSchema, insertProposalPricingItemSchema, insertTemplateSectionSchema, PROPOSAL_SECTION_TYPES } from "@shared/schema";
 
@@ -106,8 +107,29 @@ export async function registerRoutes(
         return res.status(401).json({ message: "Invalid credentials" });
       }
       
-      const accessToken = generateAccessToken(user);
-      const refreshToken = generateRefreshToken(user);
+      // Check if multi-workspace is enabled for this user's tenant
+      let activeWorkspaceId: string | undefined;
+      const multiWorkspaceEnabled = await storage.getFeatureFlag('multi_workspace_enabled', user.tenantId);
+      
+      if (multiWorkspaceEnabled) {
+        // Get user's last active workspace, or default to primary tenant
+        // When multi-workspace is enabled, always include activeWorkspaceId
+        const workspaces = await storage.getUserWorkspaces(user.id);
+        // Sort by lastAccessedAt descending (nulls last) to get most recent
+        const sortedWorkspaces = workspaces.sort((a, b) => {
+          if (!a.lastAccessedAt && !b.lastAccessedAt) return 0;
+          if (!a.lastAccessedAt) return 1;
+          if (!b.lastAccessedAt) return -1;
+          return new Date(b.lastAccessedAt).getTime() - new Date(a.lastAccessedAt).getTime();
+        });
+        const lastActive = sortedWorkspaces[0];
+        // Use last accessed workspace, or user's primary tenant
+        activeWorkspaceId = lastActive?.workspaceId || user.tenantId;
+      }
+      
+      const tokenOptions = activeWorkspaceId ? { activeWorkspaceId } : undefined;
+      const accessToken = generateAccessToken(user, tokenOptions);
+      const refreshToken = generateRefreshToken(user, tokenOptions);
       
       await storage.createAuthToken({
         userId: user.id,
@@ -128,6 +150,7 @@ export async function registerRoutes(
           isAdmin: user.isAdmin,
           profileImageUrl: user.profileImageUrl,
         },
+        ...(activeWorkspaceId && { activeWorkspaceId }),
       });
     } catch (error) {
       console.error("Login error:", error);
@@ -158,9 +181,34 @@ export async function registerRoutes(
         return res.status(401).json({ message: "User not found" });
       }
       
-      const newAccessToken = generateAccessToken(user);
+      // Preserve activeWorkspaceId from the old token if it was present
+      // But verify user still has access to that workspace
+      let activeWorkspaceId = payload.activeWorkspaceId;
       
-      res.json({ accessToken: newAccessToken });
+      if (activeWorkspaceId) {
+        // Validate user still has access to this workspace
+        const hasAccess = await storage.isUserInWorkspace(user.id, activeWorkspaceId);
+        const isPrimaryTenant = activeWorkspaceId === user.tenantId;
+        
+        if (!hasAccess && !isPrimaryTenant) {
+          // User no longer has access - fall back to tenant
+          activeWorkspaceId = undefined;
+        }
+        
+        // Also check if multi-workspace is still enabled
+        const multiWorkspaceEnabled = await storage.getFeatureFlag('multi_workspace_enabled', user.tenantId);
+        if (!multiWorkspaceEnabled) {
+          activeWorkspaceId = undefined;
+        }
+      }
+      
+      const tokenOptions = activeWorkspaceId ? { activeWorkspaceId } : undefined;
+      const newAccessToken = generateAccessToken(user, tokenOptions);
+      
+      res.json({ 
+        accessToken: newAccessToken,
+        ...(activeWorkspaceId && { activeWorkspaceId }),
+      });
     } catch (error) {
       console.error("Token refresh error:", error);
       res.status(500).json({ message: "Token refresh failed" });
@@ -4013,6 +4061,452 @@ export async function registerRoutes(
     } catch (error) {
       console.error("Get merge fields error:", error);
       res.status(500).json({ message: "Failed to fetch merge fields" });
+    }
+  });
+
+  // ==================== MULTI-WORKSPACE ROUTES ====================
+  // All workspace routes are gated by multi_workspace_enabled feature flag
+  // When flag is OFF, these endpoints return appropriate error responses
+  
+  // Get feature flags status for current user/tenant
+  app.get("/api/features", requireAuth, resolveWorkspaceContext, async (req, res) => {
+    try {
+      const multiWorkspaceEnabled = await storage.getFeatureFlag('multi_workspace_enabled', req.user!.tenantId);
+      
+      res.json({
+        multi_workspace_enabled: multiWorkspaceEnabled,
+        tenant_id: req.user!.tenantId,
+      });
+    } catch (error) {
+      console.error("Get features error:", error);
+      res.status(500).json({ message: "Failed to fetch features" });
+    }
+  });
+
+  // Get all workspaces for current user
+  app.get("/api/workspaces", requireAuth, resolveWorkspaceContext, requireMultiWorkspaceEnabled, async (req, res) => {
+    try {
+      const workspaces = await storage.getUserWorkspaces(req.user!.userId);
+      
+      // Also include user's primary tenant if not in workspace_users table
+      const hasPrimaryTenant = workspaces.some(w => w.workspaceId === req.user!.tenantId);
+      
+      if (!hasPrimaryTenant) {
+        const primaryTenant = await storage.getTenant(req.user!.tenantId);
+        if (primaryTenant) {
+          workspaces.unshift({
+            id: 'primary',
+            userId: req.user!.userId,
+            workspaceId: primaryTenant.id,
+            role: req.user!.isAdmin ? 'owner' : 'member',
+            isPrimary: true,
+            invitedBy: null,
+            joinedAt: new Date(),
+            lastAccessedAt: null,
+            createdAt: new Date(),
+            workspace: primaryTenant,
+          });
+        }
+      }
+      
+      res.json({
+        workspaces,
+        activeWorkspaceId: req.workspaceId || req.user!.tenantId,
+      });
+    } catch (error) {
+      console.error("Get workspaces error:", error);
+      res.status(500).json({ message: "Failed to fetch workspaces" });
+    }
+  });
+
+  // Create new workspace
+  app.post("/api/workspaces", requireAuth, resolveWorkspaceContext, requireMultiWorkspaceEnabled, async (req, res) => {
+    try {
+      const { name } = req.body;
+      
+      if (!name || typeof name !== 'string' || name.trim().length === 0) {
+        return res.status(400).json({ message: "Workspace name is required" });
+      }
+      
+      const workspace = await storage.createWorkspace({ name: name.trim() }, req.user!.userId);
+      
+      res.status(201).json(workspace);
+    } catch (error) {
+      console.error("Create workspace error:", error);
+      res.status(500).json({ message: "Failed to create workspace" });
+    }
+  });
+
+  // Switch active workspace
+  app.post("/api/workspaces/:workspaceId/switch", requireAuth, resolveWorkspaceContext, requireMultiWorkspaceEnabled, async (req, res) => {
+    try {
+      const { workspaceId } = req.params;
+      
+      // Verify user has access to workspace
+      const hasAccess = await storage.isUserInWorkspace(req.user!.userId, workspaceId);
+      const isPrimaryTenant = workspaceId === req.user!.tenantId;
+      
+      if (!hasAccess && !isPrimaryTenant) {
+        return res.status(403).json({ message: "Access denied to this workspace" });
+      }
+      
+      // Update last accessed timestamp
+      if (hasAccess) {
+        await storage.setActiveWorkspace(req.user!.userId, workspaceId);
+      }
+      
+      // Log the switch
+      await storage.logWorkspaceActivity({
+        workspaceId,
+        userId: req.user!.userId,
+        action: 'workspace_switched',
+        ipAddress: req.ip || undefined,
+        userAgent: req.headers['user-agent'] || undefined,
+      });
+      
+      // Get the user to generate new tokens with active workspace
+      const user = await storage.getUser(req.user!.userId);
+      if (!user) {
+        return res.status(404).json({ message: "User not found" });
+      }
+      
+      // Generate new tokens with the active workspace ID
+      const accessToken = generateAccessToken(user, { activeWorkspaceId: workspaceId });
+      const newRefreshToken = generateRefreshToken(user, { activeWorkspaceId: workspaceId });
+      
+      // Store the refresh token
+      const expiresAt = getRefreshTokenExpiry();
+      await storage.createAuthToken({
+        userId: user.id,
+        refreshToken: newRefreshToken,
+        expiresAt,
+      });
+      
+      res.json({ 
+        message: "Workspace switched successfully",
+        activeWorkspaceId: workspaceId,
+        accessToken,
+        refreshToken: newRefreshToken,
+      });
+    } catch (error) {
+      console.error("Switch workspace error:", error);
+      res.status(500).json({ message: "Failed to switch workspace" });
+    }
+  });
+
+  // Get workspace members
+  app.get("/api/workspaces/:workspaceId/members", requireAuth, resolveWorkspaceContext, requireMultiWorkspaceEnabled, async (req, res) => {
+    try {
+      const { workspaceId } = req.params;
+      
+      // Verify user has access
+      const hasAccess = await storage.isUserInWorkspace(req.user!.userId, workspaceId);
+      const isPrimaryTenant = workspaceId === req.user!.tenantId;
+      
+      if (!hasAccess && !isPrimaryTenant) {
+        return res.status(403).json({ message: "Access denied to this workspace" });
+      }
+      
+      const members = await storage.getWorkspaceUsers(workspaceId);
+      res.json(members);
+    } catch (error) {
+      console.error("Get workspace members error:", error);
+      res.status(500).json({ message: "Failed to fetch workspace members" });
+    }
+  });
+
+  // Update workspace member role
+  app.patch("/api/workspaces/:workspaceId/members/:userId", requireAuth, resolveWorkspaceContext, requireMultiWorkspaceEnabled, requireWorkspaceAdmin, async (req, res) => {
+    try {
+      const { workspaceId, userId } = req.params;
+      const { role } = req.body;
+      
+      if (!role || !['owner', 'admin', 'member', 'viewer'].includes(role)) {
+        return res.status(400).json({ message: "Invalid role" });
+      }
+      
+      // Cannot change your own role
+      if (userId === req.user!.userId) {
+        return res.status(400).json({ message: "Cannot change your own role" });
+      }
+      
+      const updated = await storage.updateWorkspaceUser(userId, workspaceId, { role });
+      if (!updated) {
+        return res.status(404).json({ message: "Member not found in this workspace" });
+      }
+      
+      await storage.logWorkspaceActivity({
+        workspaceId,
+        userId: req.user!.userId,
+        action: 'member_role_changed',
+        details: JSON.stringify({ targetUserId: userId, newRole: role }),
+      });
+      
+      res.json(updated);
+    } catch (error) {
+      console.error("Update workspace member error:", error);
+      res.status(500).json({ message: "Failed to update member" });
+    }
+  });
+
+  // Remove member from workspace
+  app.delete("/api/workspaces/:workspaceId/members/:userId", requireAuth, resolveWorkspaceContext, requireMultiWorkspaceEnabled, requireWorkspaceAdmin, async (req, res) => {
+    try {
+      const { workspaceId, userId } = req.params;
+      
+      // Cannot remove yourself
+      if (userId === req.user!.userId) {
+        return res.status(400).json({ message: "Cannot remove yourself from workspace" });
+      }
+      
+      await storage.removeUserFromWorkspace(userId, workspaceId);
+      
+      await storage.logWorkspaceActivity({
+        workspaceId,
+        userId: req.user!.userId,
+        action: 'member_removed',
+        details: JSON.stringify({ removedUserId: userId }),
+      });
+      
+      res.json({ message: "Member removed successfully" });
+    } catch (error) {
+      console.error("Remove workspace member error:", error);
+      res.status(500).json({ message: "Failed to remove member" });
+    }
+  });
+
+  // Get workspace invitations
+  app.get("/api/workspaces/:workspaceId/invitations", requireAuth, resolveWorkspaceContext, requireMultiWorkspaceEnabled, requireWorkspaceAdmin, async (req, res) => {
+    try {
+      const { workspaceId } = req.params;
+      const { status } = req.query;
+      
+      const invitations = await storage.getWorkspaceInvitations(workspaceId, status as string);
+      res.json(invitations);
+    } catch (error) {
+      console.error("Get invitations error:", error);
+      res.status(500).json({ message: "Failed to fetch invitations" });
+    }
+  });
+
+  // Create workspace invitation
+  app.post("/api/workspaces/:workspaceId/invitations", requireAuth, resolveWorkspaceContext, requireMultiWorkspaceEnabled, requireWorkspaceAdmin, async (req, res) => {
+    try {
+      const { workspaceId } = req.params;
+      const { email, role } = req.body;
+      
+      if (!email || !email.includes('@')) {
+        return res.status(400).json({ message: "Valid email is required" });
+      }
+      
+      const inviteRole = role && ['admin', 'member', 'viewer'].includes(role) ? role : 'member';
+      
+      // Generate unique token
+      const token = crypto.randomBytes(32).toString('hex');
+      
+      // Set expiration to 7 days
+      const expiresAt = new Date();
+      expiresAt.setDate(expiresAt.getDate() + 7);
+      
+      const invitation = await storage.createWorkspaceInvitation({
+        workspaceId,
+        email: email.toLowerCase().trim(),
+        role: inviteRole,
+        token,
+        invitedBy: req.user!.userId,
+        status: 'pending',
+        expiresAt,
+      });
+      
+      await storage.logWorkspaceActivity({
+        workspaceId,
+        userId: req.user!.userId,
+        action: 'invitation_sent',
+        details: JSON.stringify({ email: invitation.email, role: inviteRole }),
+      });
+      
+      res.status(201).json({
+        ...invitation,
+        inviteLink: `/invite/${token}`,
+      });
+    } catch (error) {
+      console.error("Create invitation error:", error);
+      res.status(500).json({ message: "Failed to create invitation" });
+    }
+  });
+
+  // Revoke invitation
+  app.delete("/api/workspaces/:workspaceId/invitations/:invitationId", requireAuth, resolveWorkspaceContext, requireMultiWorkspaceEnabled, requireWorkspaceAdmin, async (req, res) => {
+    try {
+      const { workspaceId, invitationId } = req.params;
+      
+      await storage.revokeInvitation(invitationId);
+      
+      await storage.logWorkspaceActivity({
+        workspaceId,
+        userId: req.user!.userId,
+        action: 'invitation_revoked',
+        details: JSON.stringify({ invitationId }),
+      });
+      
+      res.json({ message: "Invitation revoked" });
+    } catch (error) {
+      console.error("Revoke invitation error:", error);
+      res.status(500).json({ message: "Failed to revoke invitation" });
+    }
+  });
+
+  // Get pending invitations for current user (by email)
+  app.get("/api/invitations/pending", requireAuth, resolveWorkspaceContext, async (req, res) => {
+    try {
+      const invitations = await storage.getInvitationsByEmail(req.user!.email, 'pending');
+      res.json(invitations);
+    } catch (error) {
+      console.error("Get pending invitations error:", error);
+      res.status(500).json({ message: "Failed to fetch pending invitations" });
+    }
+  });
+
+  // Accept invitation by token
+  app.post("/api/invitations/:token/accept", requireAuth, async (req, res) => {
+    try {
+      const { token } = req.params;
+      
+      const workspaceUser = await storage.acceptInvitation(token, req.user!.userId);
+      
+      if (!workspaceUser) {
+        return res.status(400).json({ message: "Invalid or expired invitation" });
+      }
+      
+      await storage.logWorkspaceActivity({
+        workspaceId: workspaceUser.workspaceId,
+        userId: req.user!.userId,
+        action: 'invitation_accepted',
+        ipAddress: req.ip || undefined,
+        userAgent: req.headers['user-agent'] || undefined,
+      });
+      
+      res.json({ 
+        message: "Invitation accepted",
+        workspaceId: workspaceUser.workspaceId,
+      });
+    } catch (error) {
+      console.error("Accept invitation error:", error);
+      res.status(500).json({ message: "Failed to accept invitation" });
+    }
+  });
+
+  // Decline invitation by token
+  app.post("/api/invitations/:token/decline", requireAuth, async (req, res) => {
+    try {
+      const { token } = req.params;
+      
+      const invitation = await storage.getInvitationByToken(token);
+      if (!invitation || invitation.status !== 'pending') {
+        return res.status(400).json({ message: "Invalid or already processed invitation" });
+      }
+      
+      await storage.updateInvitationStatus(invitation.id, 'declined');
+      
+      res.json({ message: "Invitation declined" });
+    } catch (error) {
+      console.error("Decline invitation error:", error);
+      res.status(500).json({ message: "Failed to decline invitation" });
+    }
+  });
+
+  // Get workspace activity logs (admin only)
+  app.get("/api/workspaces/:workspaceId/activity", requireAuth, resolveWorkspaceContext, requireMultiWorkspaceEnabled, requireWorkspaceAdmin, async (req, res) => {
+    try {
+      const { workspaceId } = req.params;
+      const limit = parseInt(req.query.limit as string) || 100;
+      
+      const logs = await storage.getWorkspaceActivityLogs(workspaceId, limit);
+      res.json(logs);
+    } catch (error) {
+      console.error("Get workspace activity error:", error);
+      res.status(500).json({ message: "Failed to fetch activity logs" });
+    }
+  });
+
+  // ==================== SAAS ADMIN: FEATURE FLAG MANAGEMENT ====================
+  
+  // Get all feature flags (SaaS admin only)
+  app.get("/api/admin/feature-flags", requireAuth, requireSaasAdmin, async (req, res) => {
+    try {
+      const flags = await storage.getAllFeatureFlags();
+      res.json(flags);
+    } catch (error) {
+      console.error("Get feature flags error:", error);
+      res.status(500).json({ message: "Failed to fetch feature flags" });
+    }
+  });
+
+  // Set feature flag (SaaS admin only)
+  app.post("/api/admin/feature-flags", requireAuth, requireSaasAdmin, async (req, res) => {
+    try {
+      const { key, enabled, tenantId, description } = req.body;
+      
+      if (!key) {
+        return res.status(400).json({ message: "Flag key is required" });
+      }
+      
+      const flag = await storage.setFeatureFlag(key, !!enabled, tenantId || undefined, description);
+      res.json(flag);
+    } catch (error) {
+      console.error("Set feature flag error:", error);
+      res.status(500).json({ message: "Failed to set feature flag" });
+    }
+  });
+
+  // Enable multi-workspace for a specific tenant (SaaS admin only)
+  app.post("/api/admin/tenants/:tenantId/enable-multi-workspace", requireAuth, requireSaasAdmin, async (req, res) => {
+    try {
+      const { tenantId } = req.params;
+      
+      // Check tenant exists
+      const tenant = await storage.getTenant(tenantId);
+      if (!tenant) {
+        return res.status(404).json({ message: "Tenant not found" });
+      }
+      
+      // Enable multi-workspace for this tenant
+      const flag = await storage.setFeatureFlag(
+        'multi_workspace_enabled', 
+        true, 
+        tenantId, 
+        'Multi-workspace enabled for tenant'
+      );
+      
+      res.json({ 
+        message: "Multi-workspace enabled for tenant",
+        flag,
+      });
+    } catch (error) {
+      console.error("Enable multi-workspace error:", error);
+      res.status(500).json({ message: "Failed to enable multi-workspace" });
+    }
+  });
+
+  // Disable multi-workspace for a specific tenant (SaaS admin only)
+  app.post("/api/admin/tenants/:tenantId/disable-multi-workspace", requireAuth, requireSaasAdmin, async (req, res) => {
+    try {
+      const { tenantId } = req.params;
+      
+      const flag = await storage.setFeatureFlag(
+        'multi_workspace_enabled', 
+        false, 
+        tenantId, 
+        'Multi-workspace disabled for tenant'
+      );
+      
+      res.json({ 
+        message: "Multi-workspace disabled for tenant",
+        flag,
+      });
+    } catch (error) {
+      console.error("Disable multi-workspace error:", error);
+      res.status(500).json({ message: "Failed to disable multi-workspace" });
     }
   });
 

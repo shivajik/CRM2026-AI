@@ -102,3 +102,42 @@ This document lists assumptions made during development of the Nexus CRM marketi
 - Includes micro-anecdotes where appropriate
 - Avoids common AI writing patterns
 - Target Humanise score: 60+
+
+## Multi-Workspace Feature (Production-Impacting)
+
+### Feature Flag Control
+- All multi-workspace functionality is gated behind `multi_workspace_enabled` feature flag
+- Default state: **OFF** - ensures no impact on existing users
+- Per-tenant override available for gradual rollout
+
+### Data Isolation
+- Workspace data remains isolated by tenantId
+- Users can only access workspaces they are explicitly members of
+- Cross-workspace data access is not permitted
+
+### Backward Compatibility
+- When feature flag is OFF, system behaves exactly as before
+- No changes to JWT payload structure when flag is OFF
+- All existing API endpoints maintain their current behavior
+
+### Database Changes
+- All schema changes are additive (new tables only)
+- No existing columns are modified or renamed
+- Rollback does not require data migration
+
+### User Experience
+- Workspace switcher UI is hidden when flag is OFF
+- Existing single-tenant users see no UI changes
+- Invitation links work for both new and existing users
+
+### Security Considerations
+- Only SaaS admins can enable/disable feature flags
+- Workspace role-based access control (owner, admin, member, viewer)
+- Invitation tokens are cryptographically random and expire after 7 days
+
+### Sign-Off Required
+The following assumptions require explicit sign-off before production rollout:
+- [ ] Feature flag default is OFF
+- [ ] No destructive database migrations
+- [ ] Backward compatibility verified
+- [ ] Rollback procedure tested

@@ -1357,3 +1357,115 @@ export const insertProposalCommentSchema = createInsertSchema(proposalComments).
 });
 export type InsertProposalComment = z.infer<typeof insertProposalCommentSchema>;
 export type ProposalComment = typeof proposalComments.$inferSelect;
+
+// ==================== FEATURE FLAGS (Multi-Workspace Support) ====================
+
+// Feature Flags table - global and per-tenant feature toggles
+export const featureFlags = pgTable("feature_flags", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  key: text("key").notNull(),
+  tenantId: varchar("tenant_id").references(() => tenants.id, { onDelete: "cascade" }),
+  enabled: boolean("enabled").default(false).notNull(),
+  description: text("description"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+export const insertFeatureFlagSchema = createInsertSchema(featureFlags).omit({ 
+  id: true, 
+  createdAt: true,
+  updatedAt: true,
+});
+export type InsertFeatureFlag = z.infer<typeof insertFeatureFlagSchema>;
+export type FeatureFlag = typeof featureFlags.$inferSelect;
+
+// ==================== MULTI-WORKSPACE SUPPORT ====================
+
+// Workspace roles for multi-workspace access control
+export const WORKSPACE_ROLES = {
+  OWNER: 'owner',         // Full control, can delete workspace
+  ADMIN: 'admin',         // Can manage members and settings
+  MEMBER: 'member',       // Standard access
+  VIEWER: 'viewer',       // Read-only access
+} as const;
+
+export type WorkspaceRole = typeof WORKSPACE_ROLES[keyof typeof WORKSPACE_ROLES];
+
+// Workspace Users - links users to workspaces (tenants) they can access
+// This enables multi-workspace support without breaking existing tenantId logic
+export const workspaceUsers = pgTable("workspace_users", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  userId: varchar("user_id").references(() => users.id, { onDelete: "cascade" }).notNull(),
+  workspaceId: varchar("workspace_id").references(() => tenants.id, { onDelete: "cascade" }).notNull(),
+  role: text("role").notNull().default("member"), // owner, admin, member, viewer
+  isPrimary: boolean("is_primary").default(false).notNull(), // User's primary/default workspace
+  invitedBy: varchar("invited_by").references(() => users.id, { onDelete: "set null" }),
+  joinedAt: timestamp("joined_at").defaultNow().notNull(),
+  lastAccessedAt: timestamp("last_accessed_at"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+export const insertWorkspaceUserSchema = createInsertSchema(workspaceUsers).omit({ 
+  id: true, 
+  createdAt: true,
+  joinedAt: true,
+});
+export type InsertWorkspaceUser = z.infer<typeof insertWorkspaceUserSchema>;
+export type WorkspaceUser = typeof workspaceUsers.$inferSelect;
+
+// Workspace invitation statuses
+export const INVITATION_STATUSES = {
+  PENDING: 'pending',
+  ACCEPTED: 'accepted',
+  DECLINED: 'declined',
+  EXPIRED: 'expired',
+  REVOKED: 'revoked',
+} as const;
+
+export type InvitationStatus = typeof INVITATION_STATUSES[keyof typeof INVITATION_STATUSES];
+
+// Workspace Invitations - pending invitations to join a workspace
+export const workspaceInvitations = pgTable("workspace_invitations", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  workspaceId: varchar("workspace_id").references(() => tenants.id, { onDelete: "cascade" }).notNull(),
+  email: text("email").notNull(),
+  role: text("role").notNull().default("member"),
+  token: text("token").notNull().unique(), // Unique invitation token
+  invitedBy: varchar("invited_by").references(() => users.id, { onDelete: "set null" }).notNull(),
+  status: text("status").notNull().default("pending"), // pending, accepted, declined, expired, revoked
+  expiresAt: timestamp("expires_at").notNull(),
+  acceptedAt: timestamp("accepted_at"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+export const insertWorkspaceInvitationSchema = createInsertSchema(workspaceInvitations, {
+  expiresAt: z.union([z.string(), z.date()]).transform(val => {
+    if (val instanceof Date) return val;
+    return new Date(val);
+  }),
+}).omit({ 
+  id: true, 
+  createdAt: true,
+  acceptedAt: true,
+});
+export type InsertWorkspaceInvitation = z.infer<typeof insertWorkspaceInvitationSchema>;
+export type WorkspaceInvitation = typeof workspaceInvitations.$inferSelect;
+
+// Workspace Activity Log - audit trail for workspace events (only when multi-workspace enabled)
+export const workspaceActivityLogs = pgTable("workspace_activity_logs", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  workspaceId: varchar("workspace_id").references(() => tenants.id, { onDelete: "cascade" }).notNull(),
+  userId: varchar("user_id").references(() => users.id, { onDelete: "set null" }),
+  action: text("action").notNull(), // created, updated, member_added, member_removed, switched_to, etc.
+  details: text("details"), // JSON string with additional context
+  ipAddress: text("ip_address"),
+  userAgent: text("user_agent"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+export const insertWorkspaceActivityLogSchema = createInsertSchema(workspaceActivityLogs).omit({ 
+  id: true, 
+  createdAt: true,
+});
+export type InsertWorkspaceActivityLog = z.infer<typeof insertWorkspaceActivityLogSchema>;
+export type WorkspaceActivityLog = typeof workspaceActivityLogs.$inferSelect;

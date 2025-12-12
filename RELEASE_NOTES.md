@@ -140,3 +140,124 @@
 5. Add analytics and conversion tracking
 6. Set up A/B testing infrastructure
 7. Conduct user testing for conversion optimization
+
+---
+
+## v2.0.0 - Multi-Workspace Support (December 2024)
+
+### Overview
+
+This release adds multi-workspace (multi-agency) support, allowing a single user to access and work across multiple organizations. All new functionality is behind the `multi_workspace_enabled` feature flag, which is **OFF by default**.
+
+### Breaking Changes
+**None** - This release is fully backward compatible. Existing functionality is unchanged when the feature flag is OFF.
+
+### New Features
+
+**Feature Flag System**
+- New `feature_flags` table for global and per-tenant feature toggles
+- SaaS Admin API for managing feature flags
+- Runtime flag checking in all workspace-related code paths
+
+**Multi-Workspace Support** (When `multi_workspace_enabled` is ON)
+- Workspace switcher UI in the header
+- Create new workspaces
+- Switch between workspaces
+- Workspace settings page
+- Member management (add, remove, change roles)
+- Role-based access: owner, admin, member, viewer
+
+**Invitation System**
+- Invite users to workspaces via email
+- Unique invitation tokens with 7-day expiry
+- Accept/decline invitation flow
+- Pending invitations indicator
+
+**Activity Logging**
+- Workspace activity audit trail
+- Track member additions, role changes, switches
+
+### Database Changes
+
+**New Tables (Additive Only)**
+- `feature_flags` - Feature toggle storage
+- `workspace_users` - User-to-workspace membership linking
+- `workspace_invitations` - Pending invitations
+- `workspace_activity_logs` - Audit trail
+
+**No Modifications** to existing tables or columns.
+
+### API Changes
+
+**New Endpoints**
+- `GET /api/features` - Get feature flags for current user
+- `GET /api/workspaces` - List user's workspaces
+- `POST /api/workspaces` - Create new workspace
+- `POST /api/workspaces/:id/switch` - Switch workspace
+- `GET /api/workspaces/:id/members` - List workspace members
+- `PATCH /api/workspaces/:id/members/:userId` - Update member role
+- `DELETE /api/workspaces/:id/members/:userId` - Remove member
+- `GET /api/workspaces/:id/invitations` - List invitations
+- `POST /api/workspaces/:id/invitations` - Create invitation
+- `DELETE /api/workspaces/:id/invitations/:id` - Revoke invitation
+- `GET /api/invitations/pending` - User's pending invitations
+- `POST /api/invitations/:token/accept` - Accept invitation
+- `POST /api/invitations/:token/decline` - Decline invitation
+- `GET /api/admin/feature-flags` - List all flags (SaaS Admin)
+- `POST /api/admin/feature-flags` - Set flag (SaaS Admin)
+- `POST /api/admin/tenants/:id/enable-multi-workspace` - Enable for tenant
+- `POST /api/admin/tenants/:id/disable-multi-workspace` - Disable for tenant
+
+**All new endpoints are gated by feature flag** and return 403 when flag is OFF.
+
+### Environment Variables
+
+**No new required environment variables.** Feature control is via database flags.
+
+### Migration Notes
+
+1. Run `npm run db:push` to apply schema changes
+2. Default global feature flag is created automatically (disabled)
+3. No data migration required
+
+### Rollback Procedure
+
+**Quick Rollback** (Feature flag only):
+```sql
+UPDATE feature_flags SET enabled = false WHERE key = 'multi_workspace_enabled';
+```
+
+**Full Rollback** (If needed):
+```bash
+psql $DATABASE_URL -f migrations/0001_add_multi_workspace_support_down.sql
+```
+
+### Testing Verification
+
+- [ ] All existing tests pass when flag is OFF
+- [ ] New workspace tests pass when flag is ON
+- [ ] Rollback tested in staging
+- [ ] Pilot tenant tested successfully
+
+### Sign-Off Checklist
+
+| Requirement | Status | Signed By | Date |
+|-------------|--------|-----------|------|
+| Code review completed | | | |
+| No breaking changes verified | | | |
+| Staging tests passed | | | |
+| Rollback tested | | | |
+| Security review completed | | | |
+| Product Owner approval | | | |
+
+### Risk Assessment
+
+**Low Risk**
+- Feature is completely gated behind disabled flag
+- No changes to existing data structures
+- Immediate rollback available via flag toggle
+
+**Mitigation Steps**
+- Pilot with 1-3 trusted tenants first
+- Monitor for 24-72 hours before wider rollout
+- Gradual enablement (10% → 50% → 100%)

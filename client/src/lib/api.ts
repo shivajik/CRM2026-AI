@@ -1,4 +1,4 @@
-import { getToken, setToken, getRefreshToken, clearAuth } from "./auth";
+import { getToken, setToken, getRefreshToken, setRefreshToken, clearAuth } from "./auth";
 
 const API_BASE = "/api";
 
@@ -510,4 +510,104 @@ export const proposalTemplatesApi = {
   deleteSection: (id: string) => apiRequest(`/proposal-templates/sections/${id}`, { method: "DELETE" }),
   reorderSections: (templateId: string, sectionIds: string[]) => 
     apiRequest(`/proposal-templates/${templateId}/sections/reorder`, { method: "POST", body: JSON.stringify({ sectionIds }) }),
+};
+
+// Feature Flags API
+export const featuresApi = {
+  getFeatures: () => apiRequest("/features"),
+};
+
+// Workspaces API (Multi-Workspace Support)
+// These endpoints are only available when multi_workspace_enabled flag is ON
+export const workspacesApi = {
+  // Get all workspaces for current user
+  getAll: () => apiRequest("/workspaces"),
+  
+  // Create new workspace
+  create: (data: { name: string }) => 
+    apiRequest("/workspaces", { method: "POST", body: JSON.stringify(data) }),
+  
+  // Switch to a different workspace (updates tokens automatically)
+  switch: async (workspaceId: string) => {
+    const response = await apiRequest<{
+      message: string;
+      activeWorkspaceId: string;
+      accessToken: string;
+      refreshToken: string;
+    }>(`/workspaces/${workspaceId}/switch`, { method: "POST" });
+    
+    // Update stored tokens with new ones that include activeWorkspaceId
+    if (response.accessToken) {
+      setToken(response.accessToken);
+    }
+    if (response.refreshToken) {
+      setRefreshToken(response.refreshToken);
+    }
+    
+    return response;
+  },
+  
+  // Get workspace members
+  getMembers: (workspaceId: string) => 
+    apiRequest(`/workspaces/${workspaceId}/members`),
+  
+  // Update member role
+  updateMemberRole: (workspaceId: string, userId: string, role: string) => 
+    apiRequest(`/workspaces/${workspaceId}/members/${userId}`, { 
+      method: "PATCH", 
+      body: JSON.stringify({ role }) 
+    }),
+  
+  // Remove member from workspace
+  removeMember: (workspaceId: string, userId: string) => 
+    apiRequest(`/workspaces/${workspaceId}/members/${userId}`, { method: "DELETE" }),
+  
+  // Invitations
+  getInvitations: (workspaceId: string, status?: string) => {
+    const params = status ? `?status=${status}` : '';
+    return apiRequest(`/workspaces/${workspaceId}/invitations${params}`);
+  },
+  
+  createInvitation: (workspaceId: string, data: { email: string; role?: string }) => 
+    apiRequest(`/workspaces/${workspaceId}/invitations`, { 
+      method: "POST", 
+      body: JSON.stringify(data) 
+    }),
+  
+  revokeInvitation: (workspaceId: string, invitationId: string) => 
+    apiRequest(`/workspaces/${workspaceId}/invitations/${invitationId}`, { method: "DELETE" }),
+  
+  // Activity logs
+  getActivityLogs: (workspaceId: string, limit?: number) => {
+    const params = limit ? `?limit=${limit}` : '';
+    return apiRequest(`/workspaces/${workspaceId}/activity${params}`);
+  },
+};
+
+// User Invitations API (for accepting/declining invitations)
+export const invitationsApi = {
+  // Get pending invitations for current user
+  getPending: () => apiRequest("/invitations/pending"),
+  
+  // Accept invitation by token
+  accept: (token: string) => 
+    apiRequest(`/invitations/${token}/accept`, { method: "POST" }),
+  
+  // Decline invitation by token
+  decline: (token: string) => 
+    apiRequest(`/invitations/${token}/decline`, { method: "POST" }),
+};
+
+// Feature Flags Admin API (SaaS Admin only)
+export const featureFlagsAdminApi = {
+  getAll: () => apiRequest("/admin/feature-flags"),
+  
+  set: (data: { key: string; enabled: boolean; tenantId?: string; description?: string }) => 
+    apiRequest("/admin/feature-flags", { method: "POST", body: JSON.stringify(data) }),
+  
+  enableMultiWorkspace: (tenantId: string) => 
+    apiRequest(`/admin/tenants/${tenantId}/enable-multi-workspace`, { method: "POST" }),
+  
+  disableMultiWorkspace: (tenantId: string) => 
+    apiRequest(`/admin/tenants/${tenantId}/disable-multi-workspace`, { method: "POST" }),
 };
