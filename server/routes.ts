@@ -3335,7 +3335,18 @@ export async function registerRoutes(
   // Update proposal
   app.patch("/api/proposals/:id", requireAuth, validateTenant, async (req, res) => {
     try {
-      const proposal = await storage.updateProposal(req.params.id, req.user!.tenantId, req.body);
+      // Filter out system-managed fields that shouldn't be updated directly
+      const { id, createdAt, updatedAt, sections, pricingItems, versions, activityLogs, comments, signatures, customer, ...updates } = req.body;
+      
+      // Convert date strings to Date objects for date fields
+      if (updates.validUntil) updates.validUntil = new Date(updates.validUntil);
+      if (updates.sentAt) updates.sentAt = new Date(updates.sentAt);
+      if (updates.viewedAt) updates.viewedAt = new Date(updates.viewedAt);
+      if (updates.acceptedAt) updates.acceptedAt = new Date(updates.acceptedAt);
+      if (updates.rejectedAt) updates.rejectedAt = new Date(updates.rejectedAt);
+      if (updates.expiresAt) updates.expiresAt = new Date(updates.expiresAt);
+      
+      const proposal = await storage.updateProposal(req.params.id, req.user!.tenantId, updates);
       if (!proposal) {
         return res.status(404).json({ message: "Proposal not found" });
       }
@@ -3543,7 +3554,10 @@ export async function registerRoutes(
 
   app.patch("/api/proposals/pricing/:id", requireAuth, validateTenant, async (req, res) => {
     try {
-      const item = await storage.updateProposalPricingItem(req.params.id, req.body);
+      // Filter out system-managed fields that shouldn't be updated directly
+      const { id, createdAt, proposalId, ...updates } = req.body;
+      
+      const item = await storage.updateProposalPricingItem(req.params.id, updates);
       if (!item) {
         return res.status(404).json({ message: "Pricing item not found" });
       }
