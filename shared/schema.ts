@@ -1790,3 +1790,78 @@ export const workspaceOnboardingProgress = pgTable("workspace_onboarding_progres
 export const insertWorkspaceOnboardingProgressSchema = createInsertSchema(workspaceOnboardingProgress).omit({ id: true, createdAt: true, updatedAt: true, completedAt: true });
 export type InsertWorkspaceOnboardingProgress = z.infer<typeof insertWorkspaceOnboardingProgressSchema>;
 export type WorkspaceOnboardingProgress = typeof workspaceOnboardingProgress.$inferSelect;
+
+// ==================== ENTERPRISE SECURITY: AUDIT LOGS ====================
+
+export const AUDIT_LOG_ACTIONS = {
+  LOGIN_SUCCESS: 'login_success',
+  LOGIN_FAILED: 'login_failed',
+  LOGOUT: 'logout',
+  PASSWORD_CHANGE: 'password_change',
+  PASSWORD_RESET_REQUEST: 'password_reset_request',
+  USER_CREATED: 'user_created',
+  USER_UPDATED: 'user_updated',
+  USER_DELETED: 'user_deleted',
+  ROLE_CHANGED: 'role_changed',
+  PERMISSION_CHANGED: 'permission_changed',
+  DATA_EXPORT: 'data_export',
+  DATA_DELETE: 'data_delete',
+  SETTINGS_CHANGED: 'settings_changed',
+  API_KEY_CREATED: 'api_key_created',
+  API_KEY_REVOKED: 'api_key_revoked',
+  TENANT_CREATED: 'tenant_created',
+  TENANT_UPDATED: 'tenant_updated',
+  WORKSPACE_JOINED: 'workspace_joined',
+  WORKSPACE_LEFT: 'workspace_left',
+  ADMIN_ACTION: 'admin_action',
+} as const;
+
+export type AuditLogAction = typeof AUDIT_LOG_ACTIONS[keyof typeof AUDIT_LOG_ACTIONS];
+
+export const AUDIT_LOG_SEVERITY = {
+  INFO: 'info',
+  WARNING: 'warning',
+  CRITICAL: 'critical',
+} as const;
+
+export type AuditLogSeverity = typeof AUDIT_LOG_SEVERITY[keyof typeof AUDIT_LOG_SEVERITY];
+
+export const auditLogs = pgTable("audit_logs", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  tenantId: varchar("tenant_id").references(() => tenants.id, { onDelete: "cascade" }),
+  userId: varchar("user_id").references(() => users.id, { onDelete: "set null" }),
+  action: text("action").notNull(),
+  severity: text("severity").notNull().default("info"),
+  resourceType: text("resource_type"),
+  resourceId: varchar("resource_id"),
+  ipAddress: text("ip_address"),
+  userAgent: text("user_agent"),
+  requestMethod: text("request_method"),
+  requestPath: text("request_path"),
+  details: text("details"),
+  previousValue: text("previous_value"),
+  newValue: text("new_value"),
+  success: boolean("success").default(true).notNull(),
+  errorMessage: text("error_message"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+export const insertAuditLogSchema = createInsertSchema(auditLogs).omit({ id: true, createdAt: true });
+export type InsertAuditLog = z.infer<typeof insertAuditLogSchema>;
+export type AuditLog = typeof auditLogs.$inferSelect;
+
+// ==================== ENTERPRISE SECURITY: LOGIN ATTEMPTS ====================
+
+export const loginAttempts = pgTable("login_attempts", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  email: text("email").notNull(),
+  ipAddress: text("ip_address"),
+  userAgent: text("user_agent"),
+  success: boolean("success").default(false).notNull(),
+  failureReason: text("failure_reason"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+export const insertLoginAttemptSchema = createInsertSchema(loginAttempts).omit({ id: true, createdAt: true });
+export type InsertLoginAttempt = z.infer<typeof insertLoginAttemptSchema>;
+export type LoginAttempt = typeof loginAttempts.$inferSelect;

@@ -202,6 +202,63 @@ export const stats = [
   { value: "99.9%", label: "Uptime" },
 ];
 
+export const enterpriseIntegrations = [
+  { name: "Salesforce", category: "CRM" },
+  { name: "HubSpot", category: "Marketing" },
+  { name: "Slack", category: "Communication" },
+  { name: "Gmail", category: "Email" },
+  { name: "Outlook", category: "Email" },
+  { name: "Zoom", category: "Meetings" },
+  { name: "Stripe", category: "Payments" },
+  { name: "QuickBooks", category: "Accounting" },
+  { name: "Zapier", category: "Automation" },
+  { name: "Calendly", category: "Scheduling" },
+  { name: "DocuSign", category: "Contracts" },
+  { name: "Jira", category: "Project Management" },
+];
+
+export const securityFeatures = [
+  {
+    title: "SOC 2 Type II Certified",
+    description: "Our security controls are independently audited and verified annually.",
+    icon: "Shield",
+  },
+  {
+    title: "GDPR Compliant",
+    description: "Full data protection compliance with data residency options in EU, US, and APAC.",
+    icon: "Globe",
+  },
+  {
+    title: "Enterprise SSO",
+    description: "Single sign-on integration with Okta, Azure AD, and SAML 2.0 providers.",
+    icon: "Key",
+  },
+  {
+    title: "256-bit AES Encryption",
+    description: "Bank-grade encryption for all data at rest and in transit.",
+    icon: "Lock",
+  },
+  {
+    title: "Role-Based Access Control",
+    description: "Granular permissions to control exactly who can see and do what.",
+    icon: "Users",
+  },
+  {
+    title: "Audit Logs",
+    description: "Complete audit trail of all user actions for compliance and security.",
+    icon: "FileSearch",
+  },
+];
+
+export const enterpriseCustomers = [
+  { name: "Fortune 500 Company", logo: "F500", industry: "Technology" },
+  { name: "Global Bank", logo: "GB", industry: "Finance" },
+  { name: "Healthcare Leader", logo: "HL", industry: "Healthcare" },
+  { name: "Retail Giant", logo: "RG", industry: "Retail" },
+  { name: "Manufacturing Corp", logo: "MC", industry: "Manufacturing" },
+  { name: "Consulting Firm", logo: "CF", industry: "Professional Services" },
+];
+
 export const blogPosts = [
   {
     id: 1,

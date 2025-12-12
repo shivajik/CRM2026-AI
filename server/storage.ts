@@ -68,6 +68,8 @@ import type {
   InsertWorkspaceAnalyticsCache, WorkspaceAnalyticsCache,
   InsertWorkspaceDeletionLog, WorkspaceDeletionLog,
   InsertWorkspaceOnboardingProgress, WorkspaceOnboardingProgress,
+  InsertAuditLog, AuditLog,
+  InsertLoginAttempt, LoginAttempt,
 } from "@shared/schema";
 
 export interface IStorage {
@@ -3820,6 +3822,69 @@ export class DatabaseStorage implements IStorage {
       .where(eq(schema.workspaceOnboardingProgress.workspaceId, workspaceId))
       .returning();
     return updated;
+  }
+
+  // ==================== ENTERPRISE SECURITY: AUDIT LOG OPERATIONS ====================
+
+  async createAuditLog(log: InsertAuditLog): Promise<AuditLog> {
+    const [created] = await db.insert(schema.auditLogs)
+      .values(log)
+      .returning();
+    return created;
+  }
+
+  async getAuditLogs(tenantId: string, options?: { 
+    limit?: number; 
+    offset?: number;
+    action?: string;
+    userId?: string;
+    startDate?: Date;
+    endDate?: Date;
+  }): Promise<AuditLog[]> {
+    const conditions = [eq(schema.auditLogs.tenantId, tenantId)];
+    
+    if (options?.action) {
+      conditions.push(eq(schema.auditLogs.action, options.action));
+    }
+    if (options?.userId) {
+      conditions.push(eq(schema.auditLogs.userId, options.userId));
+    }
+    if (options?.startDate) {
+      conditions.push(gte(schema.auditLogs.createdAt, options.startDate));
+    }
+    if (options?.endDate) {
+      conditions.push(lte(schema.auditLogs.createdAt, options.endDate));
+    }
+
+    return db.select()
+      .from(schema.auditLogs)
+      .where(and(...conditions))
+      .orderBy(desc(schema.auditLogs.createdAt))
+      .limit(options?.limit || 100)
+      .offset(options?.offset || 0);
+  }
+
+  async createLoginAttempt(attempt: InsertLoginAttempt): Promise<LoginAttempt> {
+    const [created] = await db.insert(schema.loginAttempts)
+      .values(attempt)
+      .returning();
+    return created;
+  }
+
+  async getRecentLoginAttempts(email: string, minutes: number = 15): Promise<LoginAttempt[]> {
+    const since = new Date(Date.now() - minutes * 60 * 1000);
+    return db.select()
+      .from(schema.loginAttempts)
+      .where(and(
+        eq(schema.loginAttempts.email, email.toLowerCase()),
+        gte(schema.loginAttempts.createdAt, since)
+      ))
+      .orderBy(desc(schema.loginAttempts.createdAt));
+  }
+
+  async getFailedLoginCount(email: string, minutes: number = 15): Promise<number> {
+    const attempts = await this.getRecentLoginAttempts(email, minutes);
+    return attempts.filter(a => !a.success).length;
   }
 }
 

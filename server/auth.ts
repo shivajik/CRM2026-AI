@@ -1,10 +1,71 @@
 import jwt from "jsonwebtoken";
 import bcrypt from "bcrypt";
+import crypto from "crypto";
 import type { User, UserType } from "@shared/schema";
 
-const JWT_SECRET = process.env.JWT_SECRET || "your-secret-key-change-in-production";
+const JWT_SECRET_ENV = process.env.JWT_SECRET;
+if (!JWT_SECRET_ENV) {
+  throw new Error("FATAL: JWT_SECRET environment variable is not set. This is required for secure operation.");
+}
+const JWT_SECRET: string = JWT_SECRET_ENV;
+
 const JWT_EXPIRES_IN = "15m";
 const REFRESH_TOKEN_EXPIRES_IN = "7d";
+const SALT_ROUNDS = 12;
+
+export interface PasswordPolicy {
+  minLength: number;
+  requireUppercase: boolean;
+  requireLowercase: boolean;
+  requireNumbers: boolean;
+  requireSpecialChars: boolean;
+}
+
+const PASSWORD_POLICY: PasswordPolicy = {
+  minLength: 12,
+  requireUppercase: true,
+  requireLowercase: true,
+  requireNumbers: true,
+  requireSpecialChars: true,
+};
+
+export interface PasswordValidationResult {
+  isValid: boolean;
+  errors: string[];
+}
+
+export function validatePassword(password: string): PasswordValidationResult {
+  const errors: string[] = [];
+
+  if (password.length < PASSWORD_POLICY.minLength) {
+    errors.push(`Password must be at least ${PASSWORD_POLICY.minLength} characters long`);
+  }
+
+  if (PASSWORD_POLICY.requireUppercase && !/[A-Z]/.test(password)) {
+    errors.push("Password must contain at least one uppercase letter");
+  }
+
+  if (PASSWORD_POLICY.requireLowercase && !/[a-z]/.test(password)) {
+    errors.push("Password must contain at least one lowercase letter");
+  }
+
+  if (PASSWORD_POLICY.requireNumbers && !/\d/.test(password)) {
+    errors.push("Password must contain at least one number");
+  }
+
+  if (PASSWORD_POLICY.requireSpecialChars && !/[!@#$%^&*(),.?":{}|<>]/.test(password)) {
+    errors.push("Password must contain at least one special character (!@#$%^&*(),.?\":{}|<>)");
+  }
+
+  return {
+    isValid: errors.length === 0,
+    errors,
+  };
+}
+
+export function generateSecureToken(length: number = 32): string {
+  return crypto.randomBytes(length).toString('hex');
+}
 
 export interface JWTPayload {
   userId: string;
@@ -16,8 +77,7 @@ export interface JWTPayload {
 }
 
 export async function hashPassword(password: string): Promise<string> {
-  const saltRounds = 10;
-  return bcrypt.hash(password, saltRounds);
+  return bcrypt.hash(password, SALT_ROUNDS);
 }
 
 export async function verifyPassword(password: string, hash: string): Promise<boolean> {

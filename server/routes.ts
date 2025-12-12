@@ -1,11 +1,12 @@
 import type { Express } from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
-import { hashPassword, verifyPassword, generateAccessToken, generateRefreshToken, getRefreshTokenExpiry, verifyToken } from "./auth";
+import { hashPassword, verifyPassword, generateAccessToken, generateRefreshToken, getRefreshTokenExpiry, verifyToken, validatePassword } from "./auth";
 import { requireAuth, validateTenant, requireAgencyAdmin, requireSaasAdmin, denyCustomerAccess, resolveWorkspaceContext, requireMultiWorkspaceEnabled, requireWorkspaceAdmin } from "./middleware";
+import { authRateLimiter, strictRateLimiter, getClientIp, validateEmail } from "./security";
 import crypto from "crypto";
 import { z } from "zod";
-import { insertContactSchema, insertDealSchema, insertTaskSchema, insertProductSchema, insertCustomerSchema, insertQuotationSchema, insertQuotationItemSchema, insertInvoiceSchema, insertInvoiceItemSchema, insertPaymentSchema, insertActivitySchema, insertProposalSchema, insertProposalTemplateSchema, insertProposalSectionSchema, insertProposalPricingItemSchema, insertTemplateSectionSchema, PROPOSAL_SECTION_TYPES } from "@shared/schema";
+import { insertContactSchema, insertDealSchema, insertTaskSchema, insertProductSchema, insertCustomerSchema, insertQuotationSchema, insertQuotationItemSchema, insertInvoiceSchema, insertInvoiceItemSchema, insertPaymentSchema, insertActivitySchema, insertProposalSchema, insertProposalTemplateSchema, insertProposalSectionSchema, insertProposalPricingItemSchema, insertTemplateSectionSchema, PROPOSAL_SECTION_TYPES, AUDIT_LOG_ACTIONS } from "@shared/schema";
 
 export async function registerRoutes(
   httpServer: Server,
@@ -18,7 +19,10 @@ export async function registerRoutes(
   
   // ==================== AUTH ROUTES ====================
   
-  app.post("/api/auth/register", async (req, res) => {
+  app.post("/api/auth/register", authRateLimiter, async (req, res) => {
+    const clientIp = getClientIp(req);
+    const userAgent = req.headers['user-agent'] || 'unknown';
+    
     try {
       const { email, password, firstName, lastName, companyName } = req.body;
       
@@ -26,12 +30,24 @@ export async function registerRoutes(
         return res.status(400).json({ message: "All fields are required" });
       }
       
-      const existingUser = await storage.getUserByEmail(email);
+      if (!validateEmail(email)) {
+        return res.status(400).json({ message: "Please provide a valid email address" });
+      }
+      
+      const passwordValidation = validatePassword(password);
+      if (!passwordValidation.isValid) {
+        return res.status(400).json({ 
+          message: "Password does not meet security requirements",
+          errors: passwordValidation.errors
+        });
+      }
+      
+      const existingUser = await storage.getUserByEmail(email.toLowerCase().trim());
       if (existingUser) {
         return res.status(400).json({ message: "User already exists" });
       }
       
-      const tenant = await storage.createTenant({ name: companyName });
+      const tenant = await storage.createTenant({ name: companyName.trim() });
       
       let adminRole = await storage.getRoleById("admin");
       if (!adminRole) {
@@ -44,10 +60,10 @@ export async function registerRoutes(
       const passwordHash = await hashPassword(password);
       const user = await storage.createUser({
         tenantId: tenant.id,
-        email,
+        email: email.toLowerCase().trim(),
         passwordHash,
-        firstName,
-        lastName,
+        firstName: firstName.trim(),
+        lastName: lastName.trim(),
         roleId: adminRole.id,
         userType: 'agency_admin',
         isAdmin: true,
@@ -72,6 +88,21 @@ export async function registerRoutes(
         expiresAt: getRefreshTokenExpiry(),
       });
       
+      await storage.createAuditLog({
+        tenantId: tenant.id,
+        userId: user.id,
+        action: AUDIT_LOG_ACTIONS.USER_CREATED,
+        severity: 'info',
+        resourceType: 'user',
+        resourceId: user.id,
+        ipAddress: clientIp,
+        userAgent,
+        requestMethod: 'POST',
+        requestPath: '/api/auth/register',
+        details: JSON.stringify({ email: user.email, firstName: user.firstName }),
+        success: true,
+      });
+      
       res.json({
         accessToken,
         refreshToken,
@@ -89,7 +120,10 @@ export async function registerRoutes(
     }
   });
   
-  app.post("/api/auth/login", async (req, res) => {
+  app.post("/api/auth/login", authRateLimiter, async (req, res) => {
+    const clientIp = getClientIp(req);
+    const userAgent = req.headers['user-agent'] || 'unknown';
+    
     try {
       const { email, password } = req.body;
       
@@ -97,15 +131,77 @@ export async function registerRoutes(
         return res.status(400).json({ message: "Email and password are required" });
       }
       
-      const user = await storage.getUserByEmail(email);
+      const normalizedEmail = email.toLowerCase().trim();
+      
+      const failedAttempts = await storage.getFailedLoginCount(normalizedEmail, 15);
+      if (failedAttempts >= 5) {
+        await storage.createLoginAttempt({
+          email: normalizedEmail,
+          ipAddress: clientIp,
+          userAgent,
+          success: false,
+          failureReason: 'account_locked',
+        });
+        return res.status(429).json({ 
+          message: "Account temporarily locked due to too many failed attempts. Please try again in 15 minutes." 
+        });
+      }
+      
+      const user = await storage.getUserByEmail(normalizedEmail);
       if (!user) {
+        await storage.createLoginAttempt({
+          email: normalizedEmail,
+          ipAddress: clientIp,
+          userAgent,
+          success: false,
+          failureReason: 'user_not_found',
+        });
         return res.status(401).json({ message: "Invalid credentials" });
       }
       
       const isValidPassword = await verifyPassword(password, user.passwordHash);
       if (!isValidPassword) {
+        await storage.createLoginAttempt({
+          email: normalizedEmail,
+          ipAddress: clientIp,
+          userAgent,
+          success: false,
+          failureReason: 'invalid_password',
+        });
+        
+        await storage.createAuditLog({
+          tenantId: user.tenantId,
+          userId: user.id,
+          action: AUDIT_LOG_ACTIONS.LOGIN_FAILED,
+          severity: 'warning',
+          ipAddress: clientIp,
+          userAgent,
+          requestMethod: 'POST',
+          requestPath: '/api/auth/login',
+          success: false,
+          errorMessage: 'Invalid password',
+        });
+        
         return res.status(401).json({ message: "Invalid credentials" });
       }
+      
+      if (!user.isActive) {
+        await storage.createLoginAttempt({
+          email: normalizedEmail,
+          ipAddress: clientIp,
+          userAgent,
+          success: false,
+          failureReason: 'account_inactive',
+        });
+        return res.status(401).json({ message: "Account is inactive. Please contact your administrator." });
+      }
+      
+      await storage.createLoginAttempt({
+        email: normalizedEmail,
+        ipAddress: clientIp,
+        userAgent,
+        success: true,
+      });
       
       // Check if multi-workspace is enabled for this user's tenant
       let activeWorkspaceId: string | undefined;
@@ -137,6 +233,18 @@ export async function registerRoutes(
         expiresAt: getRefreshTokenExpiry(),
       });
       
+      await storage.createAuditLog({
+        tenantId: user.tenantId,
+        userId: user.id,
+        action: AUDIT_LOG_ACTIONS.LOGIN_SUCCESS,
+        severity: 'info',
+        ipAddress: clientIp,
+        userAgent,
+        requestMethod: 'POST',
+        requestPath: '/api/auth/login',
+        success: true,
+      });
+      
       res.json({
         accessToken,
         refreshToken,
@@ -158,7 +266,7 @@ export async function registerRoutes(
     }
   });
   
-  app.post("/api/auth/refresh", async (req, res) => {
+  app.post("/api/auth/refresh", authRateLimiter, async (req, res) => {
     try {
       const { refreshToken } = req.body;
       
@@ -319,6 +427,18 @@ export async function registerRoutes(
       
       if (!email || !password || !firstName || !lastName) {
         return res.status(400).json({ message: "Email, password, first name and last name are required" });
+      }
+      
+      if (!validateEmail(email)) {
+        return res.status(400).json({ message: "Please provide a valid email address" });
+      }
+      
+      const passwordValidation = validatePassword(password);
+      if (!passwordValidation.isValid) {
+        return res.status(400).json({ 
+          message: "Password does not meet security requirements",
+          errors: passwordValidation.errors
+        });
       }
       
       const existingUser = await storage.getUserByEmail(email);

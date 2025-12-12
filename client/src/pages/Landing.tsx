@@ -19,9 +19,16 @@ import {
   Smartphone,
   Shield,
   Clock,
-  TrendingUp
+  TrendingUp,
+  Lock,
+  Key,
+  Globe,
+  FileSearch,
+  CheckCircle,
+  Building2,
+  Award
 } from "lucide-react";
-import { testimonials, features, pricingPlans, faqs, trustBadges, stats } from "@/lib/marketingData";
+import { testimonials, features, pricingPlans, faqs, trustBadges, stats, securityFeatures, enterpriseIntegrations, enterpriseCustomers } from "@/lib/marketingData";
 
 import dashboardImage from "@assets/generated_images/crm_dashboard_analytics_interface.png";
 
@@ -385,6 +392,175 @@ function FAQSection() {
   );
 }
 
+function SecurityComplianceSection() {
+  const iconMap: Record<string, React.ReactNode> = {
+    Shield: <Shield className="h-6 w-6" />,
+    Globe: <Globe className="h-6 w-6" />,
+    Key: <Key className="h-6 w-6" />,
+    Lock: <Lock className="h-6 w-6" />,
+    Users: <Users className="h-6 w-6" />,
+    FileSearch: <FileSearch className="h-6 w-6" />,
+  };
+
+  return (
+    <section className="py-20 lg:py-28 bg-slate-900 text-white" data-testid="section-security">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+        <div className="text-center mb-16">
+          <Badge variant="secondary" className="mb-4 bg-green-500/20 text-green-400 border-green-500/30">
+            <Shield className="w-3 h-3 mr-1" />
+            Enterprise-Grade Security
+          </Badge>
+          <h2 className="text-3xl sm:text-4xl font-heading font-bold mb-4">
+            Security & Compliance You Can Trust
+          </h2>
+          <p className="text-lg text-slate-300 max-w-2xl mx-auto">
+            Built for enterprise requirements with industry-leading security certifications 
+            and compliance standards.
+          </p>
+        </div>
+
+        <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6 mb-12">
+          {securityFeatures.map((feature) => (
+            <div 
+              key={feature.title} 
+              className="bg-slate-800/50 border border-slate-700 rounded-xl p-6 hover:border-green-500/50 transition-colors"
+              data-testid={`security-feature-${feature.title.toLowerCase().replace(/\s+/g, '-')}`}
+            >
+              <div className="w-12 h-12 bg-green-500/10 rounded-lg flex items-center justify-center mb-4 text-green-400">
+                {iconMap[feature.icon]}
+              </div>
+              <h3 className="text-lg font-heading font-semibold mb-2">{feature.title}</h3>
+              <p className="text-slate-400 text-sm">{feature.description}</p>
+            </div>
+          ))}
+        </div>
+
+        <div className="flex flex-wrap items-center justify-center gap-8 pt-8 border-t border-slate-700">
+          <div className="flex items-center gap-2 text-slate-400">
+            <Award className="h-5 w-5 text-green-400" />
+            <span className="text-sm font-medium">SOC 2 Type II</span>
+          </div>
+          <div className="flex items-center gap-2 text-slate-400">
+            <CheckCircle className="h-5 w-5 text-green-400" />
+            <span className="text-sm font-medium">GDPR Compliant</span>
+          </div>
+          <div className="flex items-center gap-2 text-slate-400">
+            <Shield className="h-5 w-5 text-green-400" />
+            <span className="text-sm font-medium">HIPAA Ready</span>
+          </div>
+          <div className="flex items-center gap-2 text-slate-400">
+            <Lock className="h-5 w-5 text-green-400" />
+            <span className="text-sm font-medium">ISO 27001</span>
+          </div>
+        </div>
+      </div>
+    </section>
+  );
+}
+
+function IntegrationsSection() {
+  return (
+    <section className="py-20 lg:py-28" data-testid="section-integrations">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+        <div className="text-center mb-16">
+          <h2 className="text-3xl sm:text-4xl font-heading font-bold mb-4">
+            Connects With Your Favorite Tools
+          </h2>
+          <p className="text-lg text-muted-foreground max-w-2xl mx-auto">
+            Seamlessly integrate with 200+ tools you already use. 
+            No more switching between apps.
+          </p>
+        </div>
+
+        <div className="grid grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-4 mb-12">
+          {enterpriseIntegrations.map((integration) => (
+            <div 
+              key={integration.name}
+              className="bg-muted/50 border rounded-xl p-4 text-center hover:shadow-lg hover:-translate-y-1 transition-all"
+              data-testid={`integration-${integration.name.toLowerCase()}`}
+            >
+              <div className="w-12 h-12 bg-primary/10 rounded-lg flex items-center justify-center mx-auto mb-3">
+                <Puzzle className="h-6 w-6 text-primary" />
+              </div>
+              <p className="font-medium text-sm">{integration.name}</p>
+              <p className="text-xs text-muted-foreground">{integration.category}</p>
+            </div>
+          ))}
+        </div>
+
+        <div className="text-center">
+          <Link href="/integrations">
+            <Button variant="outline" size="lg" data-testid="button-view-integrations">
+              View All 200+ Integrations
+              <ArrowRight className="ml-2 h-4 w-4" />
+            </Button>
+          </Link>
+        </div>
+      </div>
+    </section>
+  );
+}
+
+function EnterpriseCustomersSection() {
+  return (
+    <section className="py-20 lg:py-28 bg-muted/30" data-testid="section-enterprise-customers">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+        <div className="text-center mb-16">
+          <Badge variant="secondary" className="mb-4">
+            <Building2 className="w-3 h-3 mr-1" />
+            Trusted by Enterprise
+          </Badge>
+          <h2 className="text-3xl sm:text-4xl font-heading font-bold mb-4">
+            Powering Sales Teams at Leading Companies
+          </h2>
+          <p className="text-lg text-muted-foreground max-w-2xl mx-auto">
+            From startups to Fortune 500, over 10,000 companies trust Nexus to manage 
+            their customer relationships.
+          </p>
+        </div>
+
+        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-6 mb-12">
+          {enterpriseCustomers.map((customer) => (
+            <div 
+              key={customer.name}
+              className="bg-card border rounded-xl p-6 text-center"
+              data-testid={`customer-${customer.name.toLowerCase().replace(/\s+/g, '-')}`}
+            >
+              <div className="w-16 h-16 bg-muted rounded-lg flex items-center justify-center mx-auto mb-3">
+                <span className="font-heading font-bold text-xl text-muted-foreground">
+                  {customer.logo}
+                </span>
+              </div>
+              <p className="text-xs text-muted-foreground">{customer.industry}</p>
+            </div>
+          ))}
+        </div>
+
+        <div className="bg-card border rounded-2xl p-8 lg:p-12 text-center max-w-3xl mx-auto">
+          <div className="flex gap-1 justify-center mb-4">
+            {[...Array(5)].map((_, i) => (
+              <Star key={i} className="h-5 w-5 fill-yellow-400 text-yellow-400" />
+            ))}
+          </div>
+          <blockquote className="text-xl lg:text-2xl font-medium mb-6">
+            "Nexus transformed our sales process. We closed 40% more deals in Q1 after switching 
+            from our legacy CRM."
+          </blockquote>
+          <div className="flex items-center justify-center gap-4">
+            <div className="w-12 h-12 bg-primary/10 rounded-full flex items-center justify-center font-bold text-primary">
+              JM
+            </div>
+            <div className="text-left">
+              <div className="font-semibold">Jennifer Martinez</div>
+              <div className="text-sm text-muted-foreground">VP of Sales, Fortune 500 Tech Company</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+  );
+}
+
 function CTASection() {
   return (
     <section className="py-20 lg:py-28 bg-primary text-primary-foreground" data-testid="section-cta">
@@ -426,10 +602,10 @@ export default function Landing() {
   return (
     <MarketingLayout>
       <SEOHead
-        title="Nexus CRM - Close More Deals, Spend Less Time on Admin"
-        description="Nexus is the CRM that sales teams actually enjoy using. Beautiful, fast, and packed with features that help you win - starting at just $29/month."
+        title="Nexus CRM - Enterprise-Grade Sales Platform | Close More Deals"
+        description="Nexus is the enterprise CRM that sales teams actually enjoy using. SOC 2 certified, GDPR compliant, with bank-grade security - starting at just $29/month."
         canonical="https://nexus.com/"
-        keywords={["CRM software", "sales CRM", "customer relationship management", "pipeline management"]}
+        keywords={["enterprise CRM software", "sales CRM", "customer relationship management", "pipeline management", "SOC 2 certified CRM", "GDPR compliant CRM"]}
         hreflang={[
           { lang: "en-US", href: "https://nexus.com/us" },
           { lang: "en-GB", href: "https://nexus.com/uk" },
@@ -441,6 +617,9 @@ export default function Landing() {
       <StatsSection />
       <BenefitsSection />
       <FeaturesSection />
+      <SecurityComplianceSection />
+      <IntegrationsSection />
+      <EnterpriseCustomersSection />
       <TestimonialsSection />
       <PricingPreviewSection />
       <FAQSection />
