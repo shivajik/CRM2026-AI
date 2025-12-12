@@ -730,9 +730,10 @@ export async function registerRoutes(
   
   // ==================== TENANT MODULE ROUTES ====================
   
-  app.get("/api/tenant/modules", requireAuth, validateTenant, async (req, res) => {
+  app.get("/api/tenant/modules", requireAuth, validateTenant, resolveWorkspaceContext, async (req, res) => {
     try {
-      const tenantModules = await storage.getTenantModules(req.user!.tenantId);
+      const workspaceId = req.workspaceId || req.user!.tenantId;
+      const tenantModules = await storage.getTenantModules(workspaceId);
       res.json(tenantModules);
     } catch (error) {
       console.error("Get tenant modules error:", error);
@@ -740,9 +741,10 @@ export async function registerRoutes(
     }
   });
 
-  app.get("/api/tenant/package", requireAuth, validateTenant, async (req, res) => {
+  app.get("/api/tenant/package", requireAuth, validateTenant, resolveWorkspaceContext, async (req, res) => {
     try {
-      const tenant = await storage.getTenant(req.user!.tenantId);
+      const workspaceId = req.workspaceId || req.user!.tenantId;
+      const tenant = await storage.getTenant(workspaceId);
       if (!tenant?.packageId) {
         return res.json(null);
       }
@@ -2624,9 +2626,10 @@ export async function registerRoutes(
   // ==================== EMAIL MODULE ROUTES ====================
 
   // Email Templates
-  app.get("/api/email/templates", requireAuth, validateTenant, async (req, res) => {
+  app.get("/api/email/templates", requireAuth, validateTenant, resolveWorkspaceContext, async (req, res) => {
     try {
-      const templates = await storage.getEmailTemplatesByTenant(req.user!.tenantId);
+      const workspaceId = req.workspaceId || req.user!.tenantId;
+      const templates = await storage.getEmailTemplatesByTenant(workspaceId);
       res.json(templates);
     } catch (error) {
       console.error("Get email templates error:", error);
@@ -2634,9 +2637,10 @@ export async function registerRoutes(
     }
   });
 
-  app.get("/api/email/templates/:id", requireAuth, validateTenant, async (req, res) => {
+  app.get("/api/email/templates/:id", requireAuth, validateTenant, resolveWorkspaceContext, async (req, res) => {
     try {
-      const template = await storage.getEmailTemplateById(req.params.id, req.user!.tenantId);
+      const workspaceId = req.workspaceId || req.user!.tenantId;
+      const template = await storage.getEmailTemplateById(req.params.id, workspaceId);
       if (!template) {
         return res.status(404).json({ message: "Template not found" });
       }
@@ -2647,11 +2651,12 @@ export async function registerRoutes(
     }
   });
 
-  app.post("/api/email/templates", requireAuth, validateTenant, requireAgencyAdmin, async (req, res) => {
+  app.post("/api/email/templates", requireAuth, validateTenant, resolveWorkspaceContext, requireAgencyAdmin, async (req, res) => {
     try {
+      const workspaceId = req.workspaceId || req.user!.tenantId;
       const template = await storage.createEmailTemplate({
         ...req.body,
-        tenantId: req.user!.tenantId,
+        tenantId: workspaceId,
         createdBy: req.user!.userId,
       });
       res.status(201).json(template);
@@ -2661,9 +2666,10 @@ export async function registerRoutes(
     }
   });
 
-  app.patch("/api/email/templates/:id", requireAuth, validateTenant, requireAgencyAdmin, async (req, res) => {
+  app.patch("/api/email/templates/:id", requireAuth, validateTenant, resolveWorkspaceContext, requireAgencyAdmin, async (req, res) => {
     try {
-      const template = await storage.updateEmailTemplate(req.params.id, req.user!.tenantId, req.body);
+      const workspaceId = req.workspaceId || req.user!.tenantId;
+      const template = await storage.updateEmailTemplate(req.params.id, workspaceId, req.body);
       if (!template) {
         return res.status(404).json({ message: "Template not found" });
       }
@@ -2674,9 +2680,10 @@ export async function registerRoutes(
     }
   });
 
-  app.delete("/api/email/templates/:id", requireAuth, validateTenant, requireAgencyAdmin, async (req, res) => {
+  app.delete("/api/email/templates/:id", requireAuth, validateTenant, resolveWorkspaceContext, requireAgencyAdmin, async (req, res) => {
     try {
-      await storage.deleteEmailTemplate(req.params.id, req.user!.tenantId);
+      const workspaceId = req.workspaceId || req.user!.tenantId;
+      await storage.deleteEmailTemplate(req.params.id, workspaceId);
       res.json({ message: "Template deleted successfully" });
     } catch (error) {
       console.error("Delete email template error:", error);
@@ -2685,9 +2692,10 @@ export async function registerRoutes(
   });
 
   // Email Logs
-  app.get("/api/email/logs", requireAuth, validateTenant, async (req, res) => {
+  app.get("/api/email/logs", requireAuth, validateTenant, resolveWorkspaceContext, async (req, res) => {
     try {
-      const logs = await storage.getEmailLogsByTenant(req.user!.tenantId);
+      const workspaceId = req.workspaceId || req.user!.tenantId;
+      const logs = await storage.getEmailLogsByTenant(workspaceId);
       res.json(logs);
     } catch (error) {
       console.error("Get email logs error:", error);
@@ -2695,9 +2703,10 @@ export async function registerRoutes(
     }
   });
 
-  app.get("/api/email/logs/:id", requireAuth, validateTenant, async (req, res) => {
+  app.get("/api/email/logs/:id", requireAuth, validateTenant, resolveWorkspaceContext, async (req, res) => {
     try {
-      const log = await storage.getEmailLogById(req.params.id, req.user!.tenantId);
+      const workspaceId = req.workspaceId || req.user!.tenantId;
+      const log = await storage.getEmailLogById(req.params.id, workspaceId);
       if (!log) {
         return res.status(404).json({ message: "Email log not found" });
       }
