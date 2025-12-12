@@ -3231,8 +3231,27 @@ export async function registerRoutes(
       const proposalNumber = await storage.getNextProposalNumber(req.user!.tenantId);
       const { sections, pricingItems, ...proposalData } = req.body;
       
+      // Handle date fields - convert strings to Date objects or null
+      let validUntil = null;
+      if (proposalData.validUntil && proposalData.validUntil !== '') {
+        validUntil = new Date(proposalData.validUntil);
+        if (isNaN(validUntil.getTime())) {
+          validUntil = null;
+        }
+      }
+      
+      let expiresAt = null;
+      if (proposalData.expiresAt && proposalData.expiresAt !== '') {
+        expiresAt = new Date(proposalData.expiresAt);
+        if (isNaN(expiresAt.getTime())) {
+          expiresAt = null;
+        }
+      }
+      
       const proposal = await storage.createProposal({
         ...proposalData,
+        validUntil,
+        expiresAt,
         tenantId: req.user!.tenantId,
         createdBy: req.user!.userId,
         ownerId: req.body.ownerId || req.user!.userId,
