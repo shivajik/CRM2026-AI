@@ -35,6 +35,8 @@ import {
 import { useToast } from "@/hooks/use-toast";
 import { proposalTemplatesApi } from "@/lib/api";
 import { format } from "date-fns";
+import { ScrollArea } from "@/components/ui/scroll-area";
+import { Separator } from "@/components/ui/separator";
 import {
   ArrowLeft,
   Plus,
@@ -45,6 +47,9 @@ import {
   Trash2,
   LayoutTemplate,
   FileText,
+  Eye,
+  Palette,
+  ListOrdered,
 } from "lucide-react";
 
 export default function ProposalTemplates() {
@@ -53,6 +58,7 @@ export default function ProposalTemplates() {
   const [showCreateDialog, setShowCreateDialog] = useState(false);
   const [editingTemplate, setEditingTemplate] = useState<any>(null);
   const [deleteId, setDeleteId] = useState<string | null>(null);
+  const [previewTemplateId, setPreviewTemplateId] = useState<string | null>(null);
   const [formData, setFormData] = useState({ name: "", description: "", category: "" });
   const { toast } = useToast();
   const queryClient = useQueryClient();
@@ -60,6 +66,12 @@ export default function ProposalTemplates() {
   const { data: templates = [], isLoading } = useQuery({
     queryKey: ["proposal-templates"],
     queryFn: proposalTemplatesApi.getAll,
+  });
+
+  const { data: previewTemplate, isLoading: previewLoading } = useQuery({
+    queryKey: ["proposal-template", previewTemplateId],
+    queryFn: () => proposalTemplatesApi.getById(previewTemplateId!),
+    enabled: !!previewTemplateId,
   });
 
   const createMutation = useMutation({
@@ -213,6 +225,10 @@ export default function ProposalTemplates() {
                             </Button>
                           </DropdownMenuTrigger>
                           <DropdownMenuContent align="end">
+                            <DropdownMenuItem onClick={() => setPreviewTemplateId(template.id)}>
+                              <Eye className="w-4 h-4 mr-2" />
+                              View
+                            </DropdownMenuItem>
                             <DropdownMenuItem onClick={() => handleEdit(template)}>
                               <FileEdit className="w-4 h-4 mr-2" />
                               Edit
@@ -240,9 +256,20 @@ export default function ProposalTemplates() {
                         <span className="text-xs text-muted-foreground">
                           Updated {format(new Date(template.updatedAt), "MMM d, yyyy")}
                         </span>
-                        <Button size="sm" onClick={() => handleUseTemplate(template.id)} data-testid={`button-use-${template.id}`}>
-                          Use Template
-                        </Button>
+                        <div className="flex gap-2">
+                          <Button 
+                            size="sm" 
+                            variant="outline" 
+                            onClick={() => setPreviewTemplateId(template.id)} 
+                            data-testid={`button-view-${template.id}`}
+                          >
+                            <Eye className="w-4 h-4 mr-1" />
+                            View
+                          </Button>
+                          <Button size="sm" onClick={() => handleUseTemplate(template.id)} data-testid={`button-use-${template.id}`}>
+                            Use Template
+                          </Button>
+                        </div>
                       </div>
                     </CardContent>
                   </Card>
@@ -339,6 +366,121 @@ export default function ProposalTemplates() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      <Dialog open={!!previewTemplateId} onOpenChange={(open) => !open && setPreviewTemplateId(null)}>
+        <DialogContent className="max-w-2xl max-h-[80vh]">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2" data-testid="text-preview-title">
+              <Eye className="w-5 h-5" />
+              Template Preview
+            </DialogTitle>
+            <DialogDescription>
+              Review this template before using it
+            </DialogDescription>
+          </DialogHeader>
+          
+          {previewLoading ? (
+            <div className="text-center py-12 text-muted-foreground">Loading template...</div>
+          ) : previewTemplate ? (
+            <ScrollArea className="max-h-[50vh] pr-4">
+              <div className="space-y-6">
+                <div>
+                  <h3 className="text-lg font-semibold" data-testid="text-preview-name">{previewTemplate.name}</h3>
+                  {previewTemplate.purpose && (
+                    <Badge variant="secondary" className="mt-1">{previewTemplate.purpose}</Badge>
+                  )}
+                  <p className="text-sm text-muted-foreground mt-2">
+                    {previewTemplate.description || "No description provided"}
+                  </p>
+                </div>
+
+                <Separator />
+
+                <div>
+                  <h4 className="font-medium flex items-center gap-2 mb-3">
+                    <Palette className="w-4 h-4" />
+                    Theme Settings
+                  </h4>
+                  <div className="grid grid-cols-2 gap-4 text-sm">
+                    <div className="flex items-center gap-2">
+                      <span className="text-muted-foreground">Theme:</span>
+                      <Badge variant="outline">{previewTemplate.themePreset || "modern_blue"}</Badge>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <span className="text-muted-foreground">Font:</span>
+                      <span>{previewTemplate.fontFamily || "Inter"}</span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <span className="text-muted-foreground">Primary Color:</span>
+                      <div 
+                        className="w-5 h-5 rounded border"
+                        style={{ backgroundColor: previewTemplate.primaryColor || "#3B82F6" }}
+                      />
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <span className="text-muted-foreground">Accent Color:</span>
+                      <div 
+                        className="w-5 h-5 rounded border"
+                        style={{ backgroundColor: previewTemplate.accentColor || "#10B981" }}
+                      />
+                    </div>
+                  </div>
+                </div>
+
+                <Separator />
+
+                <div>
+                  <h4 className="font-medium flex items-center gap-2 mb-3">
+                    <ListOrdered className="w-4 h-4" />
+                    Template Sections ({previewTemplate.sections?.length || 0})
+                  </h4>
+                  {previewTemplate.sections && previewTemplate.sections.length > 0 ? (
+                    <div className="space-y-2">
+                      {previewTemplate.sections
+                        .sort((a: any, b: any) => a.sortOrder - b.sortOrder)
+                        .map((section: any, index: number) => (
+                          <Card key={section.id} className="p-3" data-testid={`card-section-${index}`}>
+                            <div className="flex items-center gap-2">
+                              <span className="text-muted-foreground text-sm">#{index + 1}</span>
+                              <span className="font-medium">{section.title}</span>
+                              <Badge variant="outline" className="text-xs ml-auto">
+                                {section.sectionType}
+                              </Badge>
+                            </div>
+                            {section.content && (
+                              <p className="text-xs text-muted-foreground mt-2 line-clamp-2">
+                                {section.content.replace(/<[^>]*>/g, '').substring(0, 150)}
+                                {section.content.length > 150 ? '...' : ''}
+                              </p>
+                            )}
+                          </Card>
+                        ))}
+                    </div>
+                  ) : (
+                    <p className="text-sm text-muted-foreground">No sections defined in this template</p>
+                  )}
+                </div>
+              </div>
+            </ScrollArea>
+          ) : null}
+
+          <DialogFooter className="gap-2 sm:gap-0">
+            <Button variant="outline" onClick={() => setPreviewTemplateId(null)}>
+              Close
+            </Button>
+            <Button 
+              onClick={() => {
+                if (previewTemplateId) {
+                  handleUseTemplate(previewTemplateId);
+                }
+              }}
+              data-testid="button-use-from-preview"
+            >
+              Use This Template
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </Layout>
   );
 }
