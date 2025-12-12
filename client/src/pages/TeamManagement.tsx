@@ -180,8 +180,6 @@ export default function TeamManagement() {
     );
   }
 
-  const teamLoginUrl = `${window.location.origin}/team-login`;
-
   return (
     <ProtectedRoute>
       <Layout>
@@ -343,36 +341,6 @@ export default function TeamManagement() {
               </DialogContent>
             </Dialog>
           </div>
-
-          <Card className="bg-blue-50 dark:bg-blue-950 border-blue-200 dark:border-blue-800">
-            <CardHeader className="pb-3">
-              <CardTitle className="text-lg flex items-center gap-2">
-                <Users className="h-5 w-5" />
-                Team Login URL
-              </CardTitle>
-              <CardDescription>
-                Share this URL with your team members so they can log in
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="flex items-center gap-2">
-                <code className="flex-1 p-2 bg-background rounded border text-sm" data-testid="text-team-login-url">
-                  {teamLoginUrl}
-                </code>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => {
-                    navigator.clipboard.writeText(teamLoginUrl);
-                    toast({ title: "URL copied to clipboard" });
-                  }}
-                  data-testid="button-copy-login-url"
-                >
-                  <Copy className="h-4 w-4" />
-                </Button>
-              </div>
-            </CardContent>
-          </Card>
 
           <Card>
             <CardHeader>
