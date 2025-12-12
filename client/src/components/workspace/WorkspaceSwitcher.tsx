@@ -53,11 +53,13 @@ export function WorkspaceSwitcher() {
     enabled: !!user,
   });
 
-  const { data: workspaces = [], isLoading: workspacesLoading } = useQuery<Workspace[]>({
+  const { data: workspacesData, isLoading: workspacesLoading } = useQuery<{ workspaces: Workspace[]; activeWorkspaceId: string }>({
     queryKey: ["workspaces"],
     queryFn: workspacesApi.getAll,
     enabled: !!user && features?.multi_workspace_enabled === true,
   });
+
+  const workspaces = workspacesData?.workspaces || [];
 
   const { data: companyProfile } = useQuery({
     queryKey: ["company-profile"],

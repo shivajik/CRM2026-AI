@@ -110,12 +110,13 @@ export default function WorkspaceSettings() {
     enabled: !!user,
   });
 
-  const { data: workspaces = [], isLoading: workspacesLoading } = useQuery({
+  const { data: workspacesData, isLoading: workspacesLoading } = useQuery<{ workspaces: any[]; activeWorkspaceId: string }>({
     queryKey: ["workspaces"],
     queryFn: workspacesApi.getAll,
     enabled: !!user && features?.multi_workspace_enabled === true,
   });
 
+  const workspaces = workspacesData?.workspaces || [];
   const currentWorkspace = workspaces.find((w: any) => w.isPrimary) || workspaces[0];
   const workspaceId = currentWorkspace?.id;
 
