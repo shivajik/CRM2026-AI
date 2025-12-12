@@ -69,9 +69,9 @@ export function WorkspaceSwitcher() {
   const switchWorkspaceMutation = useMutation({
     mutationFn: (workspaceId: string) => workspacesApi.switch(workspaceId),
     onSuccess: () => {
-      queryClient.invalidateQueries();
+      queryClient.clear();
       toast({ title: "Workspace switched successfully" });
-      setLocation("/");
+      window.location.href = "/";
     },
     onError: (error: Error) => {
       toast({ title: "Failed to switch workspace", description: error.message, variant: "destructive" });
