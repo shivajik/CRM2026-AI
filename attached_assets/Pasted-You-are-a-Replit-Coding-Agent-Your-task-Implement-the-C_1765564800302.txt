@@ -1,0 +1,255 @@
+You are a Replit Coding Agent.
+
+Your task: Implement the COMPLETE Customer Portal Module — but ONLY after performing a full audit of the existing CRM.  
+The portal must allow clients to log in and access proposals, quotations, invoices, tasks, messages, and documents, depending on workspace settings.
+
+IMPORTANT:
+- DO NOT overwrite existing features.
+- DO NOT break existing client data or modules.
+- DO NOT assume anything is missing — AUDIT FIRST.
+- Use feature flag: `customer_portal_enabled`.
+
+===========================================================
+PHASE 1 — CROSS-VERIFY (MANDATORY)
+===========================================================
+Before writing any code, generate a **Customer Portal Audit Report**:
+
+CHECK WHETHER THESE COMPONENTS ALREADY EXIST:
+
+A. CLIENT CREDENTIALS & ACCESS
+1. Does the CRM already support client login?  
+2. Do clients exist as separate user type?  
+3. Is there a “client portal” table or field?  
+4. Does client have username/password or OTP login?
+
+B. CLIENT VIEWS
+Check if any client-facing UI or API exists for:
+1. Viewing Proposals  
+2. Viewing Quotations  
+3. Viewing Invoices  
+4. Approvals / Digital Signatures  
+5. Payment options  
+6. Tasks assigned to client  
+7. File sharing or documents  
+8. Messaging or comments
+
+C. PUBLIC PAGES
+Verify:
+1. Public proposal view  
+2. Public quotation view  
+3. Public invoice view  
+4. Acceptance workflows
+
+D. BACKEND SUPPORT
+Check if backend already supports:
+1. Client authentication  
+2. Token generation  
+3. Workspace-aware client lookups  
+4. Proposal/quotation/invoice permissions  
+5. Payment integration (even placeholder)
+
+E. FRONTEND PAGES
+Check for existing:
+- /client
+- /portal
+- /public/proposal/xxx
+- /public/invoice/xxx
+
+F. PERMISSIONS & LIMITATIONS
+Check:
+- Does workspace admin control what client can see?
+- Is client allowed to leave comments?
+- Is any client activity logged?
+
+DO NOT IMPLEMENT ANYTHING BEFORE PRODUCING THIS AUDIT REPORT.
+
+===========================================================
+PHASE 2 — DECISION RULES
+===========================================================
+After the audit:
+
+1. If a feature is fully implemented → DO NOT TOUCH IT.  
+2. If partially implemented → ONLY complete missing parts.  
+3. If missing → Implement fully according to the specification below.  
+4. All new features MUST be guarded behind the feature flag `customer_portal_enabled`.  
+
+===========================================================
+PHASE 3 — BUILD MISSING COMPONENTS (ONLY IF REQUIRED)
+===========================================================
+Below is the full Customer Portal specification.  
+Implement ONLY sections missing from the audit.
+
+-----------------------------------------------------------
+1. CUSTOMER PORTAL AUTHENTICATION
+-----------------------------------------------------------
+Implement client login via:
+- Email + OTP  
+or  
+- Email + Password (determine based on audit)
+
+Add:
+- Forgot password  
+- Reset password  
+- Client access token generation  
+- Workspace-based scoping  
+- Portal session handling  
+
+Database additions (if missing):
+- client_users (id, email, phone, passwordHash, workspaceId, status)
+- client_sessions
+- client_portal_settings
+
+-----------------------------------------------------------
+2. CUSTOMER PORTAL DASHBOARD
+-----------------------------------------------------------
+Create a client dashboard showing:
+
+- Upcoming invoices  
+- Pending proposals  
+- Assigned tasks (optional)  
+- Shared documents  
+- Messages (optional)  
+
+-----------------------------------------------------------
+3. VIEW + APPROVE PROPOSALS
+-----------------------------------------------------------
+Portal must support:
+
+- Proposal view  
+- Proposal PDF preview  
+- Accept / Reject button  
+- Client signature  
+- Comments or notes  
+- Event logging  
+
+-----------------------------------------------------------
+4. VIEW + DOWNLOAD QUOTATIONS
+-----------------------------------------------------------
+- Quotation preview  
+- Quotation PDF  
+- Accept/Decline  
+- Notes/comments  
+
+-----------------------------------------------------------
+5. VIEW + PAY INVOICES (PLACEHOLDER)
+-----------------------------------------------------------
+If billing system exists:
+- Show invoice list  
+- Invoice detail page  
+- Payment button (placeholder UI)  
+- Payment status  
+
+-----------------------------------------------------------
+6. CLIENT DOCUMENTS
+-----------------------------------------------------------
+Portal must allow clients to:
+- Download documents uploaded by agency  
+- Upload required documents back to agency (optional, check audit)
+
+Add:
+- Document list page  
+- Upload widget (if enabled)  
+
+-----------------------------------------------------------
+7. CLIENT TASKS (OPTIONAL)
+-----------------------------------------------------------
+If agency wants:
+- Show tasks assigned to client (ex: provide content, supply files)  
+- Allow client to mark tasks as completed  
+
+-----------------------------------------------------------
+8. MESSAGING / COMMENTS
+-----------------------------------------------------------
+Add missing:
+- Client ↔ Agency message feed  
+- Proposal thread comments  
+- Invoice or quotation queries  
+- File attachments  
+
+-----------------------------------------------------------
+9. SETTINGS & PROFILE
+-----------------------------------------------------------
+Client must be able to:
+- Update name, email, phone  
+- Manage password  
+- View workspace branding  
+
+-----------------------------------------------------------
+10. WORKSPACE BRANDING IN PORTAL
+-----------------------------------------------------------
+Apply workspace branding to:
+- Header  
+- Colors  
+- Logo  
+- Proposal/invoice pages  
+
+-----------------------------------------------------------
+11. PERMISSIONS
+-----------------------------------------------------------
+Workspace admin can toggle what clients see:
+
+- Show proposals?  
+- Show invoices?  
+- Show tasks?  
+- Allow file uploads?  
+- Allow comments?  
+- Allow messaging?  
+- Allow online payments?  
+
+Require a new settings area:
+`workspace_client_portal_settings`
+
+-----------------------------------------------------------
+12. EVENT LOGGING & NOTIFICATIONS
+-----------------------------------------------------------
+Log:
+- Client login  
+- Proposal viewed  
+- Proposal accepted  
+- Invoice viewed  
+- Document downloaded  
+- Comment created  
+
+Send notifications to workspace users (optional).
+
+-----------------------------------------------------------
+13. ADDITIVE MIGRATIONS (SAFE)
+-----------------------------------------------------------
+Only create tables / fields if missing:
+- client_users  
+- client_sessions  
+- client_roles (optional)  
+- client_activity_logs  
+- client_portal_settings  
+
+Never remove or modify existing DB structure.
+
+-----------------------------------------------------------
+14. TESTING
+-----------------------------------------------------------
+ONLY test the new or modified portal-related components:
+- Authentication  
+- Proposal acceptance  
+- Invoice viewing  
+- Permissions  
+- Branding  
+- Backward compatibility  
+
+===========================================================
+PHASE 4 — DELIVERABLES
+===========================================================
+Your output must include ONLY:
+
+1. Missing backend logic  
+2. Missing frontend components  
+3. Missing migrations (additive)  
+4. Missing APIs  
+5. Tests  
+6. Documentation for all added features  
+7. Final summary:
+   - What was already implemented  
+   - What was partially implemented  
+   - What was missing  
+   - What you added  
+
+Start now by auditing the project and generate the **Customer Portal Audit Report** BEFORE writing any code.
