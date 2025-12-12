@@ -120,3 +120,82 @@ When multi-workspace is enabled:
 ### Migration Files
 - `migrations/0001_add_multi_workspace_support.sql` - Up migration
 - `migrations/0001_add_multi_workspace_support_down.sql` - Rollback migration
+- `migrations/0002_add_workspace_modules.sql` - 6 workspace modules migration
+
+## Workspace Management Modules (December 2024)
+
+### Overview
+Six comprehensive workspace management modules for enterprise-grade CRM functionality. All modules are feature-flagged using `multi_workspace_enabled` for safe rollout.
+
+### Module 1: Billing & Subscription Management
+**Database Tables**: `workspace_subscription_plans`, `workspace_subscriptions`, `workspace_payment_methods`, `workspace_invoices`, `workspace_usage`
+
+**API Endpoints**:
+- `GET /api/workspace/plans` - Available subscription plans
+- `GET /api/workspace/:id/subscription` - Current subscription
+- `GET /api/workspace/:id/usage` - Usage metrics
+- `GET /api/workspace/:id/invoices` - Billing history
+- `GET /api/workspace/:id/payment-methods` - Payment methods
+
+**UI**: Billing tab in WorkspaceSettings with plan cards, usage metrics, and invoice history
+
+### Module 2: Workspace Branding (White-Label)
+**Database Tables**: `workspace_branding`, `workspace_pdf_settings`
+
+**API Endpoints**:
+- `GET/PUT /api/workspace/:id/branding` - Logo, colors, theme
+- `GET/PUT /api/workspace/:id/pdf-settings` - PDF template customization
+
+**UI**: Branding tab with color picker, logo upload, and PDF settings
+
+### Module 3: Advanced Roles & Permissions
+**Database Tables**: `workspace_custom_roles`, `workspace_role_permissions`, `workspace_resource_permissions`
+
+**API Endpoints**:
+- `GET/POST /api/workspace/:id/roles` - Custom role management
+- `GET/PUT/DELETE /api/workspace/:id/roles/:roleId` - Individual role CRUD
+
+**Features**: Granular resource-level permissions (contacts, deals, proposals, reports)
+
+### Module 4: Workspace Analytics & Insights
+**Database Tables**: `workspace_analytics`
+
+**API Endpoints**:
+- `GET /api/workspace/:id/analytics/summary` - Dashboard summary
+- `GET /api/workspace/:id/analytics` - Detailed metrics with filters
+
+**UI**: Analytics tab with revenue, proposals, leads, and team performance metrics
+
+### Module 5: Deletion & Restore (Soft-Delete)
+**Database Tables**: Uses `deleted_at` on tenants table + `workspace_deletion_logs`
+
+**API Endpoints**:
+- `DELETE /api/workspace/:id` - Soft-delete (30-day retention)
+- `POST /api/workspace/:id/restore` - Restore workspace
+- `GET /api/workspace/deleted` - View deleted workspaces
+- `GET /api/workspace/:id/deletion-logs` - Deletion history
+
+**Features**: 30-day recovery period before permanent deletion, audit logs
+
+### Module 6: Onboarding Wizard
+**Database Tables**: `workspace_onboarding`
+
+**API Endpoints**:
+- `GET /api/workspace/:id/onboarding` - Progress status
+- `PUT /api/workspace/:id/onboarding/:step` - Update step status
+- `POST /api/workspace/:id/onboarding/complete` - Mark completed
+- `POST /api/workspace/:id/onboarding/dismiss` - Dismiss wizard
+
+**UI**: OnboardingWizard component with 5-step guided setup:
+1. Customize branding
+2. Invite team members
+3. Add first client
+4. Create project
+5. Send first proposal
+
+### Component Locations
+- `client/src/pages/WorkspaceSettings.tsx` - Main settings page (6 tabs)
+- `client/src/components/workspace/OnboardingWizard.tsx` - Onboarding wizard
+
+### Storage Interface
+All storage methods defined in `server/storage.ts` with type-safe interfaces using Drizzle ORM
