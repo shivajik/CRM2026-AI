@@ -1715,6 +1715,82 @@ export class DatabaseStorage implements IStorage {
     return template;
   }
 
+  async getEmailTemplatesWithOwnership(tenantId: string, userId: string, workspaceId?: string): Promise<{
+    userTemplates: EmailTemplate[];
+    sharedTemplates: EmailTemplate[];
+    workspaceTemplates: EmailTemplate[];
+    systemTemplates: EmailTemplate[];
+  }> {
+    const allTemplates = await db.select().from(schema.emailTemplates)
+      .where(eq(schema.emailTemplates.tenantId, tenantId))
+      .orderBy(desc(schema.emailTemplates.createdAt));
+
+    const userTemplates = allTemplates.filter(t => 
+      t.ownerType === 'user' && t.ownerId === userId && !t.isShared
+    );
+    
+    const sharedTemplates = allTemplates.filter(t => 
+      t.ownerType === 'user' && t.isShared
+    );
+    
+    const workspaceTemplates = allTemplates.filter(t => 
+      t.ownerType === 'workspace' && (!workspaceId || t.ownerId === workspaceId)
+    );
+    
+    const systemTemplates = allTemplates.filter(t => 
+      t.ownerType === 'system'
+    );
+
+    return { userTemplates, sharedTemplates, workspaceTemplates, systemTemplates };
+  }
+
+  async duplicateEmailTemplate(id: string, tenantId: string, userId: string): Promise<EmailTemplate | undefined> {
+    const original = await this.getEmailTemplateById(id, tenantId);
+    if (!original) return undefined;
+
+    const duplicateData: InsertEmailTemplate = {
+      tenantId,
+      createdBy: userId,
+      ownerType: 'user',
+      ownerId: userId,
+      isShared: false,
+      name: `${original.name} (Copy)`,
+      purpose: original.purpose,
+      subject: original.subject,
+      body: original.body,
+      mergeFields: original.mergeFields,
+      isDefault: false,
+      defaultFor: null,
+      isActive: true,
+      version: 1,
+    };
+
+    return this.createEmailTemplate(duplicateData);
+  }
+
+  async toggleEmailTemplateShare(id: string, tenantId: string, userId: string, isShared: boolean): Promise<EmailTemplate | undefined> {
+    const template = await this.getEmailTemplateById(id, tenantId);
+    if (!template || template.ownerType !== 'user' || template.ownerId !== userId) {
+      return undefined;
+    }
+    return this.updateEmailTemplate(id, tenantId, { isShared });
+  }
+
+  async canEditEmailTemplate(template: EmailTemplate, userId: string, isAdmin: boolean): Promise<boolean> {
+    if (template.ownerType === 'system') return false;
+    if (template.ownerType === 'user' && template.ownerId === userId) return true;
+    if (template.ownerType === 'workspace' && isAdmin) return true;
+    if (template.isShared && isAdmin) return true;
+    return false;
+  }
+
+  async canDeleteEmailTemplate(template: EmailTemplate, userId: string, isAdmin: boolean): Promise<boolean> {
+    if (template.ownerType === 'system') return false;
+    if (template.ownerType === 'user' && template.ownerId === userId) return true;
+    if (template.ownerType === 'workspace' && isAdmin) return true;
+    return false;
+  }
+
   // Email Log operations
   async createEmailLog(insertLog: InsertEmailLog): Promise<EmailLog> {
     const [log] = await db.insert(schema.emailLogs).values(insertLog).returning();
