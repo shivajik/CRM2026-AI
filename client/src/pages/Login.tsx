@@ -7,7 +7,7 @@ import { useState } from "react";
 import { authApi } from "@/lib/api";
 import { setToken, setRefreshToken, setUser } from "@/lib/auth";
 import { useToast } from "@/hooks/use-toast";
-import { Eye, EyeOff, Mail, Lock, ArrowRight, Sparkles } from "lucide-react";
+import { Eye, EyeOff, Mail, Lock, ArrowRight, Sparkles, Zap, Shield, Users, Building2 } from "lucide-react";
 
 export default function Login() {
   const [, setLocation] = useLocation();
@@ -74,8 +74,38 @@ export default function Login() {
     }
   };
 
+  const quickLogin = async (email: string) => {
+    setIsLoading(true);
+    try {
+      const response = await authApi.login(email, "password123");
+      setToken(response.accessToken);
+      setRefreshToken(response.refreshToken);
+      setUser(response.user);
+      toast({
+        title: "Quick login successful!",
+        description: `Logged in as ${response.user.firstName} (${response.user.userType})`,
+      });
+      setLocation("/app");
+    } catch (error: any) {
+      toast({
+        title: "Login failed",
+        description: error.message || "User not found. Please run database seed first.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const devUsers = [
+    { email: "superadmin@nexuscrm.com", label: "Super Admin", icon: Shield, color: "bg-red-500" },
+    { email: "admin@acme.com", label: "Agency Admin", icon: Building2, color: "bg-blue-500" },
+    { email: "sarah@acme.com", label: "Team Member", icon: Users, color: "bg-green-500" },
+    { email: "customer@techstart.com", label: "Customer", icon: Zap, color: "bg-purple-500" },
+  ];
+
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-slate-50 via-white to-slate-100 dark:from-slate-950 dark:via-slate-900 dark:to-slate-950 p-4">
+    <div className="min-h-screen flex flex-col items-center justify-center bg-gradient-to-br from-slate-50 via-white to-slate-100 dark:from-slate-950 dark:via-slate-900 dark:to-slate-950 p-4">
       <div className="absolute inset-0 overflow-hidden">
         <div className="absolute -top-40 -right-40 w-80 h-80 bg-primary/10 rounded-full blur-3xl" />
         <div className="absolute -bottom-40 -left-40 w-80 h-80 bg-primary/10 rounded-full blur-3xl" />
@@ -189,6 +219,44 @@ export default function Login() {
             <span>Start your 14-day free trial</span>
           </div>
         </CardFooter>
+      </Card>
+
+      {/* DEV ONLY: Quick Login Buttons - Remove before production */}
+      <Card className="w-full max-w-md mt-4 shadow-lg border-dashed border-2 border-orange-300 dark:border-orange-700 backdrop-blur-sm relative z-10">
+        <CardHeader className="pb-3">
+          <CardTitle className="text-base font-semibold flex items-center gap-2 text-orange-600 dark:text-orange-400">
+            <Zap className="h-4 w-4" />
+            Quick Login (Dev Only)
+          </CardTitle>
+          <CardDescription className="text-xs">
+            Click to login instantly. Password: password123
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="pt-0">
+          <div className="grid grid-cols-2 gap-2">
+            {devUsers.map((user) => (
+              <Button
+                key={user.email}
+                variant="outline"
+                size="sm"
+                onClick={() => quickLogin(user.email)}
+                disabled={isLoading}
+                className="h-auto py-2 px-3 flex flex-col items-start gap-1 hover:bg-slate-100 dark:hover:bg-slate-800"
+                data-testid={`quick-login-${user.label.toLowerCase().replace(' ', '-')}`}
+              >
+                <div className="flex items-center gap-2 w-full">
+                  <div className={`p-1 rounded ${user.color}`}>
+                    <user.icon className="h-3 w-3 text-white" />
+                  </div>
+                  <span className="font-medium text-xs">{user.label}</span>
+                </div>
+                <span className="text-[10px] text-muted-foreground truncate w-full text-left">
+                  {user.email}
+                </span>
+              </Button>
+            ))}
+          </div>
+        </CardContent>
       </Card>
     </div>
   );
