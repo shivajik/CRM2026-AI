@@ -1,19 +1,11 @@
+import { useMemo } from "react";
 import { Layout } from "@/components/layout/Layout";
 import { ProtectedRoute } from "@/components/ProtectedRoute";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { DollarSign, Users, Briefcase, CheckSquare, TrendingUp } from "lucide-react";
+import { DollarSign, Users, Briefcase, CheckSquare, BarChart3, TrendingUp } from "lucide-react";
 import { Area, AreaChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import { useQuery } from "@tanstack/react-query";
 import { dealsApi, contactsApi, tasksApi } from "@/lib/api";
-
-const chartData = [
-  { name: "Jan", total: 12000 },
-  { name: "Feb", total: 18000 },
-  { name: "Mar", total: 15000 },
-  { name: "Apr", total: 24000 },
-  { name: "May", total: 28000 },
-  { name: "Jun", total: 32000 },
-];
 
 export default function Dashboard() {
   const { data: deals = [] } = useQuery({
@@ -28,13 +20,40 @@ export default function Dashboard() {
 
   const { data: tasks = [] } = useQuery({
     queryKey: ["tasks"],
-    queryFn: tasksApi.getAll,
+    queryFn: () => tasksApi.getAll(),
   });
 
   const totalRevenue = deals.reduce((acc: number, deal: any) => acc + Number(deal.value), 0);
   const activeDeals = deals.length;
   const totalContacts = contacts.length;
   const pendingTasks = tasks.filter((t: any) => t.status !== "done").length;
+
+  const chartData = useMemo(() => {
+    if (deals.length === 0) return [];
+    
+    const monthNames = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+    const monthlyRevenue: { [key: string]: number } = {};
+    
+    deals.forEach((deal: any) => {
+      const date = deal.createdAt ? new Date(deal.createdAt) : new Date();
+      const monthKey = `${date.getFullYear()}-${date.getMonth()}`;
+      const monthName = monthNames[date.getMonth()];
+      
+      if (!monthlyRevenue[monthKey]) {
+        monthlyRevenue[monthKey] = 0;
+      }
+      monthlyRevenue[monthKey] += Number(deal.value) || 0;
+    });
+    
+    const sortedKeys = Object.keys(monthlyRevenue).sort();
+    return sortedKeys.map(key => {
+      const [year, month] = key.split("-");
+      return {
+        name: monthNames[parseInt(month)],
+        total: monthlyRevenue[key]
+      };
+    });
+  }, [deals]);
 
   return (
     <ProtectedRoute>
@@ -105,40 +124,48 @@ export default function Dashboard() {
                 <CardTitle>Revenue Overview</CardTitle>
               </CardHeader>
               <CardContent className="pl-2">
-                <ResponsiveContainer width="100%" height={350}>
-                  <AreaChart data={chartData}>
-                    <defs>
-                      <linearGradient id="colorTotal" x1="0" y1="0" x2="0" y2="1">
-                        <stop offset="5%" stopColor="hsl(var(--primary))" stopOpacity={0.3} />
-                        <stop offset="95%" stopColor="hsl(var(--primary))" stopOpacity={0} />
-                      </linearGradient>
-                    </defs>
-                    <XAxis dataKey="name" stroke="#888888" fontSize={12} tickLine={false} axisLine={false} />
-                    <YAxis
-                      stroke="#888888"
-                      fontSize={12}
-                      tickLine={false}
-                      axisLine={false}
-                      tickFormatter={(value) => `$${value}`}
-                    />
-                    <Tooltip
-                      contentStyle={{
-                        backgroundColor: "hsl(var(--card))",
-                        borderRadius: "8px",
-                        border: "1px solid hsl(var(--border))",
-                      }}
-                      itemStyle={{ color: "hsl(var(--foreground))" }}
-                    />
-                    <Area
-                      type="monotone"
-                      dataKey="total"
-                      stroke="hsl(var(--primary))"
-                      strokeWidth={2}
-                      fillOpacity={1}
-                      fill="url(#colorTotal)"
-                    />
-                  </AreaChart>
-                </ResponsiveContainer>
+                {chartData.length > 0 ? (
+                  <ResponsiveContainer width="100%" height={350}>
+                    <AreaChart data={chartData}>
+                      <defs>
+                        <linearGradient id="colorTotal" x1="0" y1="0" x2="0" y2="1">
+                          <stop offset="5%" stopColor="hsl(var(--primary))" stopOpacity={0.3} />
+                          <stop offset="95%" stopColor="hsl(var(--primary))" stopOpacity={0} />
+                        </linearGradient>
+                      </defs>
+                      <XAxis dataKey="name" stroke="#888888" fontSize={12} tickLine={false} axisLine={false} />
+                      <YAxis
+                        stroke="#888888"
+                        fontSize={12}
+                        tickLine={false}
+                        axisLine={false}
+                        tickFormatter={(value) => `$${value}`}
+                      />
+                      <Tooltip
+                        contentStyle={{
+                          backgroundColor: "hsl(var(--card))",
+                          borderRadius: "8px",
+                          border: "1px solid hsl(var(--border))",
+                        }}
+                        itemStyle={{ color: "hsl(var(--foreground))" }}
+                      />
+                      <Area
+                        type="monotone"
+                        dataKey="total"
+                        stroke="hsl(var(--primary))"
+                        strokeWidth={2}
+                        fillOpacity={1}
+                        fill="url(#colorTotal)"
+                      />
+                    </AreaChart>
+                  </ResponsiveContainer>
+                ) : (
+                  <div className="flex flex-col items-center justify-center h-[350px] text-muted-foreground">
+                    <BarChart3 className="h-12 w-12 mb-4 opacity-50" />
+                    <p className="text-sm font-medium">No revenue data yet</p>
+                    <p className="text-xs mt-1">Create deals to see your revenue overview</p>
+                  </div>
+                )}
               </CardContent>
             </Card>
 
