@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { useLocation, useRoute } from "wouter";
+import { useLocation, useRoute, useSearch } from "wouter";
 import { Layout } from "@/components/layout/Layout";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -26,7 +26,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { useToast } from "@/hooks/use-toast";
-import { proposalsApi, customersApi } from "@/lib/api";
+import { proposalsApi, customersApi, proposalTemplatesApi } from "@/lib/api";
 import {
   ArrowLeft,
   Save,
@@ -62,10 +62,15 @@ const sectionTypes = [
 export default function ProposalBuilder() {
   const [, setLocation] = useLocation();
   const [, params] = useRoute("/proposals/edit/:id");
+  const searchString = useSearch();
   const proposalId = params?.id;
   const isEditing = !!proposalId;
   const { toast } = useToast();
   const queryClient = useQueryClient();
+
+  // Get templateId from query params
+  const urlParams = new URLSearchParams(searchString);
+  const templateId = urlParams.get("templateId");
 
   const [title, setTitle] = useState("");
   const [customerId, setCustomerId] = useState<string>("");
@@ -75,6 +80,7 @@ export default function ProposalBuilder() {
   const [pricingItems, setPricingItems] = useState<any[]>([]);
   const [activeTab, setActiveTab] = useState("content");
   const [showAddSection, setShowAddSection] = useState(false);
+  const [templateLoaded, setTemplateLoaded] = useState(false);
 
   const { data: customers = [] } = useQuery({
     queryKey: ["customers"],
@@ -86,6 +92,34 @@ export default function ProposalBuilder() {
     queryFn: () => proposalsApi.getById(proposalId!),
     enabled: isEditing,
   });
+
+  // Fetch template if templateId is provided
+  const { data: template, isLoading: templateLoading } = useQuery({
+    queryKey: ["proposal-template", templateId],
+    queryFn: () => proposalTemplatesApi.getById(templateId!),
+    enabled: !!templateId && !isEditing && !templateLoaded,
+  });
+
+  // Load template data when creating new proposal from template
+  useEffect(() => {
+    if (template && !isEditing && !templateLoaded) {
+      setTitle(template.name || "New Proposal");
+      // Load template sections
+      if (template.sections && template.sections.length > 0) {
+        const templateSections = template.sections.map((s: any, index: number) => ({
+          sectionType: s.sectionType || "custom",
+          title: s.title || "Untitled Section",
+          content: s.content || "",
+          sortOrder: index,
+          isVisible: s.isVisible !== false,
+          isLocked: s.isLocked || false,
+        }));
+        setSections(templateSections);
+      }
+      setTemplateLoaded(true);
+      toast({ title: "Template loaded", description: `Using template: ${template.name}` });
+    }
+  }, [template, isEditing, templateLoaded, toast]);
 
   useEffect(() => {
     if (proposal) {
