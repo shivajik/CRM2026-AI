@@ -2777,10 +2777,16 @@ export async function registerRoutes(
         return res.status(403).json({ message: "Customer access only" });
       }
       const user = await storage.getUserById(req.user!.userId);
-      if (!user?.customerId) {
+      if (!user) {
         return res.json([]);
       }
-      const documents = await storage.getClientDocuments(req.user!.tenantId, user.customerId);
+      // Find customer by matching email
+      const customers = await storage.getCustomersByTenant(req.user!.tenantId);
+      const matchingCustomer = customers.find(c => c.email === user.email);
+      if (!matchingCustomer) {
+        return res.json([]);
+      }
+      const documents = await storage.getClientDocuments(req.user!.tenantId, matchingCustomer.id);
       res.json(documents.filter(d => d.isVisibleToClient));
     } catch (error) {
       console.error("Get customer documents error:", error);
@@ -2795,10 +2801,16 @@ export async function registerRoutes(
         return res.status(403).json({ message: "Customer access only" });
       }
       const user = await storage.getUserById(req.user!.userId);
-      if (!user?.customerId) {
+      if (!user) {
         return res.json([]);
       }
-      const proposals = await storage.getProposalsByCustomerForPortal(user.customerId, req.user!.tenantId);
+      // Find customer by matching email
+      const customers = await storage.getCustomersByTenant(req.user!.tenantId);
+      const matchingCustomer = customers.find(c => c.email === user.email);
+      if (!matchingCustomer) {
+        return res.json([]);
+      }
+      const proposals = await storage.getProposalsByCustomerForPortal(matchingCustomer.id, req.user!.tenantId);
       res.json(proposals);
     } catch (error) {
       console.error("Get customer proposals error:", error);
@@ -2829,17 +2841,14 @@ export async function registerRoutes(
       });
 
       // Log activity
-      const user = await storage.getUserById(req.user!.userId);
-      if (user?.customerId) {
-        await storage.createPortalActivityLog({
-          workspaceId: req.user!.tenantId,
-          customerId: req.user!.userId,
-          action: action === 'accept' ? 'quotation_accepted' : 'quotation_rejected',
-          resourceType: 'quotation',
-          resourceId: req.params.id,
-          metadata: JSON.stringify({ notes })
-        });
-      }
+      await storage.createPortalActivityLog({
+        workspaceId: req.user!.tenantId,
+        customerId: req.user!.userId,
+        action: action === 'accept' ? 'quotation_accepted' : 'quotation_rejected',
+        resourceType: 'quotation',
+        resourceId: req.params.id,
+        metadata: JSON.stringify({ notes })
+      });
 
       res.json(updated);
     } catch (error) {
@@ -2866,8 +2875,7 @@ export async function registerRoutes(
       
       const newStatus = action === 'accept' ? 'accepted' : 'rejected';
       const updated = await storage.updateProposal(req.params.id, req.user!.tenantId, { 
-        status: newStatus,
-        clientAcceptedAt: action === 'accept' ? new Date() : undefined
+        status: newStatus
       });
 
       // Log activity
