@@ -583,6 +583,10 @@ export const workspacesApi = {
     return apiRequest(`/workspaces/${workspaceId}/activity${params}`);
   },
   
+  // Seed demo data
+  seedDemoData: (workspaceId: string) => 
+    apiRequest(`/workspaces/${workspaceId}/seed-demo-data`, { method: "POST" }),
+  
   // ==== MODULE 1: BILLING ====
   getPlans: () => apiRequest("/workspace/plans"),
   getSubscription: (workspaceId: string) => apiRequest(`/workspace/${workspaceId}/subscription`),

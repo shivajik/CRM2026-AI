@@ -4433,6 +4433,154 @@ export async function registerRoutes(
     }
   });
 
+  // Seed demo data for a workspace (workspace admin only)
+  app.post("/api/workspaces/:workspaceId/seed-demo-data", requireAuth, resolveWorkspaceContext, requireMultiWorkspaceEnabled, requireWorkspaceAdmin, async (req, res) => {
+    try {
+      const { workspaceId } = req.params;
+      
+      // Check if workspace already has data
+      const existingCustomers = await storage.getCustomersByTenant(workspaceId);
+      if (existingCustomers.length > 0) {
+        return res.status(400).json({ message: "Workspace already has data. Demo data can only be seeded to empty workspaces." });
+      }
+      
+      // Get workspace owner to use as owner for created records
+      const ownerId = req.user!.userId;
+      
+      // Create sample products for this workspace
+      const productsData = [
+        { tenantId: workspaceId, name: "Consulting Service (Hourly)", description: "Expert consulting services billed hourly", sku: "SVC-CON-001", type: "service", unitPrice: "150.00", taxRate: "18", category: "Consulting" },
+        { tenantId: workspaceId, name: "Monthly Retainer", description: "Monthly consulting retainer package", sku: "SVC-RET-001", type: "service", unitPrice: "2500.00", taxRate: "18", category: "Retainer" },
+        { tenantId: workspaceId, name: "Project Setup Fee", description: "One-time project setup and onboarding", sku: "SVC-SET-001", type: "service", unitPrice: "500.00", taxRate: "18", category: "Setup" },
+        { tenantId: workspaceId, name: "Premium Support Package", description: "Priority support with 4-hour response time", sku: "SUP-PRM-001", type: "service", unitPrice: "800.00", taxRate: "18", category: "Support" },
+      ];
+      const products = await Promise.all(productsData.map(p => storage.createProduct(p)));
+      
+      // Create sample customers for this workspace
+      const customersData = [
+        { tenantId: workspaceId, ownerId, name: "Sunrise Digital Agency", email: "contact@sunrisedigital.io", phone: "+1-555-2001", company: "Sunrise Digital Agency", website: "https://sunrisedigital.io", address: "100 Creative Ave", city: "Los Angeles", state: "CA", country: "USA", postalCode: "90001", customerType: "customer", segment: "mid-market", industry: "Marketing", paymentTerms: "net30" },
+        { tenantId: workspaceId, ownerId, name: "CloudNine Technologies", email: "hello@cloudnine.tech", phone: "+1-555-2002", company: "CloudNine Technologies", address: "500 Tech Park", city: "Seattle", state: "WA", country: "USA", postalCode: "98101", customerType: "customer", segment: "enterprise", industry: "Technology", paymentTerms: "net45" },
+        { tenantId: workspaceId, ownerId, name: "Green Valley Organics", email: "info@greenvalley.org", phone: "+1-555-2003", company: "Green Valley Organics", address: "75 Farm Road", city: "Portland", state: "OR", country: "USA", postalCode: "97201", customerType: "prospect", segment: "small-business", industry: "Agriculture", paymentTerms: "net15" },
+        { tenantId: workspaceId, ownerId, name: "Urban Fitness Studios", email: "management@urbanfitness.com", phone: "+1-555-2004", company: "Urban Fitness Studios", address: "200 Wellness Blvd", city: "Denver", state: "CO", country: "USA", postalCode: "80201", customerType: "lead", segment: "small-business", industry: "Health & Fitness", paymentTerms: "net30" },
+      ];
+      const customers = await Promise.all(customersData.map(c => storage.createCustomer(c)));
+      
+      // Create sample contacts for this workspace
+      const contactsData = [
+        { tenantId: workspaceId, ownerId, name: "Jennifer Lee", email: "jennifer@sunrisedigital.io", phone: "+1-555-2101", company: "Sunrise Digital Agency", role: "Creative Director" },
+        { tenantId: workspaceId, ownerId, name: "Marcus Thompson", email: "marcus@cloudnine.tech", phone: "+1-555-2102", company: "CloudNine Technologies", role: "VP Engineering" },
+        { tenantId: workspaceId, ownerId, name: "Sarah Green", email: "sarah@greenvalley.org", phone: "+1-555-2103", company: "Green Valley Organics", role: "Operations Manager" },
+        { tenantId: workspaceId, ownerId, name: "James Miller", email: "james@urbanfitness.com", phone: "+1-555-2104", company: "Urban Fitness Studios", role: "Franchise Owner" },
+      ];
+      const contacts = await Promise.all(contactsData.map(c => storage.createContact(c)));
+      
+      // Create sample deals for this workspace
+      const dealsData = [
+        { tenantId: workspaceId, ownerId, contactId: contacts[0].id, customerId: customers[0].id, title: "Brand Refresh Campaign", value: "25000.00", stage: "proposal", probability: 70, expectedCloseDate: new Date(Date.now() + 21 * 24 * 60 * 60 * 1000), notes: "Complete brand identity refresh for Sunrise Digital" },
+        { tenantId: workspaceId, ownerId, contactId: contacts[1].id, customerId: customers[1].id, title: "Cloud Migration Project", value: "85000.00", stage: "negotiation", probability: 80, expectedCloseDate: new Date(Date.now() + 45 * 24 * 60 * 60 * 1000), notes: "Full infrastructure migration to cloud" },
+        { tenantId: workspaceId, ownerId, contactId: contacts[2].id, customerId: customers[2].id, title: "E-commerce Platform", value: "15000.00", stage: "qualification", probability: 45, expectedCloseDate: new Date(Date.now() + 60 * 24 * 60 * 60 * 1000), notes: "Online store for organic products" },
+        { tenantId: workspaceId, ownerId, contactId: contacts[3].id, customerId: customers[3].id, title: "Fitness App Development", value: "45000.00", stage: "new", probability: 25, expectedCloseDate: new Date(Date.now() + 90 * 24 * 60 * 60 * 1000), notes: "Mobile app for gym members" },
+      ];
+      const deals = await Promise.all(dealsData.map(d => storage.createDeal(d)));
+      
+      // Create sample quotations
+      const quotation1 = await storage.createQuotation({
+        tenantId: workspaceId,
+        customerId: customers[0].id,
+        createdBy: ownerId,
+        quoteNumber: "WS-QT-001",
+        title: "Brand Refresh Package",
+        status: "sent",
+        subtotal: "5500.00",
+        taxAmount: "990.00",
+        discountAmount: "0",
+        totalAmount: "6490.00",
+        validUntil: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000),
+        terms: "Payment due within 30 days of acceptance.",
+      });
+      await storage.createQuotationItem({ quotationId: quotation1.id, productId: products[0].id, description: "Consulting (20 hours)", quantity: "20", unitPrice: "150.00", taxRate: "18", discount: "0", totalPrice: "3540.00", sortOrder: 1 });
+      await storage.createQuotationItem({ quotationId: quotation1.id, productId: products[2].id, description: "Project Setup", quantity: "1", unitPrice: "500.00", taxRate: "18", discount: "0", totalPrice: "590.00", sortOrder: 2 });
+      await storage.createQuotationItem({ quotationId: quotation1.id, productId: products[3].id, description: "Support Package (3 months)", quantity: "3", unitPrice: "800.00", taxRate: "18", discount: "0", totalPrice: "2832.00", sortOrder: 3 });
+      
+      const quotation2 = await storage.createQuotation({
+        tenantId: workspaceId,
+        customerId: customers[1].id,
+        createdBy: ownerId,
+        quoteNumber: "WS-QT-002",
+        title: "Cloud Migration Services",
+        status: "draft",
+        subtotal: "8500.00",
+        taxAmount: "1530.00",
+        discountAmount: "500.00",
+        totalAmount: "9530.00",
+        validUntil: new Date(Date.now() + 45 * 24 * 60 * 60 * 1000),
+      });
+      await storage.createQuotationItem({ quotationId: quotation2.id, productId: products[1].id, description: "Monthly Retainer (3 months)", quantity: "3", unitPrice: "2500.00", taxRate: "18", discount: "0", totalPrice: "8850.00", sortOrder: 1 });
+      await storage.createQuotationItem({ quotationId: quotation2.id, productId: products[2].id, description: "Setup Fee", quantity: "1", unitPrice: "500.00", taxRate: "18", discount: "0", totalPrice: "590.00", sortOrder: 2 });
+      
+      // Create sample invoices
+      const invoice1 = await storage.createInvoice({
+        tenantId: workspaceId,
+        customerId: customers[0].id,
+        createdBy: ownerId,
+        invoiceNumber: "WS-INV-001",
+        status: "paid",
+        issueDate: new Date(Date.now() - 45 * 24 * 60 * 60 * 1000),
+        dueDate: new Date(Date.now() - 15 * 24 * 60 * 60 * 1000),
+        subtotal: "3000.00",
+        taxAmount: "540.00",
+        discountAmount: "0",
+        totalAmount: "3540.00",
+        paidAmount: "3540.00",
+        balanceDue: "0",
+      });
+      await storage.createInvoiceItem({ invoiceId: invoice1.id, productId: products[0].id, description: "Consulting Services (20 hours)", quantity: "20", unitPrice: "150.00", taxRate: "18", discount: "0", totalPrice: "3540.00", sortOrder: 1 });
+      await storage.createPayment({ tenantId: workspaceId, invoiceId: invoice1.id, amount: "3540.00", paymentMethod: "bank_transfer", paymentDate: new Date(Date.now() - 20 * 24 * 60 * 60 * 1000), reference: "TRF-WS-001" });
+      
+      const invoice2 = await storage.createInvoice({
+        tenantId: workspaceId,
+        customerId: customers[1].id,
+        createdBy: ownerId,
+        invoiceNumber: "WS-INV-002",
+        status: "sent",
+        issueDate: new Date(Date.now() - 10 * 24 * 60 * 60 * 1000),
+        dueDate: new Date(Date.now() + 20 * 24 * 60 * 60 * 1000),
+        subtotal: "2500.00",
+        taxAmount: "450.00",
+        discountAmount: "0",
+        totalAmount: "2950.00",
+        paidAmount: "0",
+        balanceDue: "2950.00",
+      });
+      await storage.createInvoiceItem({ invoiceId: invoice2.id, productId: products[1].id, description: "Monthly Retainer", quantity: "1", unitPrice: "2500.00", taxRate: "18", discount: "0", totalPrice: "2950.00", sortOrder: 1 });
+      
+      // Create sample tasks
+      const tasksData = [
+        { tenantId: workspaceId, createdBy: ownerId, assignedTo: ownerId, title: "Review brand guidelines", description: "Review and approve final brand guidelines for Sunrise Digital", status: "in_progress", priority: "high", dueDate: new Date(Date.now() + 3 * 24 * 60 * 60 * 1000), tags: ["branding", "review"] },
+        { tenantId: workspaceId, createdBy: ownerId, assignedTo: ownerId, title: "Schedule kickoff call", description: "Schedule project kickoff with CloudNine team", status: "not_started", priority: "medium", dueDate: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000), tags: ["meeting", "project"] },
+        { tenantId: workspaceId, createdBy: ownerId, assignedTo: ownerId, title: "Prepare e-commerce proposal", description: "Finalize proposal for Green Valley online store", status: "not_started", priority: "low", dueDate: new Date(Date.now() + 14 * 24 * 60 * 60 * 1000), tags: ["proposal", "sales"] },
+        { tenantId: workspaceId, createdBy: ownerId, assignedTo: ownerId, title: "Follow up with Urban Fitness", description: "Send follow-up email about fitness app requirements", status: "completed", priority: "medium", dueDate: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000), tags: ["follow-up", "email"] },
+      ];
+      await Promise.all(tasksData.map(t => storage.createTask(t)));
+      
+      res.json({ 
+        message: "Demo data seeded successfully",
+        summary: {
+          products: products.length,
+          customers: customers.length,
+          contacts: contacts.length,
+          deals: deals.length,
+          quotations: 2,
+          invoices: 2,
+          tasks: tasksData.length,
+        }
+      });
+    } catch (error) {
+      console.error("Seed demo data error:", error);
+      res.status(500).json({ message: "Failed to seed demo data" });
+    }
+  });
+
   // ==================== SAAS ADMIN: FEATURE FLAG MANAGEMENT ====================
   
   // Get all feature flags (SaaS admin only)

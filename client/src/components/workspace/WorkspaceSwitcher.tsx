@@ -71,7 +71,8 @@ export function WorkspaceSwitcher() {
     onSuccess: () => {
       queryClient.clear();
       toast({ title: "Workspace switched successfully" });
-      window.location.href = "/";
+      // Navigate to /app which checks auth and redirects to proper dashboard
+      window.location.href = "/app";
     },
     onError: (error: Error) => {
       toast({ title: "Failed to switch workspace", description: error.message, variant: "destructive" });

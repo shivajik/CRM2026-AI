@@ -203,6 +203,23 @@ export default function WorkspaceSettings() {
     },
   });
 
+  const seedDemoDataMutation = useMutation({
+    mutationFn: () => {
+      if (!workspaceId) throw new Error("No workspace selected");
+      return workspacesApi.seedDemoData(workspaceId);
+    },
+    onSuccess: (data: any) => {
+      queryClient.invalidateQueries();
+      toast({ 
+        title: "Demo data seeded successfully", 
+        description: `Created ${data.summary?.customers || 0} customers, ${data.summary?.deals || 0} deals, ${data.summary?.quotations || 0} quotations, and more.` 
+      });
+    },
+    onError: (error: Error) => {
+      toast({ title: "Failed to seed demo data", description: error.message, variant: "destructive" });
+    },
+  });
+
   const handleInvite = () => {
     if (!inviteEmail.trim() || !workspaceId) return;
     inviteMutation.mutate({ email: inviteEmail.trim(), role: inviteRole });
@@ -410,6 +427,32 @@ export default function WorkspaceSettings() {
                     </Button>
                   </>
                 )}
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <Zap className="h-5 w-5" />
+                  Quick Start Demo Data
+                </CardTitle>
+                <CardDescription>
+                  Populate this workspace with sample customers, deals, quotes, and invoices to explore features quickly.
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <p className="text-sm text-muted-foreground mb-4">
+                  This will add sample data including 4 customers, 4 contacts, 4 deals, 2 quotations, 2 invoices, and 4 tasks.
+                  Demo data can only be added to empty workspaces.
+                </p>
+                <Button 
+                  onClick={() => seedDemoDataMutation.mutate()}
+                  disabled={seedDemoDataMutation.isPending}
+                  variant="outline"
+                  data-testid="button-seed-demo-data"
+                >
+                  {seedDemoDataMutation.isPending ? "Seeding..." : "Seed Demo Data"}
+                </Button>
               </CardContent>
             </Card>
           </TabsContent>
