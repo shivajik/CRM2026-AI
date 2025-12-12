@@ -414,12 +414,28 @@ export default function PublicProposalView() {
                   <h2 className="text-2xl font-bold text-slate-800">{section.title}</h2>
                 </div>
                 <div 
-                  className="prose prose-slate prose-lg max-w-none
-                    prose-headings:text-slate-800 prose-headings:font-bold
-                    prose-p:text-slate-600 prose-p:leading-relaxed
-                    prose-li:text-slate-600
-                    prose-strong:text-slate-800
-                    prose-a:text-blue-600 prose-a:no-underline hover:prose-a:underline"
+                  className="proposal-content prose prose-slate prose-lg max-w-none
+                    prose-headings:text-slate-800 prose-headings:font-bold prose-headings:mt-6 prose-headings:mb-4
+                    [&>h2:first-child]:hidden
+                    prose-h3:text-lg prose-h3:text-slate-700 prose-h3:border-l-4 prose-h3:border-blue-500 prose-h3:pl-4 prose-h3:py-1 prose-h3:bg-blue-50/50
+                    prose-p:text-slate-600 prose-p:leading-relaxed prose-p:my-4
+                    prose-ul:my-4 prose-ul:space-y-2
+                    prose-li:text-slate-600 prose-li:leading-relaxed
+                    prose-strong:text-slate-800 prose-strong:font-semibold
+                    prose-a:text-blue-600 prose-a:no-underline hover:prose-a:underline
+                    prose-table:border-collapse prose-table:w-full prose-table:my-6
+                    prose-th:bg-slate-100 prose-th:text-slate-700 prose-th:font-semibold prose-th:p-4 prose-th:text-left prose-th:border prose-th:border-slate-200
+                    prose-td:p-4 prose-td:border prose-td:border-slate-200 prose-td:text-slate-600
+                    [&_.highlight]:bg-gradient-to-r [&_.highlight]:from-blue-50 [&_.highlight]:to-indigo-50 [&_.highlight]:p-6 [&_.highlight]:rounded-xl [&_.highlight]:border [&_.highlight]:border-blue-100 [&_.highlight]:my-6
+                    [&_.feature-grid]:grid [&_.feature-grid]:grid-cols-1 [&_.feature-grid]:md:grid-cols-2 [&_.feature-grid]:gap-4 [&_.feature-grid]:my-6
+                    [&_.feature-card]:bg-white [&_.feature-card]:p-5 [&_.feature-card]:rounded-lg [&_.feature-card]:border [&_.feature-card]:border-slate-200 [&_.feature-card]:shadow-sm
+                    [&_.feature-card_h4]:text-slate-800 [&_.feature-card_h4]:font-semibold [&_.feature-card_h4]:mb-2 [&_.feature-card_h4]:text-base
+                    [&_.stat-box]:text-center [&_.stat-box]:p-4
+                    [&_.stat-box_.number]:text-3xl [&_.stat-box_.number]:font-bold [&_.stat-box_.number]:text-blue-600
+                    [&_.stat-box_.label]:text-sm [&_.stat-box_.label]:text-slate-500 [&_.stat-box_.label]:mt-1
+                    [&_.check-list]:list-none [&_.check-list]:pl-0 [&_.check-list]:space-y-3
+                    [&_.check-list_li]:flex [&_.check-list_li]:items-start [&_.check-list_li]:gap-3
+                    [&_.check-list_li]:before:content-['✓'] [&_.check-list_li]:before:text-green-500 [&_.check-list_li]:before:font-bold [&_.check-list_li]:before:text-lg"
                   dangerouslySetInnerHTML={{ __html: replaceTemplatePlaceholders(section.content, proposal) }}
                 />
               </CardContent>
