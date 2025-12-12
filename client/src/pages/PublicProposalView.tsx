@@ -306,9 +306,10 @@ export default function PublicProposalView() {
             {proposal.sections.map((section) => (
               <div key={section.id} data-testid={`section-${section.id}`}>
                 <h2 className="text-xl font-semibold mb-4">{section.title}</h2>
-                <div className="prose prose-sm max-w-none whitespace-pre-wrap">
-                  {section.content}
-                </div>
+                <div 
+                  className="prose prose-sm max-w-none"
+                  dangerouslySetInnerHTML={{ __html: section.content }}
+                />
               </div>
             ))}
 
