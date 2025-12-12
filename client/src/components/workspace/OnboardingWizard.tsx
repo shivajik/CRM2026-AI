@@ -40,7 +40,7 @@ export function OnboardingWizard({ workspaceId, onComplete, onDismiss }: Onboard
   const dismissMutation = useMutation({
     mutationFn: () => workspacesApi.dismissOnboarding(workspaceId),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["onboarding-progress"] });
+      queryClient.invalidateQueries({ queryKey: ["onboarding-progress", workspaceId] });
       onDismiss?.();
     },
   });
@@ -48,7 +48,7 @@ export function OnboardingWizard({ workspaceId, onComplete, onDismiss }: Onboard
   const completeMutation = useMutation({
     mutationFn: () => workspacesApi.completeOnboarding(workspaceId),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["onboarding-progress"] });
+      queryClient.invalidateQueries({ queryKey: ["onboarding-progress", workspaceId] });
       onComplete?.();
     },
   });
