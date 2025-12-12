@@ -2549,8 +2549,13 @@ export class DatabaseStorage implements IStorage {
   }
 
   async getProposalByAccessToken(accessToken: string): Promise<Proposal | undefined> {
-    const [proposal] = await db.select().from(schema.proposals)
+    let [proposal] = await db.select().from(schema.proposals)
       .where(eq(schema.proposals.accessToken, accessToken));
+    
+    if (!proposal) {
+      [proposal] = await db.select().from(schema.proposals)
+        .where(eq(schema.proposals.id, accessToken));
+    }
     return proposal;
   }
 
