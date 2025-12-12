@@ -47,6 +47,7 @@ const EmailModule = lazy(() => import("@/pages/EmailModule"));
 const Proposals = lazy(() => import("@/pages/Proposals"));
 const ProposalBuilder = lazy(() => import("@/pages/ProposalBuilder"));
 const ProposalTemplates = lazy(() => import("@/pages/ProposalTemplates"));
+const ProposalTemplatePreview = lazy(() => import("@/pages/ProposalTemplatePreview"));
 const PublicProposalView = lazy(() => import("@/pages/PublicProposalView"));
 const USLanding = lazy(() => import("@/pages/GeoLanding").then(m => ({ default: m.USLanding })));
 const UKLanding = lazy(() => import("@/pages/GeoLanding").then(m => ({ default: m.UKLanding })));
@@ -139,6 +140,7 @@ function Router() {
         <Route path="/proposals/new">{() => <ProtectedPage component={ProposalBuilder} />}</Route>
         <Route path="/proposals/edit/:id">{() => <ProtectedPage component={ProposalBuilder} />}</Route>
         <Route path="/proposals/templates">{() => <ProtectedPage component={ProposalTemplates} />}</Route>
+        <Route path="/proposals/templates/:id">{() => <ProtectedPage component={ProposalTemplatePreview} />}</Route>
         <Route path="/proposal/view/:accessToken" component={PublicProposalView} />
         <Route path="/tasks">{() => <ProtectedPage component={Tasks} />}</Route>
         <Route path="/activities">{() => <ProtectedPage component={Activities} />}</Route>
