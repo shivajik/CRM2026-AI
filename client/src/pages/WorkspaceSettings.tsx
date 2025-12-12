@@ -105,12 +105,6 @@ export default function WorkspaceSettings() {
     enabled: !!user,
   });
 
-  const { data: companyProfile, isLoading: profileLoading } = useQuery({
-    queryKey: ["company-profile"],
-    queryFn: companyProfileApi.get,
-    enabled: !!user,
-  });
-
   const { data: workspacesData, isLoading: workspacesLoading } = useQuery<{ workspaces: any[]; activeWorkspaceId: string }>({
     queryKey: ["workspaces"],
     queryFn: workspacesApi.getAll,
@@ -121,6 +115,12 @@ export default function WorkspaceSettings() {
   const activeWorkspaceId = workspacesData?.activeWorkspaceId;
   const currentWorkspace = workspaces.find((w: any) => w.workspaceId === activeWorkspaceId) || workspaces[0];
   const workspaceId = currentWorkspace?.workspaceId;
+
+  const { data: companyProfile, isLoading: profileLoading } = useQuery({
+    queryKey: ["company-profile", activeWorkspaceId],
+    queryFn: companyProfileApi.get,
+    enabled: !!user && !!activeWorkspaceId,
+  });
 
   const { data: members = [], isLoading: membersLoading } = useQuery<WorkspaceMember[]>({
     queryKey: ["workspace-members", workspaceId],
@@ -137,7 +137,7 @@ export default function WorkspaceSettings() {
   const updateProfileMutation = useMutation({
     mutationFn: (data: any) => companyProfileApi.update(data),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["company-profile"] });
+      queryClient.invalidateQueries({ queryKey: ["company-profile", activeWorkspaceId] });
       toast({ title: "Workspace info updated successfully" });
     },
     onError: (error: Error) => {

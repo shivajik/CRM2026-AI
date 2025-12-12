@@ -678,13 +678,15 @@ export async function registerRoutes(
 
   // ==================== COMPANY PROFILE ROUTES ====================
   
-  app.get("/api/company-profile", requireAuth, validateTenant, async (req, res) => {
+  app.get("/api/company-profile", requireAuth, validateTenant, resolveWorkspaceContext, async (req, res) => {
     try {
-      const profile = await storage.getCompanyProfile(req.user!.tenantId);
+      // Use workspaceId when multi-workspace is enabled, otherwise fall back to tenantId
+      const workspaceId = req.workspaceId || req.user!.tenantId;
+      const profile = await storage.getCompanyProfile(workspaceId);
       if (!profile) {
-        const tenant = await storage.getTenant(req.user!.tenantId);
+        const tenant = await storage.getTenant(workspaceId);
         return res.json({
-          tenantId: req.user!.tenantId,
+          tenantId: workspaceId,
           companyName: tenant?.name || '',
           email: '',
           phone: '',
@@ -714,9 +716,11 @@ export async function registerRoutes(
     }
   });
 
-  app.put("/api/company-profile", requireAuth, validateTenant, requireAgencyAdmin, async (req, res) => {
+  app.put("/api/company-profile", requireAuth, validateTenant, resolveWorkspaceContext, requireAgencyAdmin, async (req, res) => {
     try {
-      const profile = await storage.upsertCompanyProfile(req.user!.tenantId, req.body);
+      // Use workspaceId when multi-workspace is enabled, otherwise fall back to tenantId
+      const workspaceId = req.workspaceId || req.user!.tenantId;
+      const profile = await storage.upsertCompanyProfile(workspaceId, req.body);
       res.json(profile);
     } catch (error) {
       console.error("Update company profile error:", error);
