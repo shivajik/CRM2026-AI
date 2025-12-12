@@ -169,7 +169,7 @@ export function WorkspaceSwitcher() {
           </DropdownMenuItem>
           
           <DropdownMenuItem
-            onClick={() => setLocation("/workspace-settings")}
+            onClick={() => setLocation("/settings/workspace")}
             className="flex items-center gap-2 cursor-pointer"
             data-testid="button-workspace-settings"
           >
