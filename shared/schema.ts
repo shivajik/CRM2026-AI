@@ -782,11 +782,15 @@ export type PackageModule = typeof packageModules.$inferSelect;
 
 // ==================== EMAIL COMMUNICATION MODULE ====================
 
-// Email Templates - reusable email templates
+// Email Templates - reusable email templates with ownership model
+// ownerType: 'system' (global, locked), 'workspace' (shared in workspace), 'user' (private unless shared)
 export const emailTemplates = pgTable("email_templates", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   tenantId: varchar("tenant_id").references(() => tenants.id, { onDelete: "cascade" }).notNull(),
   createdBy: varchar("created_by").references(() => users.id).notNull(),
+  ownerType: text("owner_type").notNull().default("user"), // system, workspace, user
+  ownerId: varchar("owner_id"), // user id for 'user' type, workspace id for 'workspace', null for 'system'
+  isShared: boolean("is_shared").default(false).notNull(), // user templates can be shared to workspace
   name: text("name").notNull(),
   purpose: text("purpose").notNull().default("custom"), // quotation, invoice, follow_up, meeting, payment_reminder, welcome, renewal, feedback, custom
   subject: text("subject").notNull(),
