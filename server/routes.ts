@@ -769,11 +769,11 @@ export async function registerRoutes(
   
   // ==================== CONTACT ROUTES ====================
   
-  app.get("/api/contacts", requireAuth, validateTenant, async (req, res) => {
+  app.get("/api/contacts", requireAuth, validateTenant, resolveWorkspaceContext, async (req, res) => {
     try {
       const userType = req.user!.userType;
       const ownerId = (userType === 'team_member' || userType === 'customer') ? req.user!.userId : undefined;
-      const contacts = await storage.getContactsByTenant(req.user!.tenantId, ownerId);
+      const contacts = await storage.getContactsByTenant(req.workspaceId!, ownerId);
       res.json(contacts);
     } catch (error) {
       console.error("Get contacts error:", error);
@@ -781,9 +781,9 @@ export async function registerRoutes(
     }
   });
   
-  app.get("/api/contacts/:id", requireAuth, validateTenant, async (req, res) => {
+  app.get("/api/contacts/:id", requireAuth, validateTenant, resolveWorkspaceContext, async (req, res) => {
     try {
-      const contact = await storage.getContactById(req.params.id, req.user!.tenantId);
+      const contact = await storage.getContactById(req.params.id, req.workspaceId!);
       if (!contact) {
         return res.status(404).json({ message: "Contact not found" });
       }
@@ -794,11 +794,11 @@ export async function registerRoutes(
     }
   });
   
-  app.post("/api/contacts", requireAuth, validateTenant, denyCustomerAccess, async (req, res) => {
+  app.post("/api/contacts", requireAuth, validateTenant, resolveWorkspaceContext, denyCustomerAccess, async (req, res) => {
     try {
       const validatedData = insertContactSchema.parse({
         ...req.body,
-        tenantId: req.user!.tenantId,
+        tenantId: req.workspaceId!,
         ownerId: req.user!.userId,
       });
       
@@ -813,9 +813,9 @@ export async function registerRoutes(
     }
   });
   
-  app.patch("/api/contacts/:id", requireAuth, validateTenant, denyCustomerAccess, async (req, res) => {
+  app.patch("/api/contacts/:id", requireAuth, validateTenant, resolveWorkspaceContext, denyCustomerAccess, async (req, res) => {
     try {
-      const contact = await storage.updateContact(req.params.id, req.user!.tenantId, req.body);
+      const contact = await storage.updateContact(req.params.id, req.workspaceId!, req.body);
       if (!contact) {
         return res.status(404).json({ message: "Contact not found" });
       }
@@ -826,9 +826,9 @@ export async function registerRoutes(
     }
   });
   
-  app.delete("/api/contacts/:id", requireAuth, validateTenant, denyCustomerAccess, async (req, res) => {
+  app.delete("/api/contacts/:id", requireAuth, validateTenant, resolveWorkspaceContext, denyCustomerAccess, async (req, res) => {
     try {
-      await storage.deleteContact(req.params.id, req.user!.tenantId);
+      await storage.deleteContact(req.params.id, req.workspaceId!);
       res.json({ message: "Contact deleted successfully" });
     } catch (error) {
       console.error("Delete contact error:", error);
@@ -838,11 +838,11 @@ export async function registerRoutes(
   
   // ==================== DEAL ROUTES ====================
   
-  app.get("/api/deals", requireAuth, validateTenant, async (req, res) => {
+  app.get("/api/deals", requireAuth, validateTenant, resolveWorkspaceContext, async (req, res) => {
     try {
       const userType = req.user!.userType;
       const ownerId = (userType === 'team_member' || userType === 'customer') ? req.user!.userId : undefined;
-      const deals = await storage.getDealsByTenant(req.user!.tenantId, ownerId);
+      const deals = await storage.getDealsByTenant(req.workspaceId!, ownerId);
       res.json(deals);
     } catch (error) {
       console.error("Get deals error:", error);
@@ -850,9 +850,9 @@ export async function registerRoutes(
     }
   });
   
-  app.get("/api/deals/:id", requireAuth, validateTenant, async (req, res) => {
+  app.get("/api/deals/:id", requireAuth, validateTenant, resolveWorkspaceContext, async (req, res) => {
     try {
-      const deal = await storage.getDealById(req.params.id, req.user!.tenantId);
+      const deal = await storage.getDealById(req.params.id, req.workspaceId!);
       if (!deal) {
         return res.status(404).json({ message: "Deal not found" });
       }
@@ -863,11 +863,11 @@ export async function registerRoutes(
     }
   });
   
-  app.post("/api/deals", requireAuth, validateTenant, denyCustomerAccess, async (req, res) => {
+  app.post("/api/deals", requireAuth, validateTenant, resolveWorkspaceContext, denyCustomerAccess, async (req, res) => {
     try {
       const validatedData = insertDealSchema.parse({
         ...req.body,
-        tenantId: req.user!.tenantId,
+        tenantId: req.workspaceId!,
         ownerId: req.user!.userId,
       });
       
@@ -882,9 +882,9 @@ export async function registerRoutes(
     }
   });
   
-  app.patch("/api/deals/:id", requireAuth, validateTenant, denyCustomerAccess, async (req, res) => {
+  app.patch("/api/deals/:id", requireAuth, validateTenant, resolveWorkspaceContext, denyCustomerAccess, async (req, res) => {
     try {
-      const deal = await storage.updateDeal(req.params.id, req.user!.tenantId, req.body);
+      const deal = await storage.updateDeal(req.params.id, req.workspaceId!, req.body);
       if (!deal) {
         return res.status(404).json({ message: "Deal not found" });
       }
@@ -895,9 +895,9 @@ export async function registerRoutes(
     }
   });
   
-  app.delete("/api/deals/:id", requireAuth, validateTenant, denyCustomerAccess, async (req, res) => {
+  app.delete("/api/deals/:id", requireAuth, validateTenant, resolveWorkspaceContext, denyCustomerAccess, async (req, res) => {
     try {
-      await storage.deleteDeal(req.params.id, req.user!.tenantId);
+      await storage.deleteDeal(req.params.id, req.workspaceId!);
       res.json({ message: "Deal deleted successfully" });
     } catch (error) {
       console.error("Delete deal error:", error);
@@ -906,9 +906,9 @@ export async function registerRoutes(
   });
 
   // Deal Journey - get all related data for a deal
-  app.get("/api/deals/:id/journey", requireAuth, validateTenant, async (req, res) => {
+  app.get("/api/deals/:id/journey", requireAuth, validateTenant, resolveWorkspaceContext, async (req, res) => {
     try {
-      const deal = await storage.getDealById(req.params.id, req.user!.tenantId);
+      const deal = await storage.getDealById(req.params.id, req.workspaceId!);
       if (!deal) {
         return res.status(404).json({ message: "Deal not found" });
       }
@@ -916,26 +916,26 @@ export async function registerRoutes(
       // Get customer if linked
       let customer = null;
       if (deal.customerId) {
-        customer = await storage.getCustomerById(deal.customerId, req.user!.tenantId);
+        customer = await storage.getCustomerById(deal.customerId, req.workspaceId!);
       }
       
       // Get contact if linked
       let contact = null;
       if (deal.contactId) {
-        contact = await storage.getContactById(deal.contactId, req.user!.tenantId);
+        contact = await storage.getContactById(deal.contactId, req.workspaceId!);
       }
       
       // Get related entities - scoped to deal
-      const activities = await storage.getActivitiesByDeal(req.params.id, req.user!.tenantId);
-      const tasks = await storage.getTasksByDeal(req.params.id, req.user!.tenantId);
+      const activities = await storage.getActivitiesByDeal(req.params.id, req.workspaceId!);
+      const tasks = await storage.getTasksByDeal(req.params.id, req.workspaceId!);
       
       // Get quotations and invoices linked to the customer (if exists)
       // These are customer-level as quotations/invoices are typically customer-scoped
       let quotations: any[] = [];
       let invoices: any[] = [];
       if (deal.customerId) {
-        quotations = await storage.getQuotationsByCustomer(deal.customerId, req.user!.tenantId);
-        invoices = await storage.getInvoicesByCustomer(deal.customerId, req.user!.tenantId);
+        quotations = await storage.getQuotationsByCustomer(deal.customerId, req.workspaceId!);
+        invoices = await storage.getInvoicesByCustomer(deal.customerId, req.workspaceId!);
       }
       
       // Build timeline events
@@ -1025,7 +1025,7 @@ export async function registerRoutes(
   
   // ==================== TASK ROUTES (Enhanced) ====================
   
-  app.get("/api/tasks", requireAuth, validateTenant, async (req, res) => {
+  app.get("/api/tasks", requireAuth, validateTenant, resolveWorkspaceContext, async (req, res) => {
     try {
       const userType = req.user!.userType;
       const filters: any = {};
@@ -1040,7 +1040,7 @@ export async function registerRoutes(
       if (req.query.dueFrom) filters.dueFrom = new Date(req.query.dueFrom as string);
       if (req.query.dueTo) filters.dueTo = new Date(req.query.dueTo as string);
 
-      const tasks = await storage.getTasksWithFilters(req.user!.tenantId, filters);
+      const tasks = await storage.getTasksWithFilters(req.workspaceId!, filters);
       res.json(tasks);
     } catch (error) {
       console.error("Get tasks error:", error);
@@ -1048,9 +1048,9 @@ export async function registerRoutes(
     }
   });
 
-  app.get("/api/tasks/analytics", requireAuth, validateTenant, denyCustomerAccess, async (req, res) => {
+  app.get("/api/tasks/analytics", requireAuth, validateTenant, resolveWorkspaceContext, denyCustomerAccess, async (req, res) => {
     try {
-      const analytics = await storage.getTaskAnalytics(req.user!.tenantId);
+      const analytics = await storage.getTaskAnalytics(req.workspaceId!);
       res.json(analytics);
     } catch (error) {
       console.error("Get task analytics error:", error);
@@ -1058,9 +1058,9 @@ export async function registerRoutes(
     }
   });
   
-  app.get("/api/tasks/:id", requireAuth, validateTenant, async (req, res) => {
+  app.get("/api/tasks/:id", requireAuth, validateTenant, resolveWorkspaceContext, async (req, res) => {
     try {
-      const task = await storage.getTaskById(req.params.id, req.user!.tenantId);
+      const task = await storage.getTaskById(req.params.id, req.workspaceId!);
       if (!task) {
         return res.status(404).json({ message: "Task not found" });
       }
@@ -1071,9 +1071,9 @@ export async function registerRoutes(
     }
   });
 
-  app.get("/api/tasks/:id/details", requireAuth, validateTenant, async (req, res) => {
+  app.get("/api/tasks/:id/details", requireAuth, validateTenant, resolveWorkspaceContext, async (req, res) => {
     try {
-      const task = await storage.getTaskWithDetails(req.params.id, req.user!.tenantId);
+      const task = await storage.getTaskWithDetails(req.params.id, req.workspaceId!);
       if (!task) {
         return res.status(404).json({ message: "Task not found" });
       }
@@ -1084,11 +1084,11 @@ export async function registerRoutes(
     }
   });
   
-  app.post("/api/tasks", requireAuth, validateTenant, denyCustomerAccess, async (req, res) => {
+  app.post("/api/tasks", requireAuth, validateTenant, resolveWorkspaceContext, denyCustomerAccess, async (req, res) => {
     try {
       const validatedData = insertTaskSchema.parse({
         ...req.body,
-        tenantId: req.user!.tenantId,
+        tenantId: req.workspaceId!,
         createdBy: req.user!.userId,
         assignedTo: req.body.assignedTo || null,
       });
@@ -1112,7 +1112,7 @@ export async function registerRoutes(
           
           if (userId !== req.user!.userId) {
             await storage.createTaskNotification({
-              tenantId: req.user!.tenantId,
+              tenantId: req.workspaceId!,
               recipientId: userId,
               taskId: task.id,
               actorId: req.user!.userId,
@@ -1144,9 +1144,9 @@ export async function registerRoutes(
     }
   });
   
-  app.patch("/api/tasks/:id", requireAuth, validateTenant, async (req, res) => {
+  app.patch("/api/tasks/:id", requireAuth, validateTenant, resolveWorkspaceContext, async (req, res) => {
     try {
-      const existingTask = await storage.getTaskById(req.params.id, req.user!.tenantId);
+      const existingTask = await storage.getTaskById(req.params.id, req.workspaceId!);
       if (!existingTask) {
         return res.status(404).json({ message: "Task not found" });
       }
@@ -1154,7 +1154,7 @@ export async function registerRoutes(
       if (req.body.status && req.body.status !== existingTask.status) {
         const task = await storage.updateTaskStatus(
           req.params.id, 
-          req.user!.tenantId, 
+          req.workspaceId!, 
           req.body.status, 
           req.user!.userId,
           req.body.statusNotes
@@ -1163,7 +1163,7 @@ export async function registerRoutes(
         const creator = existingTask.createdBy;
         if (creator && creator !== req.user!.userId) {
           await storage.createTaskNotification({
-            tenantId: req.user!.tenantId,
+            tenantId: req.workspaceId!,
             recipientId: creator,
             taskId: req.params.id,
             actorId: req.user!.userId,
@@ -1181,7 +1181,7 @@ export async function registerRoutes(
         }
       }
 
-      const task = await storage.updateTask(req.params.id, req.user!.tenantId, req.body);
+      const task = await storage.updateTask(req.params.id, req.workspaceId!, req.body);
       res.json(task);
     } catch (error) {
       console.error("Update task error:", error);
@@ -1189,9 +1189,9 @@ export async function registerRoutes(
     }
   });
   
-  app.delete("/api/tasks/:id", requireAuth, validateTenant, denyCustomerAccess, async (req, res) => {
+  app.delete("/api/tasks/:id", requireAuth, validateTenant, resolveWorkspaceContext, denyCustomerAccess, async (req, res) => {
     try {
-      await storage.deleteTask(req.params.id, req.user!.tenantId);
+      await storage.deleteTask(req.params.id, req.workspaceId!);
       res.json({ message: "Task deleted successfully" });
     } catch (error) {
       console.error("Delete task error:", error);
@@ -1200,7 +1200,7 @@ export async function registerRoutes(
   });
 
   // Task Assignments
-  app.get("/api/tasks/:id/assignments", requireAuth, validateTenant, async (req, res) => {
+  app.get("/api/tasks/:id/assignments", requireAuth, validateTenant, resolveWorkspaceContext, async (req, res) => {
     try {
       const assignments = await storage.getTaskAssignments(req.params.id);
       res.json(assignments);
@@ -1210,9 +1210,9 @@ export async function registerRoutes(
     }
   });
 
-  app.post("/api/tasks/:id/assignments", requireAuth, validateTenant, denyCustomerAccess, async (req, res) => {
+  app.post("/api/tasks/:id/assignments", requireAuth, validateTenant, resolveWorkspaceContext, denyCustomerAccess, async (req, res) => {
     try {
-      const task = await storage.getTaskById(req.params.id, req.user!.tenantId);
+      const task = await storage.getTaskById(req.params.id, req.workspaceId!);
       if (!task) {
         return res.status(404).json({ message: "Task not found" });
       }
@@ -1226,7 +1226,7 @@ export async function registerRoutes(
 
       if (req.body.userId !== req.user!.userId) {
         await storage.createTaskNotification({
-          tenantId: req.user!.tenantId,
+          tenantId: req.workspaceId!,
           recipientId: req.body.userId,
           taskId: req.params.id,
           actorId: req.user!.userId,
@@ -1254,7 +1254,7 @@ export async function registerRoutes(
   });
 
   // Task Comments
-  app.get("/api/tasks/:id/comments", requireAuth, validateTenant, async (req, res) => {
+  app.get("/api/tasks/:id/comments", requireAuth, validateTenant, resolveWorkspaceContext, async (req, res) => {
     try {
       const comments = await storage.getTaskComments(req.params.id);
       res.json(comments);
@@ -1264,9 +1264,9 @@ export async function registerRoutes(
     }
   });
 
-  app.post("/api/tasks/:id/comments", requireAuth, validateTenant, async (req, res) => {
+  app.post("/api/tasks/:id/comments", requireAuth, validateTenant, resolveWorkspaceContext, async (req, res) => {
     try {
-      const task = await storage.getTaskById(req.params.id, req.user!.tenantId);
+      const task = await storage.getTaskById(req.params.id, req.workspaceId!);
       if (!task) {
         return res.status(404).json({ message: "Task not found" });
       }
@@ -1282,7 +1282,7 @@ export async function registerRoutes(
       const creator = task.createdBy;
       if (creator && creator !== req.user!.userId) {
         await storage.createTaskNotification({
-          tenantId: req.user!.tenantId,
+          tenantId: req.workspaceId!,
           recipientId: creator,
           taskId: req.params.id,
           actorId: req.user!.userId,
@@ -1360,9 +1360,9 @@ export async function registerRoutes(
     }
   });
 
-  app.post("/api/tasks/:id/checklist/:itemId/toggle", requireAuth, validateTenant, async (req, res) => {
+  app.post("/api/tasks/:id/checklist/:itemId/toggle", requireAuth, validateTenant, resolveWorkspaceContext, async (req, res) => {
     try {
-      const task = await storage.getTaskById(req.params.id, req.user!.tenantId);
+      const task = await storage.getTaskById(req.params.id, req.workspaceId!);
       if (!task) {
         return res.status(404).json({ message: "Task not found" });
       }
@@ -1374,7 +1374,7 @@ export async function registerRoutes(
 
       if (item.isCompleted && task.createdBy && task.createdBy !== req.user!.userId) {
         await storage.createTaskNotification({
-          tenantId: req.user!.tenantId,
+          tenantId: req.workspaceId!,
           recipientId: task.createdBy,
           taskId: req.params.id,
           actorId: req.user!.userId,
@@ -1402,7 +1402,7 @@ export async function registerRoutes(
   });
 
   // Task Time Logs
-  app.get("/api/tasks/:id/timelogs", requireAuth, validateTenant, async (req, res) => {
+  app.get("/api/tasks/:id/timelogs", requireAuth, validateTenant, resolveWorkspaceContext, async (req, res) => {
     try {
       const timeLogs = await storage.getTaskTimeLogs(req.params.id);
       res.json(timeLogs);
@@ -1412,9 +1412,9 @@ export async function registerRoutes(
     }
   });
 
-  app.post("/api/tasks/:id/timelogs", requireAuth, validateTenant, async (req, res) => {
+  app.post("/api/tasks/:id/timelogs", requireAuth, validateTenant, resolveWorkspaceContext, async (req, res) => {
     try {
-      const task = await storage.getTaskById(req.params.id, req.user!.tenantId);
+      const task = await storage.getTaskById(req.params.id, req.workspaceId!);
       if (!task) {
         return res.status(404).json({ message: "Task not found" });
       }
@@ -1431,7 +1431,7 @@ export async function registerRoutes(
 
       if (task.createdBy && task.createdBy !== req.user!.userId) {
         await storage.createTaskNotification({
-          tenantId: req.user!.tenantId,
+          tenantId: req.workspaceId!,
           recipientId: task.createdBy,
           taskId: req.params.id,
           actorId: req.user!.userId,
@@ -1560,9 +1560,9 @@ export async function registerRoutes(
 
   // ==================== PRODUCT ROUTES ====================
   
-  app.get("/api/products", requireAuth, validateTenant, async (req, res) => {
+  app.get("/api/products", requireAuth, validateTenant, resolveWorkspaceContext, async (req, res) => {
     try {
-      const products = await storage.getProductsByTenant(req.user!.tenantId);
+      const products = await storage.getProductsByTenant(req.workspaceId!);
       res.json(products);
     } catch (error) {
       console.error("Get products error:", error);
@@ -1570,9 +1570,9 @@ export async function registerRoutes(
     }
   });
   
-  app.get("/api/products/:id", requireAuth, validateTenant, async (req, res) => {
+  app.get("/api/products/:id", requireAuth, validateTenant, resolveWorkspaceContext, async (req, res) => {
     try {
-      const product = await storage.getProductById(req.params.id, req.user!.tenantId);
+      const product = await storage.getProductById(req.params.id, req.workspaceId!);
       if (!product) {
         return res.status(404).json({ message: "Product not found" });
       }
@@ -1583,11 +1583,11 @@ export async function registerRoutes(
     }
   });
   
-  app.post("/api/products", requireAuth, validateTenant, async (req, res) => {
+  app.post("/api/products", requireAuth, validateTenant, resolveWorkspaceContext, async (req, res) => {
     try {
       const validatedData = insertProductSchema.parse({
         ...req.body,
-        tenantId: req.user!.tenantId,
+        tenantId: req.workspaceId!,
       });
       
       const product = await storage.createProduct(validatedData);
@@ -1601,9 +1601,9 @@ export async function registerRoutes(
     }
   });
   
-  app.patch("/api/products/:id", requireAuth, validateTenant, async (req, res) => {
+  app.patch("/api/products/:id", requireAuth, validateTenant, resolveWorkspaceContext, async (req, res) => {
     try {
-      const product = await storage.updateProduct(req.params.id, req.user!.tenantId, req.body);
+      const product = await storage.updateProduct(req.params.id, req.workspaceId!, req.body);
       if (!product) {
         return res.status(404).json({ message: "Product not found" });
       }
@@ -1614,9 +1614,9 @@ export async function registerRoutes(
     }
   });
   
-  app.delete("/api/products/:id", requireAuth, validateTenant, async (req, res) => {
+  app.delete("/api/products/:id", requireAuth, validateTenant, resolveWorkspaceContext, async (req, res) => {
     try {
-      await storage.deleteProduct(req.params.id, req.user!.tenantId);
+      await storage.deleteProduct(req.params.id, req.workspaceId!);
       res.json({ message: "Product deleted successfully" });
     } catch (error) {
       console.error("Delete product error:", error);
@@ -1626,11 +1626,11 @@ export async function registerRoutes(
 
   // ==================== CUSTOMER ROUTES ====================
   
-  app.get("/api/customers", requireAuth, validateTenant, async (req, res) => {
+  app.get("/api/customers", requireAuth, validateTenant, resolveWorkspaceContext, async (req, res) => {
     try {
       const userType = req.user!.userType;
       const ownerId = (userType === 'team_member' || userType === 'customer') ? req.user!.userId : undefined;
-      const customers = await storage.getCustomersByTenant(req.user!.tenantId, ownerId);
+      const customers = await storage.getCustomersByTenant(req.workspaceId!, ownerId);
       res.json(customers);
     } catch (error) {
       console.error("Get customers error:", error);
@@ -1638,9 +1638,9 @@ export async function registerRoutes(
     }
   });
   
-  app.get("/api/customers/:id", requireAuth, validateTenant, async (req, res) => {
+  app.get("/api/customers/:id", requireAuth, validateTenant, resolveWorkspaceContext, async (req, res) => {
     try {
-      const customer = await storage.getCustomerById(req.params.id, req.user!.tenantId);
+      const customer = await storage.getCustomerById(req.params.id, req.workspaceId!);
       if (!customer) {
         return res.status(404).json({ message: "Customer not found" });
       }
@@ -1651,11 +1651,11 @@ export async function registerRoutes(
     }
   });
   
-  app.post("/api/customers", requireAuth, validateTenant, async (req, res) => {
+  app.post("/api/customers", requireAuth, validateTenant, resolveWorkspaceContext, async (req, res) => {
     try {
       const validatedData = insertCustomerSchema.parse({
         ...req.body,
-        tenantId: req.user!.tenantId,
+        tenantId: req.workspaceId!,
         ownerId: req.user!.userId,
       });
       
@@ -1670,9 +1670,9 @@ export async function registerRoutes(
     }
   });
   
-  app.patch("/api/customers/:id", requireAuth, validateTenant, async (req, res) => {
+  app.patch("/api/customers/:id", requireAuth, validateTenant, resolveWorkspaceContext, async (req, res) => {
     try {
-      const customer = await storage.updateCustomer(req.params.id, req.user!.tenantId, req.body);
+      const customer = await storage.updateCustomer(req.params.id, req.workspaceId!, req.body);
       if (!customer) {
         return res.status(404).json({ message: "Customer not found" });
       }
@@ -1683,9 +1683,9 @@ export async function registerRoutes(
     }
   });
   
-  app.delete("/api/customers/:id", requireAuth, validateTenant, async (req, res) => {
+  app.delete("/api/customers/:id", requireAuth, validateTenant, resolveWorkspaceContext, async (req, res) => {
     try {
-      await storage.deleteCustomer(req.params.id, req.user!.tenantId);
+      await storage.deleteCustomer(req.params.id, req.workspaceId!);
       res.json({ message: "Customer deleted successfully" });
     } catch (error) {
       console.error("Delete customer error:", error);
@@ -1694,19 +1694,19 @@ export async function registerRoutes(
   });
 
   // Customer Journey - get all related data for a customer
-  app.get("/api/customers/:id/journey", requireAuth, validateTenant, async (req, res) => {
+  app.get("/api/customers/:id/journey", requireAuth, validateTenant, resolveWorkspaceContext, async (req, res) => {
     try {
-      const customer = await storage.getCustomerById(req.params.id, req.user!.tenantId);
+      const customer = await storage.getCustomerById(req.params.id, req.workspaceId!);
       if (!customer) {
         return res.status(404).json({ message: "Customer not found" });
       }
       
-      const contacts = await storage.getContactsByCustomer(req.params.id, req.user!.tenantId);
-      const deals = await storage.getDealsByCustomer(req.params.id, req.user!.tenantId);
-      const quotations = await storage.getQuotationsByCustomer(req.params.id, req.user!.tenantId);
-      const invoices = await storage.getInvoicesByCustomer(req.params.id, req.user!.tenantId);
-      const activities = await storage.getActivitiesByCustomer(req.params.id, req.user!.tenantId);
-      const tasks = await storage.getTasksByCustomer(req.params.id, req.user!.tenantId);
+      const contacts = await storage.getContactsByCustomer(req.params.id, req.workspaceId!);
+      const deals = await storage.getDealsByCustomer(req.params.id, req.workspaceId!);
+      const quotations = await storage.getQuotationsByCustomer(req.params.id, req.workspaceId!);
+      const invoices = await storage.getInvoicesByCustomer(req.params.id, req.workspaceId!);
+      const activities = await storage.getActivitiesByCustomer(req.params.id, req.workspaceId!);
+      const tasks = await storage.getTasksByCustomer(req.params.id, req.workspaceId!);
       
       // Build timeline events from all data
       const timelineEvents: any[] = [];
@@ -1813,11 +1813,11 @@ export async function registerRoutes(
 
   // ==================== QUOTATION ROUTES ====================
   
-  app.get("/api/quotations", requireAuth, validateTenant, async (req, res) => {
+  app.get("/api/quotations", requireAuth, validateTenant, resolveWorkspaceContext, async (req, res) => {
     try {
       const userType = req.user!.userType;
       const createdBy = userType === 'team_member' ? req.user!.userId : undefined;
-      const quotations = await storage.getQuotationsByTenant(req.user!.tenantId, createdBy);
+      const quotations = await storage.getQuotationsByTenant(req.workspaceId!, createdBy);
       res.json(quotations);
     } catch (error) {
       console.error("Get quotations error:", error);
@@ -1825,9 +1825,9 @@ export async function registerRoutes(
     }
   });
   
-  app.get("/api/quotations/:id", requireAuth, validateTenant, async (req, res) => {
+  app.get("/api/quotations/:id", requireAuth, validateTenant, resolveWorkspaceContext, async (req, res) => {
     try {
-      const quotation = await storage.getQuotationById(req.params.id, req.user!.tenantId);
+      const quotation = await storage.getQuotationById(req.params.id, req.workspaceId!);
       if (!quotation) {
         return res.status(404).json({ message: "Quotation not found" });
       }
@@ -1839,12 +1839,12 @@ export async function registerRoutes(
     }
   });
   
-  app.post("/api/quotations", requireAuth, validateTenant, async (req, res) => {
+  app.post("/api/quotations", requireAuth, validateTenant, resolveWorkspaceContext, async (req, res) => {
     try {
-      const quoteNumber = await storage.getNextQuoteNumber(req.user!.tenantId);
+      const quoteNumber = await storage.getNextQuoteNumber(req.workspaceId!);
       const validatedData = insertQuotationSchema.parse({
         ...req.body,
-        tenantId: req.user!.tenantId,
+        tenantId: req.workspaceId!,
         createdBy: req.user!.userId,
         quoteNumber,
       });
@@ -1871,9 +1871,9 @@ export async function registerRoutes(
     }
   });
   
-  app.patch("/api/quotations/:id", requireAuth, validateTenant, async (req, res) => {
+  app.patch("/api/quotations/:id", requireAuth, validateTenant, resolveWorkspaceContext, async (req, res) => {
     try {
-      const quotation = await storage.updateQuotation(req.params.id, req.user!.tenantId, req.body);
+      const quotation = await storage.updateQuotation(req.params.id, req.workspaceId!, req.body);
       if (!quotation) {
         return res.status(404).json({ message: "Quotation not found" });
       }
@@ -1896,9 +1896,9 @@ export async function registerRoutes(
     }
   });
   
-  app.delete("/api/quotations/:id", requireAuth, validateTenant, async (req, res) => {
+  app.delete("/api/quotations/:id", requireAuth, validateTenant, resolveWorkspaceContext, async (req, res) => {
     try {
-      await storage.deleteQuotation(req.params.id, req.user!.tenantId);
+      await storage.deleteQuotation(req.params.id, req.workspaceId!);
       res.json({ message: "Quotation deleted successfully" });
     } catch (error) {
       console.error("Delete quotation error:", error);
@@ -1908,11 +1908,11 @@ export async function registerRoutes(
 
   // ==================== INVOICE ROUTES ====================
   
-  app.get("/api/invoices", requireAuth, validateTenant, async (req, res) => {
+  app.get("/api/invoices", requireAuth, validateTenant, resolveWorkspaceContext, async (req, res) => {
     try {
       const userType = req.user!.userType;
       const createdBy = userType === 'team_member' ? req.user!.userId : undefined;
-      const invoices = await storage.getInvoicesByTenant(req.user!.tenantId, createdBy);
+      const invoices = await storage.getInvoicesByTenant(req.workspaceId!, createdBy);
       res.json(invoices);
     } catch (error) {
       console.error("Get invoices error:", error);
@@ -1920,9 +1920,9 @@ export async function registerRoutes(
     }
   });
   
-  app.get("/api/invoices/:id", requireAuth, validateTenant, async (req, res) => {
+  app.get("/api/invoices/:id", requireAuth, validateTenant, resolveWorkspaceContext, async (req, res) => {
     try {
-      const invoice = await storage.getInvoiceById(req.params.id, req.user!.tenantId);
+      const invoice = await storage.getInvoiceById(req.params.id, req.workspaceId!);
       if (!invoice) {
         return res.status(404).json({ message: "Invoice not found" });
       }
@@ -1935,12 +1935,12 @@ export async function registerRoutes(
     }
   });
   
-  app.post("/api/invoices", requireAuth, validateTenant, async (req, res) => {
+  app.post("/api/invoices", requireAuth, validateTenant, resolveWorkspaceContext, async (req, res) => {
     try {
-      const invoiceNumber = await storage.getNextInvoiceNumber(req.user!.tenantId);
+      const invoiceNumber = await storage.getNextInvoiceNumber(req.workspaceId!);
       const validatedData = insertInvoiceSchema.parse({
         ...req.body,
-        tenantId: req.user!.tenantId,
+        tenantId: req.workspaceId!,
         createdBy: req.user!.userId,
         invoiceNumber,
       });
@@ -1967,9 +1967,9 @@ export async function registerRoutes(
     }
   });
   
-  app.patch("/api/invoices/:id", requireAuth, validateTenant, async (req, res) => {
+  app.patch("/api/invoices/:id", requireAuth, validateTenant, resolveWorkspaceContext, async (req, res) => {
     try {
-      const invoice = await storage.updateInvoice(req.params.id, req.user!.tenantId, req.body);
+      const invoice = await storage.updateInvoice(req.params.id, req.workspaceId!, req.body);
       if (!invoice) {
         return res.status(404).json({ message: "Invoice not found" });
       }
@@ -1992,9 +1992,9 @@ export async function registerRoutes(
     }
   });
   
-  app.delete("/api/invoices/:id", requireAuth, validateTenant, async (req, res) => {
+  app.delete("/api/invoices/:id", requireAuth, validateTenant, resolveWorkspaceContext, async (req, res) => {
     try {
-      await storage.deleteInvoice(req.params.id, req.user!.tenantId);
+      await storage.deleteInvoice(req.params.id, req.workspaceId!);
       res.json({ message: "Invoice deleted successfully" });
     } catch (error) {
       console.error("Delete invoice error:", error);
@@ -2004,16 +2004,16 @@ export async function registerRoutes(
 
   // ==================== PAYMENT ROUTES ====================
   
-  app.post("/api/invoices/:invoiceId/payments", requireAuth, validateTenant, async (req, res) => {
+  app.post("/api/invoices/:invoiceId/payments", requireAuth, validateTenant, resolveWorkspaceContext, async (req, res) => {
     try {
-      const invoice = await storage.getInvoiceById(req.params.invoiceId, req.user!.tenantId);
+      const invoice = await storage.getInvoiceById(req.params.invoiceId, req.workspaceId!);
       if (!invoice) {
         return res.status(404).json({ message: "Invoice not found" });
       }
       
       const validatedData = insertPaymentSchema.parse({
         ...req.body,
-        tenantId: req.user!.tenantId,
+        tenantId: req.workspaceId!,
         invoiceId: invoice.id,
       });
       
@@ -2030,7 +2030,7 @@ export async function registerRoutes(
         status = "partial";
       }
       
-      await storage.updateInvoice(invoice.id, req.user!.tenantId, {
+      await storage.updateInvoice(invoice.id, req.workspaceId!, {
         paidAmount: String(totalPaid),
         balanceDue: String(balanceDue),
         status,
@@ -2048,14 +2048,14 @@ export async function registerRoutes(
 
   // ==================== ACTIVITY ROUTES ====================
   
-  app.get("/api/activities", requireAuth, validateTenant, async (req, res) => {
+  app.get("/api/activities", requireAuth, validateTenant, resolveWorkspaceContext, async (req, res) => {
     try {
       const { customerId } = req.query;
       let activities;
       if (customerId && typeof customerId === 'string') {
-        activities = await storage.getActivitiesByCustomer(customerId, req.user!.tenantId);
+        activities = await storage.getActivitiesByCustomer(customerId, req.workspaceId!);
       } else {
-        activities = await storage.getActivitiesByTenant(req.user!.tenantId);
+        activities = await storage.getActivitiesByTenant(req.workspaceId!);
       }
       res.json(activities);
     } catch (error) {
@@ -2064,9 +2064,9 @@ export async function registerRoutes(
     }
   });
   
-  app.get("/api/activities/:id", requireAuth, validateTenant, async (req, res) => {
+  app.get("/api/activities/:id", requireAuth, validateTenant, resolveWorkspaceContext, async (req, res) => {
     try {
-      const activity = await storage.getActivityById(req.params.id, req.user!.tenantId);
+      const activity = await storage.getActivityById(req.params.id, req.workspaceId!);
       if (!activity) {
         return res.status(404).json({ message: "Activity not found" });
       }
@@ -2077,11 +2077,11 @@ export async function registerRoutes(
     }
   });
   
-  app.post("/api/activities", requireAuth, validateTenant, async (req, res) => {
+  app.post("/api/activities", requireAuth, validateTenant, resolveWorkspaceContext, async (req, res) => {
     try {
       const validatedData = insertActivitySchema.parse({
         ...req.body,
-        tenantId: req.user!.tenantId,
+        tenantId: req.workspaceId!,
         userId: req.user!.userId,
       });
       
@@ -2096,9 +2096,9 @@ export async function registerRoutes(
     }
   });
   
-  app.patch("/api/activities/:id", requireAuth, validateTenant, async (req, res) => {
+  app.patch("/api/activities/:id", requireAuth, validateTenant, resolveWorkspaceContext, async (req, res) => {
     try {
-      const activity = await storage.updateActivity(req.params.id, req.user!.tenantId, req.body);
+      const activity = await storage.updateActivity(req.params.id, req.workspaceId!, req.body);
       if (!activity) {
         return res.status(404).json({ message: "Activity not found" });
       }
@@ -2109,9 +2109,9 @@ export async function registerRoutes(
     }
   });
   
-  app.delete("/api/activities/:id", requireAuth, validateTenant, async (req, res) => {
+  app.delete("/api/activities/:id", requireAuth, validateTenant, resolveWorkspaceContext, async (req, res) => {
     try {
-      await storage.deleteActivity(req.params.id, req.user!.tenantId);
+      await storage.deleteActivity(req.params.id, req.workspaceId!);
       res.json({ message: "Activity deleted successfully" });
     } catch (error) {
       console.error("Delete activity error:", error);
@@ -2121,9 +2121,9 @@ export async function registerRoutes(
 
   // ==================== REPORTS ROUTES ====================
   
-  app.get("/api/reports/dashboard", requireAuth, validateTenant, async (req, res) => {
+  app.get("/api/reports/dashboard", requireAuth, validateTenant, resolveWorkspaceContext, async (req, res) => {
     try {
-      const stats = await storage.getDashboardStats(req.user!.tenantId);
+      const stats = await storage.getDashboardStats(req.workspaceId!);
       res.json(stats);
     } catch (error) {
       console.error("Get dashboard stats error:", error);
@@ -2131,9 +2131,9 @@ export async function registerRoutes(
     }
   });
   
-  app.get("/api/reports/sales", requireAuth, validateTenant, async (req, res) => {
+  app.get("/api/reports/sales", requireAuth, validateTenant, resolveWorkspaceContext, async (req, res) => {
     try {
-      const deals = await storage.getSalesReport(req.user!.tenantId);
+      const deals = await storage.getSalesReport(req.workspaceId!);
       res.json(deals);
     } catch (error) {
       console.error("Get sales report error:", error);
@@ -3215,10 +3215,10 @@ export async function registerRoutes(
   // ==================== PROPOSAL BUILDER MODULE ====================
 
   // Get all proposals
-  app.get("/api/proposals", requireAuth, validateTenant, async (req, res) => {
+  app.get("/api/proposals", requireAuth, validateTenant, resolveWorkspaceContext, async (req, res) => {
     try {
       const { status, customerId, ownerId } = req.query;
-      const proposals = await storage.getProposalsByTenant(req.user!.tenantId, {
+      const proposals = await storage.getProposalsByTenant(req.workspaceId!, {
         status: status as string | undefined,
         customerId: customerId as string | undefined,
         ownerId: ownerId as string | undefined,
@@ -3231,9 +3231,9 @@ export async function registerRoutes(
   });
 
   // Get proposal analytics
-  app.get("/api/proposals/analytics", requireAuth, validateTenant, async (req, res) => {
+  app.get("/api/proposals/analytics", requireAuth, validateTenant, resolveWorkspaceContext, async (req, res) => {
     try {
-      const analytics = await storage.getProposalAnalytics(req.user!.tenantId);
+      const analytics = await storage.getProposalAnalytics(req.workspaceId!);
       res.json(analytics);
     } catch (error) {
       console.error("Get proposal analytics error:", error);
@@ -3242,9 +3242,9 @@ export async function registerRoutes(
   });
 
   // Get single proposal with details
-  app.get("/api/proposals/:id", requireAuth, validateTenant, async (req, res) => {
+  app.get("/api/proposals/:id", requireAuth, validateTenant, resolveWorkspaceContext, async (req, res) => {
     try {
-      const proposal = await storage.getProposalById(req.params.id, req.user!.tenantId);
+      const proposal = await storage.getProposalById(req.params.id, req.workspaceId!);
       if (!proposal) {
         return res.status(404).json({ message: "Proposal not found" });
       }
@@ -3255,7 +3255,7 @@ export async function registerRoutes(
       const activityLogs = await storage.getProposalActivityLogs(proposal.id);
       const comments = await storage.getProposalComments(proposal.id);
       const signatures = await storage.getProposalSignatures(proposal.id);
-      const customer = proposal.customerId ? await storage.getCustomerById(proposal.customerId, req.user!.tenantId) : null;
+      const customer = proposal.customerId ? await storage.getCustomerById(proposal.customerId, req.workspaceId!) : null;
       
       res.json({
         ...proposal,
@@ -3274,9 +3274,9 @@ export async function registerRoutes(
   });
 
   // Create new proposal
-  app.post("/api/proposals", requireAuth, validateTenant, async (req, res) => {
+  app.post("/api/proposals", requireAuth, validateTenant, resolveWorkspaceContext, async (req, res) => {
     try {
-      const proposalNumber = await storage.getNextProposalNumber(req.user!.tenantId);
+      const proposalNumber = await storage.getNextProposalNumber(req.workspaceId!);
       const { sections, pricingItems, ...proposalData } = req.body;
       
       // Handle date fields - convert strings to Date objects or null
@@ -3300,7 +3300,7 @@ export async function registerRoutes(
         ...proposalData,
         validUntil,
         expiresAt,
-        tenantId: req.user!.tenantId,
+        tenantId: req.workspaceId!,
         createdBy: req.user!.userId,
         ownerId: req.body.ownerId || req.user!.userId,
         proposalNumber,
@@ -3349,13 +3349,13 @@ export async function registerRoutes(
   });
 
   // Create proposal from template
-  app.post("/api/proposals/from-template/:templateId", requireAuth, validateTenant, async (req, res) => {
+  app.post("/api/proposals/from-template/:templateId", requireAuth, validateTenant, resolveWorkspaceContext, async (req, res) => {
     try {
-      const proposalNumber = await storage.getNextProposalNumber(req.user!.tenantId);
+      const proposalNumber = await storage.getNextProposalNumber(req.workspaceId!);
       
       const proposal = await storage.createProposalFromTemplate(req.params.templateId, {
         ...req.body,
-        tenantId: req.user!.tenantId,
+        tenantId: req.workspaceId!,
         createdBy: req.user!.userId,
         ownerId: req.body.ownerId || req.user!.userId,
         proposalNumber,
@@ -3381,7 +3381,7 @@ export async function registerRoutes(
   });
 
   // Update proposal
-  app.patch("/api/proposals/:id", requireAuth, validateTenant, async (req, res) => {
+  app.patch("/api/proposals/:id", requireAuth, validateTenant, resolveWorkspaceContext, async (req, res) => {
     try {
       // Filter out system-managed fields that shouldn't be updated directly
       const { id, createdAt, updatedAt, sections, pricingItems, versions, activityLogs, comments, signatures, customer, ...updates } = req.body;
@@ -3394,7 +3394,7 @@ export async function registerRoutes(
       if (updates.rejectedAt) updates.rejectedAt = new Date(updates.rejectedAt);
       if (updates.expiresAt) updates.expiresAt = new Date(updates.expiresAt);
       
-      const proposal = await storage.updateProposal(req.params.id, req.user!.tenantId, updates);
+      const proposal = await storage.updateProposal(req.params.id, req.workspaceId!, updates);
       if (!proposal) {
         return res.status(404).json({ message: "Proposal not found" });
       }
@@ -3414,12 +3414,12 @@ export async function registerRoutes(
   });
 
   // Update proposal status
-  app.patch("/api/proposals/:id/status", requireAuth, validateTenant, async (req, res) => {
+  app.patch("/api/proposals/:id/status", requireAuth, validateTenant, resolveWorkspaceContext, async (req, res) => {
     try {
       const { status, notes } = req.body;
       const proposal = await storage.updateProposalStatus(
         req.params.id, 
-        req.user!.tenantId, 
+        req.workspaceId!, 
         status, 
         req.user!.userId,
         notes
@@ -3437,12 +3437,12 @@ export async function registerRoutes(
   });
 
   // Send proposal (generate access token and update status)
-  app.post("/api/proposals/:id/send", requireAuth, validateTenant, async (req, res) => {
+  app.post("/api/proposals/:id/send", requireAuth, validateTenant, resolveWorkspaceContext, async (req, res) => {
     try {
-      const accessToken = await storage.generateProposalAccessToken(req.params.id, req.user!.tenantId);
+      const accessToken = await storage.generateProposalAccessToken(req.params.id, req.workspaceId!);
       const proposal = await storage.updateProposalStatus(
         req.params.id, 
-        req.user!.tenantId, 
+        req.workspaceId!, 
         'sent', 
         req.user!.userId,
         'Proposal sent to client'
@@ -3460,9 +3460,9 @@ export async function registerRoutes(
   });
 
   // Create proposal version (snapshot)
-  app.post("/api/proposals/:id/version", requireAuth, validateTenant, async (req, res) => {
+  app.post("/api/proposals/:id/version", requireAuth, validateTenant, resolveWorkspaceContext, async (req, res) => {
     try {
-      const proposal = await storage.getProposalById(req.params.id, req.user!.tenantId);
+      const proposal = await storage.getProposalById(req.params.id, req.workspaceId!);
       if (!proposal) {
         return res.status(404).json({ message: "Proposal not found" });
       }
@@ -3485,7 +3485,7 @@ export async function registerRoutes(
         changeNotes: req.body.notes || 'Version saved',
       });
       
-      await storage.updateProposal(proposal.id, req.user!.tenantId, {
+      await storage.updateProposal(proposal.id, req.workspaceId!, {
         currentVersion: proposal.currentVersion + 1,
       } as any);
       
@@ -3497,12 +3497,12 @@ export async function registerRoutes(
   });
 
   // Restore proposal version
-  app.post("/api/proposals/:id/restore/:versionId", requireAuth, validateTenant, async (req, res) => {
+  app.post("/api/proposals/:id/restore/:versionId", requireAuth, validateTenant, resolveWorkspaceContext, async (req, res) => {
     try {
       const proposal = await storage.restoreProposalVersion(
         req.params.id, 
         req.params.versionId, 
-        req.user!.tenantId, 
+        req.workspaceId!, 
         req.user!.userId
       );
       
@@ -3525,9 +3525,9 @@ export async function registerRoutes(
   });
 
   // Delete proposal
-  app.delete("/api/proposals/:id", requireAuth, validateTenant, async (req, res) => {
+  app.delete("/api/proposals/:id", requireAuth, validateTenant, resolveWorkspaceContext, async (req, res) => {
     try {
-      await storage.deleteProposal(req.params.id, req.user!.tenantId);
+      await storage.deleteProposal(req.params.id, req.workspaceId!);
       res.json({ message: "Proposal deleted successfully" });
     } catch (error) {
       console.error("Delete proposal error:", error);
@@ -3536,7 +3536,7 @@ export async function registerRoutes(
   });
 
   // Proposal Sections
-  app.post("/api/proposals/:proposalId/sections", requireAuth, validateTenant, async (req, res) => {
+  app.post("/api/proposals/:proposalId/sections", requireAuth, validateTenant, resolveWorkspaceContext, async (req, res) => {
     try {
       const section = await storage.createProposalSection({
         ...req.body,
@@ -3549,7 +3549,7 @@ export async function registerRoutes(
     }
   });
 
-  app.patch("/api/proposals/sections/:id", requireAuth, validateTenant, async (req, res) => {
+  app.patch("/api/proposals/sections/:id", requireAuth, validateTenant, resolveWorkspaceContext, async (req, res) => {
     try {
       const section = await storage.updateProposalSection(req.params.id, req.body);
       if (!section) {
@@ -3562,7 +3562,7 @@ export async function registerRoutes(
     }
   });
 
-  app.delete("/api/proposals/sections/:id", requireAuth, validateTenant, async (req, res) => {
+  app.delete("/api/proposals/sections/:id", requireAuth, validateTenant, resolveWorkspaceContext, async (req, res) => {
     try {
       await storage.deleteProposalSection(req.params.id);
       res.json({ message: "Section deleted successfully" });
@@ -3572,7 +3572,7 @@ export async function registerRoutes(
     }
   });
 
-  app.post("/api/proposals/:proposalId/sections/reorder", requireAuth, validateTenant, async (req, res) => {
+  app.post("/api/proposals/:proposalId/sections/reorder", requireAuth, validateTenant, resolveWorkspaceContext, async (req, res) => {
     try {
       const { sectionIds } = req.body;
       await storage.reorderProposalSections(req.params.proposalId, sectionIds);
@@ -3584,14 +3584,14 @@ export async function registerRoutes(
   });
 
   // Proposal Pricing Items
-  app.post("/api/proposals/:proposalId/pricing", requireAuth, validateTenant, async (req, res) => {
+  app.post("/api/proposals/:proposalId/pricing", requireAuth, validateTenant, resolveWorkspaceContext, async (req, res) => {
     try {
       const item = await storage.createProposalPricingItem({
         ...req.body,
         proposalId: req.params.proposalId,
       });
       
-      await storage.recalculateProposalTotals(req.params.proposalId, req.user!.tenantId);
+      await storage.recalculateProposalTotals(req.params.proposalId, req.workspaceId!);
       
       res.status(201).json(item);
     } catch (error) {
@@ -3600,7 +3600,7 @@ export async function registerRoutes(
     }
   });
 
-  app.patch("/api/proposals/pricing/:id", requireAuth, validateTenant, async (req, res) => {
+  app.patch("/api/proposals/pricing/:id", requireAuth, validateTenant, resolveWorkspaceContext, async (req, res) => {
     try {
       // Filter out system-managed fields that shouldn't be updated directly
       const { id, createdAt, proposalId, ...updates } = req.body;
@@ -3611,7 +3611,7 @@ export async function registerRoutes(
       }
       
       if (item.proposalId) {
-        await storage.recalculateProposalTotals(item.proposalId, req.user!.tenantId);
+        await storage.recalculateProposalTotals(item.proposalId, req.workspaceId!);
       }
       
       res.json(item);
@@ -3621,7 +3621,7 @@ export async function registerRoutes(
     }
   });
 
-  app.delete("/api/proposals/pricing/:id", requireAuth, validateTenant, async (req, res) => {
+  app.delete("/api/proposals/pricing/:id", requireAuth, validateTenant, resolveWorkspaceContext, async (req, res) => {
     try {
       await storage.deleteProposalPricingItem(req.params.id);
       res.json({ message: "Pricing item deleted successfully" });
@@ -3632,7 +3632,7 @@ export async function registerRoutes(
   });
 
   // Proposal Comments
-  app.post("/api/proposals/:proposalId/comments", requireAuth, validateTenant, async (req, res) => {
+  app.post("/api/proposals/:proposalId/comments", requireAuth, validateTenant, resolveWorkspaceContext, async (req, res) => {
     try {
       const comment = await storage.createProposalComment({
         ...req.body,
@@ -3646,7 +3646,7 @@ export async function registerRoutes(
     }
   });
 
-  app.patch("/api/proposals/comments/:id", requireAuth, validateTenant, async (req, res) => {
+  app.patch("/api/proposals/comments/:id", requireAuth, validateTenant, resolveWorkspaceContext, async (req, res) => {
     try {
       const comment = await storage.updateProposalComment(req.params.id, req.body);
       if (!comment) {
@@ -3659,7 +3659,7 @@ export async function registerRoutes(
     }
   });
 
-  app.delete("/api/proposals/comments/:id", requireAuth, validateTenant, async (req, res) => {
+  app.delete("/api/proposals/comments/:id", requireAuth, validateTenant, resolveWorkspaceContext, async (req, res) => {
     try {
       await storage.deleteProposalComment(req.params.id);
       res.json({ message: "Comment deleted successfully" });
@@ -3671,9 +3671,9 @@ export async function registerRoutes(
 
   // ==================== PROPOSAL TEMPLATES ====================
 
-  app.get("/api/proposal-templates", requireAuth, validateTenant, async (req, res) => {
+  app.get("/api/proposal-templates", requireAuth, validateTenant, resolveWorkspaceContext, async (req, res) => {
     try {
-      const templates = await storage.getProposalTemplatesByTenant(req.user!.tenantId);
+      const templates = await storage.getProposalTemplatesByTenant(req.workspaceId!);
       res.json(templates);
     } catch (error) {
       console.error("Get templates error:", error);
@@ -3681,9 +3681,9 @@ export async function registerRoutes(
     }
   });
 
-  app.get("/api/proposal-templates/:id", requireAuth, validateTenant, async (req, res) => {
+  app.get("/api/proposal-templates/:id", requireAuth, validateTenant, resolveWorkspaceContext, async (req, res) => {
     try {
-      const template = await storage.getProposalTemplateById(req.params.id, req.user!.tenantId);
+      const template = await storage.getProposalTemplateById(req.params.id, req.workspaceId!);
       if (!template) {
         return res.status(404).json({ message: "Template not found" });
       }
@@ -3696,11 +3696,11 @@ export async function registerRoutes(
     }
   });
 
-  app.post("/api/proposal-templates", requireAuth, validateTenant, requireAgencyAdmin, async (req, res) => {
+  app.post("/api/proposal-templates", requireAuth, validateTenant, resolveWorkspaceContext, requireAgencyAdmin, async (req, res) => {
     try {
       const template = await storage.createProposalTemplate({
         ...req.body,
-        tenantId: req.user!.tenantId,
+        tenantId: req.workspaceId!,
         createdBy: req.user!.userId,
       });
       res.status(201).json(template);
@@ -3710,9 +3710,9 @@ export async function registerRoutes(
     }
   });
 
-  app.patch("/api/proposal-templates/:id", requireAuth, validateTenant, requireAgencyAdmin, async (req, res) => {
+  app.patch("/api/proposal-templates/:id", requireAuth, validateTenant, resolveWorkspaceContext, requireAgencyAdmin, async (req, res) => {
     try {
-      const template = await storage.updateProposalTemplate(req.params.id, req.user!.tenantId, req.body);
+      const template = await storage.updateProposalTemplate(req.params.id, req.workspaceId!, req.body);
       if (!template) {
         return res.status(404).json({ message: "Template not found" });
       }
@@ -3723,11 +3723,11 @@ export async function registerRoutes(
     }
   });
 
-  app.post("/api/proposal-templates/:id/duplicate", requireAuth, validateTenant, requireAgencyAdmin, async (req, res) => {
+  app.post("/api/proposal-templates/:id/duplicate", requireAuth, validateTenant, resolveWorkspaceContext, requireAgencyAdmin, async (req, res) => {
     try {
       const template = await storage.duplicateProposalTemplate(
         req.params.id, 
-        req.user!.tenantId, 
+        req.workspaceId!, 
         req.user!.userId
       );
       if (!template) {
@@ -3740,9 +3740,9 @@ export async function registerRoutes(
     }
   });
 
-  app.delete("/api/proposal-templates/:id", requireAuth, validateTenant, requireAgencyAdmin, async (req, res) => {
+  app.delete("/api/proposal-templates/:id", requireAuth, validateTenant, resolveWorkspaceContext, requireAgencyAdmin, async (req, res) => {
     try {
-      await storage.deleteProposalTemplate(req.params.id, req.user!.tenantId);
+      await storage.deleteProposalTemplate(req.params.id, req.workspaceId!);
       res.json({ message: "Template deleted successfully" });
     } catch (error) {
       console.error("Delete template error:", error);
@@ -3751,7 +3751,7 @@ export async function registerRoutes(
   });
 
   // Template Sections
-  app.post("/api/proposal-templates/:templateId/sections", requireAuth, validateTenant, requireAgencyAdmin, async (req, res) => {
+  app.post("/api/proposal-templates/:templateId/sections", requireAuth, validateTenant, resolveWorkspaceContext, requireAgencyAdmin, async (req, res) => {
     try {
       const section = await storage.createTemplateSection({
         ...req.body,
@@ -3764,7 +3764,7 @@ export async function registerRoutes(
     }
   });
 
-  app.patch("/api/proposal-templates/sections/:id", requireAuth, validateTenant, requireAgencyAdmin, async (req, res) => {
+  app.patch("/api/proposal-templates/sections/:id", requireAuth, validateTenant, resolveWorkspaceContext, requireAgencyAdmin, async (req, res) => {
     try {
       const section = await storage.updateTemplateSection(req.params.id, req.body);
       if (!section) {
@@ -3777,7 +3777,7 @@ export async function registerRoutes(
     }
   });
 
-  app.delete("/api/proposal-templates/sections/:id", requireAuth, validateTenant, requireAgencyAdmin, async (req, res) => {
+  app.delete("/api/proposal-templates/sections/:id", requireAuth, validateTenant, resolveWorkspaceContext, requireAgencyAdmin, async (req, res) => {
     try {
       await storage.deleteTemplateSection(req.params.id);
       res.json({ message: "Section deleted successfully" });
@@ -3787,7 +3787,7 @@ export async function registerRoutes(
     }
   });
 
-  app.post("/api/proposal-templates/:templateId/sections/reorder", requireAuth, validateTenant, requireAgencyAdmin, async (req, res) => {
+  app.post("/api/proposal-templates/:templateId/sections/reorder", requireAuth, validateTenant, resolveWorkspaceContext, requireAgencyAdmin, async (req, res) => {
     try {
       const { sectionIds } = req.body;
       await storage.reorderTemplateSections(req.params.templateId, sectionIds);
