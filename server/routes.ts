@@ -2746,6 +2746,263 @@ export async function registerRoutes(
     }
   });
 
+  // Update customer profile
+  app.patch("/api/customer-portal/profile", requireAuth, async (req, res) => {
+    try {
+      if (req.user!.userType !== 'customer') {
+        return res.status(403).json({ message: "Customer access only" });
+      }
+      const { firstName, lastName, phone } = req.body;
+      const updated = await storage.updateUser(req.user!.userId, { firstName, lastName, phone });
+      if (!updated) {
+        return res.status(404).json({ message: "User not found" });
+      }
+      res.json({
+        id: updated.id,
+        email: updated.email,
+        firstName: updated.firstName,
+        lastName: updated.lastName,
+        phone: updated.phone,
+      });
+    } catch (error) {
+      console.error("Update customer profile error:", error);
+      res.status(500).json({ message: "Failed to update profile" });
+    }
+  });
+
+  // Get documents for customer
+  app.get("/api/customer-portal/documents", requireAuth, async (req, res) => {
+    try {
+      if (req.user!.userType !== 'customer') {
+        return res.status(403).json({ message: "Customer access only" });
+      }
+      const user = await storage.getUserById(req.user!.userId);
+      if (!user?.customerId) {
+        return res.json([]);
+      }
+      const documents = await storage.getClientDocuments(req.user!.tenantId, user.customerId);
+      res.json(documents.filter(d => d.isVisibleToClient));
+    } catch (error) {
+      console.error("Get customer documents error:", error);
+      res.status(500).json({ message: "Failed to fetch documents" });
+    }
+  });
+
+  // Get proposals for customer portal
+  app.get("/api/customer-portal/proposals", requireAuth, async (req, res) => {
+    try {
+      if (req.user!.userType !== 'customer') {
+        return res.status(403).json({ message: "Customer access only" });
+      }
+      const user = await storage.getUserById(req.user!.userId);
+      if (!user?.customerId) {
+        return res.json([]);
+      }
+      const proposals = await storage.getProposalsByCustomerForPortal(user.customerId, req.user!.tenantId);
+      res.json(proposals);
+    } catch (error) {
+      console.error("Get customer proposals error:", error);
+      res.status(500).json({ message: "Failed to fetch proposals" });
+    }
+  });
+
+  // Accept/Reject quotation
+  app.post("/api/customer-portal/quotations/:id/respond", requireAuth, async (req, res) => {
+    try {
+      if (req.user!.userType !== 'customer') {
+        return res.status(403).json({ message: "Customer access only" });
+      }
+      const { action, notes } = req.body;
+      if (!['accept', 'reject'].includes(action)) {
+        return res.status(400).json({ message: "Invalid action. Must be 'accept' or 'reject'" });
+      }
+      
+      const quotation = await storage.getQuotationById(req.params.id, req.user!.tenantId);
+      if (!quotation) {
+        return res.status(404).json({ message: "Quotation not found" });
+      }
+      
+      const newStatus = action === 'accept' ? 'accepted' : 'rejected';
+      const updated = await storage.updateQuotation(req.params.id, req.user!.tenantId, { 
+        status: newStatus,
+        notes: notes || quotation.notes
+      });
+
+      // Log activity
+      const user = await storage.getUserById(req.user!.userId);
+      if (user?.customerId) {
+        await storage.createPortalActivityLog({
+          workspaceId: req.user!.tenantId,
+          customerId: req.user!.userId,
+          action: action === 'accept' ? 'quotation_accepted' : 'quotation_rejected',
+          resourceType: 'quotation',
+          resourceId: req.params.id,
+          metadata: JSON.stringify({ notes })
+        });
+      }
+
+      res.json(updated);
+    } catch (error) {
+      console.error("Respond to quotation error:", error);
+      res.status(500).json({ message: "Failed to respond to quotation" });
+    }
+  });
+
+  // Accept/Reject proposal
+  app.post("/api/customer-portal/proposals/:id/respond", requireAuth, async (req, res) => {
+    try {
+      if (req.user!.userType !== 'customer') {
+        return res.status(403).json({ message: "Customer access only" });
+      }
+      const { action, notes, signatureData } = req.body;
+      if (!['accept', 'reject'].includes(action)) {
+        return res.status(400).json({ message: "Invalid action. Must be 'accept' or 'reject'" });
+      }
+      
+      const proposal = await storage.getProposalById(req.params.id, req.user!.tenantId);
+      if (!proposal) {
+        return res.status(404).json({ message: "Proposal not found" });
+      }
+      
+      const newStatus = action === 'accept' ? 'accepted' : 'rejected';
+      const updated = await storage.updateProposal(req.params.id, req.user!.tenantId, { 
+        status: newStatus,
+        clientAcceptedAt: action === 'accept' ? new Date() : undefined
+      });
+
+      // Log activity
+      await storage.createPortalActivityLog({
+        workspaceId: req.user!.tenantId,
+        customerId: req.user!.userId,
+        action: action === 'accept' ? 'proposal_accepted' : 'proposal_rejected',
+        resourceType: 'proposal',
+        resourceId: req.params.id,
+        metadata: JSON.stringify({ notes, signatureData })
+      });
+
+      res.json(updated);
+    } catch (error) {
+      console.error("Respond to proposal error:", error);
+      res.status(500).json({ message: "Failed to respond to proposal" });
+    }
+  });
+
+  // Get portal settings (for customer to see what's available)
+  app.get("/api/customer-portal/settings", requireAuth, async (req, res) => {
+    try {
+      if (req.user!.userType !== 'customer') {
+        return res.status(403).json({ message: "Customer access only" });
+      }
+      const settings = await storage.getCustomerPortalSettings(req.user!.tenantId);
+      if (!settings) {
+        return res.json({
+          portalEnabled: true,
+          showProposals: true,
+          showQuotations: true,
+          showInvoices: true,
+          showTasks: false,
+          showDocuments: false,
+          allowComments: true,
+          allowFileUploads: false,
+          allowOnlinePayments: false,
+          welcomeMessage: null
+        });
+      }
+      res.json(settings);
+    } catch (error) {
+      console.error("Get portal settings error:", error);
+      res.status(500).json({ message: "Failed to fetch portal settings" });
+    }
+  });
+
+  // Admin: Get/Update customer portal settings
+  app.get("/api/workspace/:workspaceId/portal-settings", requireAuth, validateTenant, resolveWorkspaceContext, async (req, res) => {
+    try {
+      const workspaceId = req.params.workspaceId || req.workspaceId || req.user!.tenantId;
+      const settings = await storage.getCustomerPortalSettings(workspaceId);
+      res.json(settings || {
+        portalEnabled: false,
+        showProposals: true,
+        showQuotations: true,
+        showInvoices: true,
+        showTasks: false,
+        showDocuments: false,
+        allowComments: true,
+        allowFileUploads: false,
+        allowOnlinePayments: false
+      });
+    } catch (error) {
+      console.error("Get portal settings error:", error);
+      res.status(500).json({ message: "Failed to fetch portal settings" });
+    }
+  });
+
+  app.put("/api/workspace/:workspaceId/portal-settings", requireAuth, validateTenant, resolveWorkspaceContext, async (req, res) => {
+    try {
+      const workspaceId = req.params.workspaceId || req.workspaceId || req.user!.tenantId;
+      const settings = await storage.upsertCustomerPortalSettings(workspaceId, req.body);
+      res.json(settings);
+    } catch (error) {
+      console.error("Update portal settings error:", error);
+      res.status(500).json({ message: "Failed to update portal settings" });
+    }
+  });
+
+  // Admin: Get portal activity logs
+  app.get("/api/workspace/:workspaceId/portal-activity", requireAuth, validateTenant, resolveWorkspaceContext, async (req, res) => {
+    try {
+      const workspaceId = req.params.workspaceId || req.workspaceId || req.user!.tenantId;
+      const { customerId, limit } = req.query;
+      const logs = await storage.getPortalActivityLogs(workspaceId, {
+        customerId: customerId as string,
+        limit: limit ? parseInt(limit as string) : undefined
+      });
+      res.json(logs);
+    } catch (error) {
+      console.error("Get portal activity logs error:", error);
+      res.status(500).json({ message: "Failed to fetch portal activity logs" });
+    }
+  });
+
+  // Admin: Manage client documents
+  app.post("/api/customers/:customerId/documents", requireAuth, validateTenant, resolveWorkspaceContext, async (req, res) => {
+    try {
+      const workspaceId = req.workspaceId || req.user!.tenantId;
+      const doc = await storage.createClientDocument({
+        tenantId: workspaceId,
+        customerId: req.params.customerId,
+        uploadedBy: req.user!.userId,
+        ...req.body
+      });
+      res.status(201).json(doc);
+    } catch (error) {
+      console.error("Create client document error:", error);
+      res.status(500).json({ message: "Failed to create document" });
+    }
+  });
+
+  app.get("/api/customers/:customerId/documents", requireAuth, validateTenant, resolveWorkspaceContext, async (req, res) => {
+    try {
+      const workspaceId = req.workspaceId || req.user!.tenantId;
+      const documents = await storage.getClientDocuments(workspaceId, req.params.customerId);
+      res.json(documents);
+    } catch (error) {
+      console.error("Get client documents error:", error);
+      res.status(500).json({ message: "Failed to fetch documents" });
+    }
+  });
+
+  app.delete("/api/customers/:customerId/documents/:docId", requireAuth, validateTenant, resolveWorkspaceContext, async (req, res) => {
+    try {
+      const workspaceId = req.workspaceId || req.user!.tenantId;
+      await storage.deleteClientDocument(req.params.docId, workspaceId);
+      res.status(204).send();
+    } catch (error) {
+      console.error("Delete client document error:", error);
+      res.status(500).json({ message: "Failed to delete document" });
+    }
+  });
+
   // ==================== EMAIL MODULE ROUTES ====================
 
   // Email Templates
