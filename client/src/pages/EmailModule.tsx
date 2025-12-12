@@ -18,7 +18,8 @@ import { emailApi, customersApi } from "@/lib/api";
 import { 
   Mail, FileText, Zap, RefreshCw, Clock, Send, Plus, Trash2, Edit, Eye, 
   Wand2, Copy, ChevronRight, CheckCircle, XCircle, Clock3, AlertCircle,
-  Users, Building2, FileCheck, Receipt, Calendar, ChevronUp, ChevronDown
+  Users, Building2, FileCheck, Receipt, Calendar, ChevronUp, ChevronDown,
+  Lock, Share2, User, Globe, Layers
 } from "lucide-react";
 import { format } from "date-fns";
 
@@ -33,6 +34,17 @@ type EmailTemplate = {
   defaultFor: string | null;
   isActive: boolean;
   createdAt: string;
+  ownerType?: 'system' | 'workspace' | 'user';
+  ownerId?: string | null;
+  isShared?: boolean;
+  createdBy?: string;
+};
+
+type GroupedTemplates = {
+  userTemplates: EmailTemplate[];
+  sharedTemplates: EmailTemplate[];
+  workspaceTemplates: EmailTemplate[];
+  systemTemplates: EmailTemplate[];
 };
 
 type EmailLog = {
@@ -203,6 +215,11 @@ export default function EmailModule() {
     queryFn: emailApi.getTemplates,
   });
 
+  const { data: groupedTemplates } = useQuery<GroupedTemplates>({
+    queryKey: ["emailTemplatesGrouped"],
+    queryFn: emailApi.getTemplatesGrouped,
+  });
+
   const { data: logs = [] } = useQuery<EmailLog[]>({
     queryKey: ["emailLogs"],
     queryFn: emailApi.getLogs,
@@ -267,6 +284,32 @@ export default function EmailModule() {
     onSuccess: () => {
       toast({ title: "Template deleted successfully" });
       queryClient.invalidateQueries({ queryKey: ["emailTemplates"] });
+      queryClient.invalidateQueries({ queryKey: ["emailTemplatesGrouped"] });
+    },
+  });
+
+  const duplicateTemplateMutation = useMutation({
+    mutationFn: (id: string) => emailApi.duplicateTemplate(id),
+    onSuccess: () => {
+      toast({ title: "Template duplicated to your personal templates" });
+      queryClient.invalidateQueries({ queryKey: ["emailTemplates"] });
+      queryClient.invalidateQueries({ queryKey: ["emailTemplatesGrouped"] });
+    },
+    onError: () => {
+      toast({ title: "Failed to duplicate template", variant: "destructive" });
+    },
+  });
+
+  const shareTemplateMutation = useMutation({
+    mutationFn: ({ id, isShared }: { id: string; isShared: boolean }) => 
+      emailApi.shareTemplate(id, isShared),
+    onSuccess: (_, variables) => {
+      toast({ title: variables.isShared ? "Template shared with team" : "Template made private" });
+      queryClient.invalidateQueries({ queryKey: ["emailTemplates"] });
+      queryClient.invalidateQueries({ queryKey: ["emailTemplatesGrouped"] });
+    },
+    onError: () => {
+      toast({ title: "Failed to update sharing settings", variant: "destructive" });
     },
   });
 
@@ -752,7 +795,7 @@ export default function EmailModule() {
               <CardHeader className="flex flex-row items-center justify-between">
                 <div>
                   <CardTitle>Email Templates</CardTitle>
-                  <CardDescription>Create and manage reusable email templates</CardDescription>
+                  <CardDescription>Create and manage reusable email templates organized by ownership</CardDescription>
                 </div>
                 <Dialog open={templateDialogOpen} onOpenChange={(open) => { setTemplateDialogOpen(open); if (!open) resetTemplateForm(); }}>
                   <DialogTrigger asChild>
@@ -844,44 +887,214 @@ export default function EmailModule() {
                 </Dialog>
               </CardHeader>
               <CardContent>
-                {templates.length === 0 ? (
+                {!groupedTemplates || (groupedTemplates.userTemplates.length === 0 && groupedTemplates.sharedTemplates.length === 0 && groupedTemplates.workspaceTemplates.length === 0 && groupedTemplates.systemTemplates.length === 0) ? (
                   <div className="text-center py-12 text-muted-foreground">
                     <FileText className="w-12 h-12 mx-auto mb-4 opacity-50" />
                     <p>No templates yet. Create your first email template to get started.</p>
                   </div>
                 ) : (
-                  <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-                    {templates.map((template) => (
-                      <Card key={template.id} className="relative" data-testid={`card-template-${template.id}`}>
-                        <CardHeader className="pb-2">
-                          <div className="flex items-start justify-between">
-                            <div>
-                              <CardTitle className="text-base">{template.name}</CardTitle>
-                              <Badge variant="outline" className="mt-1">
-                                {purposeOptions.find(p => p.value === template.purpose)?.label || template.purpose}
-                              </Badge>
-                            </div>
-                            {template.isDefault && (
-                              <Badge className="bg-primary">Default</Badge>
-                            )}
-                          </div>
-                        </CardHeader>
-                        <CardContent className="pb-2">
-                          <p className="text-sm text-muted-foreground line-clamp-2">{template.subject}</p>
-                        </CardContent>
-                        <div className="p-4 pt-0 flex gap-2">
-                          <Button variant="ghost" size="sm" onClick={() => handleEditTemplate(template)} data-testid={`button-edit-template-${template.id}`}>
-                            <Edit className="w-4 h-4" />
-                          </Button>
-                          <Button variant="ghost" size="sm" onClick={() => { setPreviewContent({ subject: template.subject, body: template.body }); setPreviewDialogOpen(true); }} data-testid={`button-preview-template-${template.id}`}>
-                            <Eye className="w-4 h-4" />
-                          </Button>
-                          <Button variant="ghost" size="sm" className="text-destructive" onClick={() => deleteTemplateMutation.mutate(template.id)} data-testid={`button-delete-template-${template.id}`}>
-                            <Trash2 className="w-4 h-4" />
-                          </Button>
+                  <div className="space-y-8">
+                    {/* MY TEMPLATES */}
+                    {(groupedTemplates?.userTemplates?.length ?? 0) > 0 && (
+                      <div>
+                        <div className="flex items-center gap-2 mb-4">
+                          <User className="w-5 h-5 text-blue-500" />
+                          <h3 className="font-semibold text-lg">My Templates</h3>
+                          <Badge variant="secondary" className="ml-2">{groupedTemplates.userTemplates.length}</Badge>
                         </div>
-                      </Card>
-                    ))}
+                        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+                          {groupedTemplates.userTemplates.map((template) => (
+                            <Card key={template.id} className="relative border-blue-200 dark:border-blue-800" data-testid={`card-template-${template.id}`}>
+                              <CardHeader className="pb-2">
+                                <div className="flex items-start justify-between">
+                                  <div>
+                                    <CardTitle className="text-base">{template.name}</CardTitle>
+                                    <Badge variant="outline" className="mt-1">
+                                      {purposeOptions.find(p => p.value === template.purpose)?.label || template.purpose}
+                                    </Badge>
+                                  </div>
+                                  <div className="flex items-center gap-1">
+                                    {template.isDefault && <Badge className="bg-primary">Default</Badge>}
+                                  </div>
+                                </div>
+                              </CardHeader>
+                              <CardContent className="pb-2">
+                                <p className="text-sm text-muted-foreground line-clamp-2">{template.subject}</p>
+                              </CardContent>
+                              <div className="p-4 pt-0 flex gap-2 flex-wrap">
+                                <Button variant="ghost" size="sm" onClick={() => handleEditTemplate(template)} data-testid={`button-edit-template-${template.id}`}>
+                                  <Edit className="w-4 h-4" />
+                                </Button>
+                                <Button variant="ghost" size="sm" onClick={() => { setPreviewContent({ subject: template.subject, body: template.body }); setPreviewDialogOpen(true); }} data-testid={`button-preview-template-${template.id}`}>
+                                  <Eye className="w-4 h-4" />
+                                </Button>
+                                <Button 
+                                  variant="ghost" 
+                                  size="sm" 
+                                  onClick={() => shareTemplateMutation.mutate({ id: template.id, isShared: !template.isShared })}
+                                  className={template.isShared ? "text-green-600" : ""}
+                                  title={template.isShared ? "Shared with team - click to make private" : "Private - click to share"}
+                                  data-testid={`button-share-template-${template.id}`}
+                                >
+                                  <Share2 className="w-4 h-4" />
+                                </Button>
+                                <Button variant="ghost" size="sm" className="text-destructive" onClick={() => deleteTemplateMutation.mutate(template.id)} data-testid={`button-delete-template-${template.id}`}>
+                                  <Trash2 className="w-4 h-4" />
+                                </Button>
+                              </div>
+                            </Card>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+
+                    {/* SHARED TEMPLATES */}
+                    {(groupedTemplates?.sharedTemplates?.length ?? 0) > 0 && (
+                      <div>
+                        <div className="flex items-center gap-2 mb-4">
+                          <Share2 className="w-5 h-5 text-green-500" />
+                          <h3 className="font-semibold text-lg">Shared by Team</h3>
+                          <Badge variant="secondary" className="ml-2">{groupedTemplates.sharedTemplates.length}</Badge>
+                        </div>
+                        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+                          {groupedTemplates.sharedTemplates.map((template) => (
+                            <Card key={template.id} className="relative border-green-200 dark:border-green-800" data-testid={`card-template-${template.id}`}>
+                              <CardHeader className="pb-2">
+                                <div className="flex items-start justify-between">
+                                  <div>
+                                    <CardTitle className="text-base">{template.name}</CardTitle>
+                                    <Badge variant="outline" className="mt-1">
+                                      {purposeOptions.find(p => p.value === template.purpose)?.label || template.purpose}
+                                    </Badge>
+                                  </div>
+                                  <Badge variant="secondary" className="bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200">
+                                    <Share2 className="w-3 h-3 mr-1" /> Shared
+                                  </Badge>
+                                </div>
+                              </CardHeader>
+                              <CardContent className="pb-2">
+                                <p className="text-sm text-muted-foreground line-clamp-2">{template.subject}</p>
+                              </CardContent>
+                              <div className="p-4 pt-0 flex gap-2">
+                                <Button variant="ghost" size="sm" onClick={() => { setPreviewContent({ subject: template.subject, body: template.body }); setPreviewDialogOpen(true); }} data-testid={`button-preview-template-${template.id}`}>
+                                  <Eye className="w-4 h-4" />
+                                </Button>
+                                <Button 
+                                  variant="ghost" 
+                                  size="sm" 
+                                  onClick={() => duplicateTemplateMutation.mutate(template.id)}
+                                  title="Copy to my templates"
+                                  data-testid={`button-duplicate-template-${template.id}`}
+                                >
+                                  <Copy className="w-4 h-4" />
+                                </Button>
+                              </div>
+                            </Card>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+
+                    {/* WORKSPACE TEMPLATES */}
+                    {(groupedTemplates?.workspaceTemplates?.length ?? 0) > 0 && (
+                      <div>
+                        <div className="flex items-center gap-2 mb-4">
+                          <Building2 className="w-5 h-5 text-purple-500" />
+                          <h3 className="font-semibold text-lg">Workspace Templates</h3>
+                          <Badge variant="secondary" className="ml-2">{groupedTemplates.workspaceTemplates.length}</Badge>
+                        </div>
+                        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+                          {groupedTemplates.workspaceTemplates.map((template) => (
+                            <Card key={template.id} className="relative border-purple-200 dark:border-purple-800" data-testid={`card-template-${template.id}`}>
+                              <CardHeader className="pb-2">
+                                <div className="flex items-start justify-between">
+                                  <div>
+                                    <CardTitle className="text-base">{template.name}</CardTitle>
+                                    <Badge variant="outline" className="mt-1">
+                                      {purposeOptions.find(p => p.value === template.purpose)?.label || template.purpose}
+                                    </Badge>
+                                  </div>
+                                  <Badge variant="secondary" className="bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-200">
+                                    <Building2 className="w-3 h-3 mr-1" /> Workspace
+                                  </Badge>
+                                </div>
+                              </CardHeader>
+                              <CardContent className="pb-2">
+                                <p className="text-sm text-muted-foreground line-clamp-2">{template.subject}</p>
+                              </CardContent>
+                              <div className="p-4 pt-0 flex gap-2">
+                                <Button variant="ghost" size="sm" onClick={() => handleEditTemplate(template)} data-testid={`button-edit-template-${template.id}`}>
+                                  <Edit className="w-4 h-4" />
+                                </Button>
+                                <Button variant="ghost" size="sm" onClick={() => { setPreviewContent({ subject: template.subject, body: template.body }); setPreviewDialogOpen(true); }} data-testid={`button-preview-template-${template.id}`}>
+                                  <Eye className="w-4 h-4" />
+                                </Button>
+                                <Button 
+                                  variant="ghost" 
+                                  size="sm" 
+                                  onClick={() => duplicateTemplateMutation.mutate(template.id)}
+                                  title="Copy to my templates"
+                                  data-testid={`button-duplicate-template-${template.id}`}
+                                >
+                                  <Copy className="w-4 h-4" />
+                                </Button>
+                              </div>
+                            </Card>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+
+                    {/* SYSTEM TEMPLATES */}
+                    {(groupedTemplates?.systemTemplates?.length ?? 0) > 0 && (
+                      <div>
+                        <div className="flex items-center gap-2 mb-4">
+                          <Globe className="w-5 h-5 text-gray-500" />
+                          <h3 className="font-semibold text-lg">System Templates</h3>
+                          <Badge variant="secondary" className="ml-2">{groupedTemplates.systemTemplates.length}</Badge>
+                          <Lock className="w-4 h-4 text-muted-foreground ml-1" title="Read-only" />
+                        </div>
+                        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+                          {groupedTemplates.systemTemplates.map((template) => (
+                            <Card key={template.id} className="relative border-gray-200 dark:border-gray-700 bg-gray-50/50 dark:bg-gray-900/50" data-testid={`card-template-${template.id}`}>
+                              <CardHeader className="pb-2">
+                                <div className="flex items-start justify-between">
+                                  <div>
+                                    <CardTitle className="text-base flex items-center gap-2">
+                                      {template.name}
+                                      <Lock className="w-3 h-3 text-muted-foreground" />
+                                    </CardTitle>
+                                    <Badge variant="outline" className="mt-1">
+                                      {purposeOptions.find(p => p.value === template.purpose)?.label || template.purpose}
+                                    </Badge>
+                                  </div>
+                                  <Badge variant="secondary" className="bg-gray-100 text-gray-800 dark:bg-gray-800 dark:text-gray-200">
+                                    <Globe className="w-3 h-3 mr-1" /> System
+                                  </Badge>
+                                </div>
+                              </CardHeader>
+                              <CardContent className="pb-2">
+                                <p className="text-sm text-muted-foreground line-clamp-2">{template.subject}</p>
+                              </CardContent>
+                              <div className="p-4 pt-0 flex gap-2">
+                                <Button variant="ghost" size="sm" onClick={() => { setPreviewContent({ subject: template.subject, body: template.body }); setPreviewDialogOpen(true); }} data-testid={`button-preview-template-${template.id}`}>
+                                  <Eye className="w-4 h-4" />
+                                </Button>
+                                <Button 
+                                  variant="ghost" 
+                                  size="sm" 
+                                  onClick={() => duplicateTemplateMutation.mutate(template.id)}
+                                  title="Copy to my templates for editing"
+                                  data-testid={`button-duplicate-template-${template.id}`}
+                                >
+                                  <Copy className="w-4 h-4" />
+                                </Button>
+                              </div>
+                            </Card>
+                          ))}
+                        </div>
+                      </div>
+                    )}
                   </div>
                 )}
               </CardContent>
