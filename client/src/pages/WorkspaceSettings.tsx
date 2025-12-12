@@ -118,7 +118,8 @@ export default function WorkspaceSettings() {
   });
 
   const workspaces = workspacesData?.workspaces || [];
-  const currentWorkspace = workspaces.find((w: any) => w.isPrimary) || workspaces[0];
+  const activeWorkspaceId = workspacesData?.activeWorkspaceId;
+  const currentWorkspace = workspaces.find((w: any) => w.workspaceId === activeWorkspaceId) || workspaces[0];
   const workspaceId = currentWorkspace?.workspaceId;
 
   const { data: members = [], isLoading: membersLoading } = useQuery<WorkspaceMember[]>({
