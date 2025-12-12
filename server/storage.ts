@@ -4008,6 +4008,137 @@ export class DatabaseStorage implements IStorage {
     const attempts = await this.getRecentLoginAttempts(email, minutes);
     return attempts.filter(a => !a.success).length;
   }
+
+  // ==================== MODULE 7: CUSTOMER PORTAL OPERATIONS ====================
+
+  async getCustomerPortalSettings(workspaceId: string): Promise<CustomerPortalSettings | undefined> {
+    const [settings] = await db.select()
+      .from(schema.customerPortalSettings)
+      .where(eq(schema.customerPortalSettings.workspaceId, workspaceId));
+    return settings;
+  }
+
+  async upsertCustomerPortalSettings(workspaceId: string, data: Partial<InsertCustomerPortalSettings>): Promise<CustomerPortalSettings> {
+    const existing = await this.getCustomerPortalSettings(workspaceId);
+    
+    if (existing) {
+      const [updated] = await db.update(schema.customerPortalSettings)
+        .set({ ...data, updatedAt: new Date() })
+        .where(eq(schema.customerPortalSettings.workspaceId, workspaceId))
+        .returning();
+      return updated;
+    }
+    
+    const [created] = await db.insert(schema.customerPortalSettings)
+      .values({ workspaceId, ...data })
+      .returning();
+    return created;
+  }
+
+  async createPortalActivityLog(log: InsertCustomerPortalActivityLog): Promise<CustomerPortalActivityLog> {
+    const [created] = await db.insert(schema.customerPortalActivityLogs)
+      .values(log)
+      .returning();
+    return created;
+  }
+
+  async getPortalActivityLogs(workspaceId: string, options?: { customerId?: string; limit?: number }): Promise<CustomerPortalActivityLog[]> {
+    const conditions = [eq(schema.customerPortalActivityLogs.workspaceId, workspaceId)];
+    
+    if (options?.customerId) {
+      conditions.push(eq(schema.customerPortalActivityLogs.customerId, options.customerId));
+    }
+    
+    return db.select()
+      .from(schema.customerPortalActivityLogs)
+      .where(and(...conditions))
+      .orderBy(desc(schema.customerPortalActivityLogs.createdAt))
+      .limit(options?.limit || 100);
+  }
+
+  async createPasswordResetToken(data: InsertPasswordResetToken): Promise<PasswordResetToken> {
+    const [created] = await db.insert(schema.passwordResetTokens)
+      .values(data)
+      .returning();
+    return created;
+  }
+
+  async getPasswordResetToken(token: string): Promise<PasswordResetToken | undefined> {
+    const [result] = await db.select()
+      .from(schema.passwordResetTokens)
+      .where(and(
+        eq(schema.passwordResetTokens.token, token),
+        isNull(schema.passwordResetTokens.usedAt),
+        gte(schema.passwordResetTokens.expiresAt, new Date())
+      ));
+    return result;
+  }
+
+  async markPasswordResetTokenUsed(id: string): Promise<void> {
+    await db.update(schema.passwordResetTokens)
+      .set({ usedAt: new Date() })
+      .where(eq(schema.passwordResetTokens.id, id));
+  }
+
+  async createClientDocument(doc: InsertClientDocument): Promise<ClientDocument> {
+    const [created] = await db.insert(schema.clientDocuments)
+      .values(doc)
+      .returning();
+    return created;
+  }
+
+  async getClientDocuments(tenantId: string, customerId: string): Promise<ClientDocument[]> {
+    return db.select()
+      .from(schema.clientDocuments)
+      .where(and(
+        eq(schema.clientDocuments.tenantId, tenantId),
+        eq(schema.clientDocuments.customerId, customerId)
+      ))
+      .orderBy(desc(schema.clientDocuments.createdAt));
+  }
+
+  async getClientDocumentById(id: string, tenantId: string): Promise<ClientDocument | undefined> {
+    const [doc] = await db.select()
+      .from(schema.clientDocuments)
+      .where(and(
+        eq(schema.clientDocuments.id, id),
+        eq(schema.clientDocuments.tenantId, tenantId)
+      ));
+    return doc;
+  }
+
+  async deleteClientDocument(id: string, tenantId: string): Promise<void> {
+    await db.delete(schema.clientDocuments)
+      .where(and(
+        eq(schema.clientDocuments.id, id),
+        eq(schema.clientDocuments.tenantId, tenantId)
+      ));
+  }
+
+  async getProposalsByCustomerForPortal(customerId: string, tenantId: string): Promise<schema.Proposal[]> {
+    return db.select()
+      .from(schema.proposals)
+      .where(and(
+        eq(schema.proposals.tenantId, tenantId),
+        eq(schema.proposals.customerId, customerId),
+        or(
+          eq(schema.proposals.status, 'sent'),
+          eq(schema.proposals.status, 'accepted'),
+          eq(schema.proposals.status, 'rejected')
+        )
+      ))
+      .orderBy(desc(schema.proposals.createdAt));
+  }
+
+  async getTasksForCustomerPortal(customerId: string, tenantId: string): Promise<Task[]> {
+    return db.select()
+      .from(schema.tasks)
+      .where(and(
+        eq(schema.tasks.tenantId, tenantId),
+        eq(schema.tasks.customerId, customerId)
+      ))
+      .orderBy(desc(schema.tasks.createdAt));
+  }
 }
 
 export const storage = new DatabaseStorage();
