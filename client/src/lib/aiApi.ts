@@ -1,4 +1,69 @@
-import { apiRequest } from "./queryClient";
+import { getToken, getRefreshToken, setToken, clearAuth } from "./auth";
+
+async function refreshAccessToken(): Promise<string | null> {
+  const refreshToken = getRefreshToken();
+  if (!refreshToken) return null;
+
+  try {
+    const response = await fetch("/api/auth/refresh", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ refreshToken }),
+    });
+
+    if (!response.ok) return null;
+
+    const data = await response.json();
+    setToken(data.accessToken);
+    return data.accessToken;
+  } catch {
+    return null;
+  }
+}
+
+async function aiApiRequest<T = any>(
+  method: string,
+  url: string,
+  data?: unknown
+): Promise<T> {
+  const token = getToken();
+  const headers: Record<string, string> = {
+    "Content-Type": "application/json",
+  };
+
+  if (token) {
+    headers["Authorization"] = `Bearer ${token}`;
+  }
+
+  let response = await fetch(url, {
+    method,
+    headers,
+    body: data ? JSON.stringify(data) : undefined,
+  });
+
+  if (response.status === 401 && token) {
+    const newToken = await refreshAccessToken();
+    if (newToken) {
+      headers["Authorization"] = `Bearer ${newToken}`;
+      response = await fetch(url, {
+        method,
+        headers,
+        body: data ? JSON.stringify(data) : undefined,
+      });
+    } else {
+      clearAuth();
+      window.location.href = "/login";
+      throw new Error("Session expired");
+    }
+  }
+
+  if (!response.ok) {
+    const error = await response.json().catch(() => ({ message: "Request failed" }));
+    throw new Error(`${response.status}: ${error.message || "Request failed"}`);
+  }
+
+  return response.json();
+}
 
 export type AIAction = 
   | 'rewrite' | 'improve_tone' | 'expand' | 'shorten' | 'summarize'
@@ -64,68 +129,58 @@ export interface AIStatus {
 export const aiApi = {
   // Get AI status for current workspace
   getStatus: async (): Promise<AIStatus> => {
-    const res = await apiRequest("GET", "/api/ai/status");
-    return res.json();
+    return aiApiRequest<AIStatus>("GET", "/api/ai/status");
   },
 
   // Get AI settings
   getSettings: async (): Promise<{ aiEnabled: boolean; settings: AISettings | null; defaults?: any }> => {
-    const res = await apiRequest("GET", "/api/ai/settings");
-    return res.json();
+    return aiApiRequest("GET", "/api/ai/settings");
   },
 
   // Update AI settings
   updateSettings: async (updates: Partial<AISettings>): Promise<AISettings> => {
-    const res = await apiRequest("PUT", "/api/ai/settings", updates);
-    return res.json();
+    return aiApiRequest<AISettings>("PUT", "/api/ai/settings", updates);
   },
 
   // Get AI usage stats
   getUsage: async (): Promise<AIUsageStats> => {
-    const res = await apiRequest("GET", "/api/ai/usage");
-    return res.json();
+    return aiApiRequest<AIUsageStats>("GET", "/api/ai/usage");
   },
 
   // Get AI logs
   getLogs: async (limit?: number): Promise<any[]> => {
     const params = limit ? `?limit=${limit}` : '';
-    const res = await apiRequest("GET", `/api/ai/logs${params}`);
-    return res.json();
+    return aiApiRequest<any[]>("GET", `/api/ai/logs${params}`);
   },
 
   // Submit feedback for an AI response
   submitFeedback: async (logId: string, rating: number, comment?: string): Promise<void> => {
-    await apiRequest("POST", "/api/ai/feedback", { logId, rating, comment });
+    await aiApiRequest("POST", "/api/ai/feedback", { logId, rating, comment });
   },
 
   // Email AI assist
   emailAssist: async (options: AIRequestOptions): Promise<AIResponse> => {
-    const res = await apiRequest("POST", "/api/email/ai-assist", options);
-    return res.json();
+    return aiApiRequest<AIResponse>("POST", "/api/email/ai-assist", options);
   },
 
   // Task AI assist
   taskAssist: async (options: AIRequestOptions): Promise<AIResponse> => {
-    const res = await apiRequest("POST", "/api/tasks/ai-assist", options);
-    return res.json();
+    return aiApiRequest<AIResponse>("POST", "/api/tasks/ai-assist", options);
   },
 
   // Proposal AI assist
   proposalAssist: async (options: AIRequestOptions): Promise<AIResponse> => {
-    const res = await apiRequest("POST", "/api/proposals/ai-assist", options);
-    return res.json();
+    return aiApiRequest<AIResponse>("POST", "/api/proposals/ai-assist", options);
   },
 
   // Client AI assist
   clientAssist: async (options: AIRequestOptions): Promise<AIResponse> => {
-    const res = await apiRequest("POST", "/api/clients/ai-assist", options);
-    return res.json();
+    return aiApiRequest<AIResponse>("POST", "/api/clients/ai-assist", options);
   },
 
   // Report AI assist
   reportAssist: async (options: AIRequestOptions): Promise<AIResponse> => {
-    const res = await apiRequest("POST", "/api/reports/ai-assist", options);
-    return res.json();
+    return aiApiRequest<AIResponse>("POST", "/api/reports/ai-assist", options);
   },
 
   // Generic AI assist based on module
