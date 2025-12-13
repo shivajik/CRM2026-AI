@@ -248,10 +248,14 @@ export interface IStorage {
   getInvoicesForCustomerUser(userId: string, tenantId: string): Promise<Invoice[]>;
 
   // Platform Settings operations (SaaS Admin)
-  getPlatformSettings(): Promise<PlatformSetting[]>;
+  getPlatformSettings(category?: string): Promise<PlatformSetting[]>;
   getPlatformSettingByKey(key: string): Promise<PlatformSetting | undefined>;
   upsertPlatformSetting(setting: InsertPlatformSetting): Promise<PlatformSetting>;
   deletePlatformSetting(key: string): Promise<void>;
+  
+  // User AI Settings operations
+  getUserAiSettings(userId: string): Promise<schema.UserAiSetting | undefined>;
+  upsertUserAiSettings(userId: string, settings: { provider?: string; apiKey?: string; isEnabled?: boolean }): Promise<schema.UserAiSetting>;
 
   // Platform Activity Logs operations (SaaS Admin)
   createPlatformActivityLog(log: InsertPlatformActivityLog): Promise<PlatformActivityLog>;
@@ -1414,7 +1418,12 @@ export class DatabaseStorage implements IStorage {
   }
 
   // Platform Settings operations
-  async getPlatformSettings(): Promise<PlatformSetting[]> {
+  async getPlatformSettings(category?: string): Promise<PlatformSetting[]> {
+    if (category) {
+      return db.select().from(schema.platformSettings)
+        .where(eq(schema.platformSettings.category, category))
+        .orderBy(schema.platformSettings.key);
+    }
     return db.select().from(schema.platformSettings).orderBy(schema.platformSettings.category, schema.platformSettings.key);
   }
 
@@ -1438,6 +1447,31 @@ export class DatabaseStorage implements IStorage {
 
   async deletePlatformSetting(key: string): Promise<void> {
     await db.delete(schema.platformSettings).where(eq(schema.platformSettings.key, key));
+  }
+
+  // User AI Settings operations
+  async getUserAiSettings(userId: string): Promise<schema.UserAiSetting | undefined> {
+    const [settings] = await db.select().from(schema.userAiSettings)
+      .where(eq(schema.userAiSettings.userId, userId));
+    return settings;
+  }
+
+  async upsertUserAiSettings(userId: string, settings: { provider?: string; apiKey?: string; isEnabled?: boolean }): Promise<schema.UserAiSetting> {
+    const existing = await this.getUserAiSettings(userId);
+    if (existing) {
+      const [updated] = await db.update(schema.userAiSettings)
+        .set({ ...settings, updatedAt: new Date() })
+        .where(eq(schema.userAiSettings.userId, userId))
+        .returning();
+      return updated;
+    }
+    const [created] = await db.insert(schema.userAiSettings).values({
+      userId,
+      provider: settings.provider || 'openai',
+      apiKey: settings.apiKey,
+      isEnabled: settings.isEnabled ?? true,
+    }).returning();
+    return created;
   }
 
   // Platform Activity Logs operations
