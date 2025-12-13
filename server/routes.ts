@@ -2331,6 +2331,37 @@ export async function registerRoutes(
     }
   });
 
+  // Update tenant subscription (enable/disable, change plan)
+  app.patch("/api/saas-admin/tenants/:id/subscription", requireAuth, requireSaasAdmin, async (req, res) => {
+    try {
+      const { status, planId } = req.body;
+      const tenantId = req.params.id;
+      
+      const updated = await storage.updateWorkspaceSubscription(tenantId, {
+        ...(status && { status }),
+        ...(planId && { planId }),
+      });
+      
+      if (!updated) {
+        const created = await storage.createWorkspaceSubscription({
+          workspaceId: tenantId,
+          status: status || 'active',
+          planId: planId || null,
+          billingCycle: 'monthly',
+          trialEndsAt: null,
+          currentPeriodStart: new Date(),
+          currentPeriodEnd: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000),
+        });
+        return res.json(created);
+      }
+      
+      res.json(updated);
+    } catch (error) {
+      console.error("Update tenant subscription error:", error);
+      res.status(500).json({ message: "Failed to update subscription" });
+    }
+  });
+
   // Platform Settings routes
   app.get("/api/saas-admin/settings", requireAuth, requireSaasAdmin, async (req, res) => {
     try {

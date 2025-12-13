@@ -1359,14 +1359,22 @@ export class DatabaseStorage implements IStorage {
     };
   }
 
-  async getAllTenants(): Promise<(Tenant & { userCount: number })[]> {
+  async getAllTenants(): Promise<(Tenant & { userCount: number; subscriptionStatus?: string; planName?: string })[]> {
     const tenants = await db.select().from(schema.tenants).orderBy(desc(schema.tenants.createdAt));
     const users = await db.select().from(schema.users);
+    const subscriptions = await db.select().from(schema.workspaceSubscriptions);
+    const plans = await db.select().from(schema.workspacePlans);
     
-    return tenants.map(tenant => ({
-      ...tenant,
-      userCount: users.filter(u => u.tenantId === tenant.id).length,
-    }));
+    return tenants.map(tenant => {
+      const subscription = subscriptions.find(s => s.workspaceId === tenant.id);
+      const plan = subscription?.planId ? plans.find(p => p.id === subscription.planId) : undefined;
+      return {
+        ...tenant,
+        userCount: users.filter(u => u.tenantId === tenant.id).length,
+        subscriptionStatus: subscription?.status,
+        planName: plan?.displayName || plan?.name,
+      };
+    });
   }
 
   async getAllUsersWithTenants(): Promise<(Omit<User, 'passwordHash'> & { tenantName: string })[]> {
@@ -1543,6 +1551,9 @@ export class DatabaseStorage implements IStorage {
     deals: Deal[];
     invoices: Invoice[];
     quotations: Quotation[];
+    subscription: (WorkspaceSubscription & { plan?: WorkspacePlan }) | null;
+    workspaceInvoices: WorkspaceInvoice[];
+    usage: WorkspaceUsage[];
     stats: {
       totalUsers: number;
       totalCustomers: number;
@@ -1554,12 +1565,15 @@ export class DatabaseStorage implements IStorage {
     const [tenant] = await db.select().from(schema.tenants).where(eq(schema.tenants.id, tenantId));
     if (!tenant) return undefined;
 
-    const [users, customers, deals, invoices, quotations] = await Promise.all([
+    const [users, customers, deals, invoices, quotations, subscriptionData, workspaceInvoices, usage] = await Promise.all([
       db.select().from(schema.users).where(eq(schema.users.tenantId, tenantId)),
       db.select().from(schema.customers).where(eq(schema.customers.tenantId, tenantId)),
       db.select().from(schema.deals).where(eq(schema.deals.tenantId, tenantId)),
       db.select().from(schema.invoices).where(eq(schema.invoices.tenantId, tenantId)),
       db.select().from(schema.quotations).where(eq(schema.quotations.tenantId, tenantId)),
+      db.select().from(schema.workspaceSubscriptions).where(eq(schema.workspaceSubscriptions.workspaceId, tenantId)),
+      db.select().from(schema.workspaceInvoices).where(eq(schema.workspaceInvoices.workspaceId, tenantId)).orderBy(desc(schema.workspaceInvoices.createdAt)),
+      db.select().from(schema.workspaceUsage).where(eq(schema.workspaceUsage.workspaceId, tenantId)).orderBy(desc(schema.workspaceUsage.periodStart)),
     ]);
 
     const usersWithoutPasswords = users.map(u => {
@@ -1575,6 +1589,17 @@ export class DatabaseStorage implements IStorage {
       d.stage !== 'closed-won' && d.stage !== 'closed-lost'
     ).length;
 
+    let subscription: (WorkspaceSubscription & { plan?: WorkspacePlan }) | null = null;
+    if (subscriptionData.length > 0) {
+      const sub = subscriptionData[0];
+      if (sub.planId) {
+        const [plan] = await db.select().from(schema.workspacePlans).where(eq(schema.workspacePlans.id, sub.planId));
+        subscription = { ...sub, plan: plan || undefined };
+      } else {
+        subscription = sub;
+      }
+    }
+
     return {
       tenant,
       users: usersWithoutPasswords,
@@ -1582,6 +1607,9 @@ export class DatabaseStorage implements IStorage {
       deals,
       invoices,
       quotations,
+      subscription,
+      workspaceInvoices,
+      usage,
       stats: {
         totalUsers: users.length,
         totalCustomers: customers.length,

@@ -343,6 +343,11 @@ export const saasAdminApi = {
   updateProfile: (data: { firstName?: string; lastName?: string; email?: string }) =>
     apiRequest("/saas-admin/profile", { method: "PATCH", body: JSON.stringify(data) }),
 
+  // Subscription Management
+  updateTenantSubscription: (tenantId: string, data: { status?: string; planId?: string }) =>
+    apiRequest(`/saas-admin/tenants/${tenantId}/subscription`, { method: "PATCH", body: JSON.stringify(data) }),
+  getPlans: () => apiRequest("/saas-admin/packages"),
+
   // Packages Management
   getPackages: () => apiRequest("/saas-admin/packages"),
   getPackageById: (id: string) => apiRequest(`/saas-admin/packages/${id}`),

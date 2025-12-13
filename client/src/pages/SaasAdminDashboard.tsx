@@ -187,6 +187,19 @@ export default function SaasAdminDashboard() {
     },
   });
 
+  const updateSubscriptionMutation = useMutation({
+    mutationFn: ({ tenantId, data }: { tenantId: string; data: { status?: string; planId?: string } }) =>
+      saasAdminApi.updateTenantSubscription(tenantId, data),
+    onSuccess: () => {
+      toast.success("Subscription updated successfully");
+      queryClient.invalidateQueries({ queryKey: ["tenantDetails"] });
+      queryClient.invalidateQueries({ queryKey: ["saasAdminTenants"] });
+    },
+    onError: () => {
+      toast.error("Failed to update subscription");
+    },
+  });
+
   const resetPackageForm = () => {
     setPackageForm({
       name: "",
@@ -578,6 +591,7 @@ export default function SaasAdminDashboard() {
                         <TableRow>
                           <TableHead>Agency Name</TableHead>
                           <TableHead>Users</TableHead>
+                          <TableHead>Subscription</TableHead>
                           <TableHead>Status</TableHead>
                           <TableHead>Created</TableHead>
                           <TableHead className="w-[50px]"></TableHead>
@@ -586,33 +600,57 @@ export default function SaasAdminDashboard() {
                       <TableBody>
                         {tenants.length === 0 ? (
                           <TableRow>
-                            <TableCell colSpan={5} className="text-center text-muted-foreground py-8">
+                            <TableCell colSpan={6} className="text-center text-muted-foreground py-8">
                               No agencies registered yet
                             </TableCell>
                           </TableRow>
                         ) : (
-                          tenants.map((tenant: any) => (
-                            <TableRow 
-                              key={tenant.id} 
-                              className="cursor-pointer hover:bg-muted/50"
-                              onClick={() => setSelectedTenant(tenant)}
-                              data-testid={`row-tenant-${tenant.id}`}
-                            >
-                              <TableCell className="font-medium">{tenant.name}</TableCell>
-                              <TableCell>{tenant.userCount || 0}</TableCell>
-                              <TableCell>
-                                <Badge variant="outline" className="bg-green-500/10 text-green-500">
-                                  Active
-                                </Badge>
-                              </TableCell>
-                              <TableCell>
-                                {tenant.createdAt ? format(new Date(tenant.createdAt), "MMM dd, yyyy") : "-"}
-                              </TableCell>
-                              <TableCell>
-                                <ChevronRight className="w-4 h-4 text-muted-foreground" />
-                              </TableCell>
-                            </TableRow>
-                          ))
+                          tenants.map((tenant: any) => {
+                            const subStatus = tenant.subscriptionStatus || 'none';
+                            const planName = tenant.planName || 'No Plan';
+                            return (
+                              <TableRow 
+                                key={tenant.id} 
+                                className="cursor-pointer hover:bg-muted/50"
+                                onClick={() => setSelectedTenant(tenant)}
+                                data-testid={`row-tenant-${tenant.id}`}
+                              >
+                                <TableCell className="font-medium">{tenant.name}</TableCell>
+                                <TableCell>{tenant.userCount || 0}</TableCell>
+                                <TableCell>
+                                  <Badge variant="outline" className={
+                                    subStatus === 'active' ? 'bg-green-500/10 text-green-500 border-green-500/20' :
+                                    subStatus === 'trial' ? 'bg-blue-500/10 text-blue-500 border-blue-500/20' :
+                                    subStatus === 'cancelled' ? 'bg-red-500/10 text-red-500 border-red-500/20' :
+                                    subStatus === 'suspended' ? 'bg-orange-500/10 text-orange-500 border-orange-500/20' :
+                                    'bg-gray-500/10 text-gray-500 border-gray-500/20'
+                                  }>
+                                    {planName}
+                                  </Badge>
+                                </TableCell>
+                                <TableCell>
+                                  <Badge variant="outline" className={
+                                    subStatus === 'active' ? 'bg-green-500/10 text-green-500 border-green-500/20' :
+                                    subStatus === 'trial' ? 'bg-blue-500/10 text-blue-500 border-blue-500/20' :
+                                    subStatus === 'cancelled' ? 'bg-red-500/10 text-red-500 border-red-500/20' :
+                                    subStatus === 'suspended' ? 'bg-orange-500/10 text-orange-500 border-orange-500/20' :
+                                    'bg-gray-500/10 text-gray-500 border-gray-500/20'
+                                  }>
+                                    {subStatus === 'active' ? 'Active' :
+                                     subStatus === 'trial' ? 'Trial' :
+                                     subStatus === 'cancelled' ? 'Cancelled' :
+                                     subStatus === 'suspended' ? 'Suspended' : 'None'}
+                                  </Badge>
+                                </TableCell>
+                                <TableCell>
+                                  {tenant.createdAt ? format(new Date(tenant.createdAt), "MMM dd, yyyy") : "-"}
+                                </TableCell>
+                                <TableCell>
+                                  <ChevronRight className="w-4 h-4 text-muted-foreground" />
+                                </TableCell>
+                              </TableRow>
+                            );
+                          })
                         )}
                       </TableBody>
                     </Table>
@@ -1162,6 +1200,71 @@ export default function SaasAdminDashboard() {
               </div>
             ) : tenantDetails ? (
               <div className="mt-6 space-y-6">
+                {/* Subscription Management Card */}
+                <Card>
+                  <CardHeader className="pb-3">
+                    <CardTitle className="text-base flex items-center gap-2">
+                      <Package className="w-4 h-4" />
+                      Subscription Management
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="grid gap-4 md:grid-cols-2">
+                      <div className="space-y-2">
+                        <Label>Subscription Status</Label>
+                        <div className="flex items-center gap-3">
+                          <Switch
+                            checked={tenantDetails.subscription?.status === 'active'}
+                            onCheckedChange={(checked) => {
+                              updateSubscriptionMutation.mutate({
+                                tenantId: selectedTenant.id,
+                                data: { status: checked ? 'active' : 'suspended' }
+                              });
+                            }}
+                            data-testid="switch-subscription-status"
+                          />
+                          <Badge variant="outline" className={
+                            tenantDetails.subscription?.status === 'active' ? 'bg-green-500/10 text-green-500' :
+                            tenantDetails.subscription?.status === 'trial' ? 'bg-blue-500/10 text-blue-500' :
+                            tenantDetails.subscription?.status === 'suspended' ? 'bg-orange-500/10 text-orange-500' :
+                            'bg-gray-500/10 text-gray-500'
+                          }>
+                            {tenantDetails.subscription?.status || 'No Subscription'}
+                          </Badge>
+                        </div>
+                      </div>
+                      <div className="space-y-2">
+                        <Label>Subscription Plan</Label>
+                        <Select
+                          value={tenantDetails.subscription?.planId || ''}
+                          onValueChange={(planId) => {
+                            updateSubscriptionMutation.mutate({
+                              tenantId: selectedTenant.id,
+                              data: { planId, status: 'active' }
+                            });
+                          }}
+                        >
+                          <SelectTrigger data-testid="select-subscription-plan">
+                            <SelectValue placeholder="Select a plan" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {packages.map((pkg: any) => (
+                              <SelectItem key={pkg.id} value={pkg.id}>
+                                {pkg.displayName} - ${parseFloat(pkg.price || 0).toFixed(2)}/{pkg.billingCycle}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                        {tenantDetails.subscription?.plan && (
+                          <p className="text-xs text-muted-foreground">
+                            Current: {tenantDetails.subscription.plan.displayName}
+                          </p>
+                        )}
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+
                 {/* Stats */}
                 <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                   <Card>
@@ -1192,11 +1295,13 @@ export default function SaasAdminDashboard() {
 
                 {/* Tabs for related data */}
                 <Tabs defaultValue="users" className="w-full">
-                  <TabsList className="grid w-full grid-cols-4">
+                  <TabsList className="grid w-full grid-cols-3 lg:grid-cols-6">
                     <TabsTrigger value="users" data-testid="tab-tenant-users">Users</TabsTrigger>
                     <TabsTrigger value="customers" data-testid="tab-tenant-customers">Customers</TabsTrigger>
                     <TabsTrigger value="deals" data-testid="tab-tenant-deals">Deals</TabsTrigger>
                     <TabsTrigger value="invoices" data-testid="tab-tenant-invoices">Invoices</TabsTrigger>
+                    <TabsTrigger value="payments" data-testid="tab-tenant-payments">Payments</TabsTrigger>
+                    <TabsTrigger value="usage" data-testid="tab-tenant-usage">Usage</TabsTrigger>
                   </TabsList>
                   
                   <TabsContent value="users" className="mt-4">
@@ -1293,6 +1398,7 @@ export default function SaasAdminDashboard() {
                   </TabsContent>
                   
                   <TabsContent value="invoices" className="mt-4">
+                    <p className="text-xs text-muted-foreground mb-2">Agency invoices to their customers</p>
                     <Table>
                       <TableHeader>
                         <TableRow>
@@ -1318,6 +1424,90 @@ export default function SaasAdminDashboard() {
                                   {invoice.status}
                                 </Badge>
                               </TableCell>
+                            </TableRow>
+                          ))
+                        )}
+                      </TableBody>
+                    </Table>
+                  </TabsContent>
+
+                  <TabsContent value="payments" className="mt-4">
+                    <p className="text-xs text-muted-foreground mb-2">Platform subscription payments from this agency</p>
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead>Invoice #</TableHead>
+                          <TableHead>Amount</TableHead>
+                          <TableHead>Period</TableHead>
+                          <TableHead>Status</TableHead>
+                          <TableHead>Date</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {(!tenantDetails.workspaceInvoices || tenantDetails.workspaceInvoices.length === 0) ? (
+                          <TableRow>
+                            <TableCell colSpan={5} className="text-center text-muted-foreground">
+                              No subscription payments found
+                            </TableCell>
+                          </TableRow>
+                        ) : (
+                          tenantDetails.workspaceInvoices.map((invoice: any) => (
+                            <TableRow key={invoice.id}>
+                              <TableCell>{invoice.invoiceNumber}</TableCell>
+                              <TableCell>${Number(invoice.amount).toLocaleString()}</TableCell>
+                              <TableCell>
+                                {invoice.periodStart && invoice.periodEnd ? 
+                                  `${format(new Date(invoice.periodStart), "MMM dd")} - ${format(new Date(invoice.periodEnd), "MMM dd, yyyy")}` : 
+                                  '-'}
+                              </TableCell>
+                              <TableCell>
+                                <Badge variant={invoice.status === "paid" ? "default" : invoice.status === "pending" ? "secondary" : "destructive"}>
+                                  {invoice.status}
+                                </Badge>
+                              </TableCell>
+                              <TableCell>
+                                {invoice.createdAt ? format(new Date(invoice.createdAt), "MMM dd, yyyy") : "-"}
+                              </TableCell>
+                            </TableRow>
+                          ))
+                        )}
+                      </TableBody>
+                    </Table>
+                  </TabsContent>
+
+                  <TabsContent value="usage" className="mt-4">
+                    <p className="text-xs text-muted-foreground mb-2">Resource usage for this agency</p>
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead>Period</TableHead>
+                          <TableHead>Members</TableHead>
+                          <TableHead>Automations</TableHead>
+                          <TableHead>Emails Sent</TableHead>
+                          <TableHead>Proposals</TableHead>
+                          <TableHead>Storage (MB)</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {(!tenantDetails.usage || tenantDetails.usage.length === 0) ? (
+                          <TableRow>
+                            <TableCell colSpan={6} className="text-center text-muted-foreground">
+                              No usage data found
+                            </TableCell>
+                          </TableRow>
+                        ) : (
+                          tenantDetails.usage.map((usage: any) => (
+                            <TableRow key={usage.id}>
+                              <TableCell>
+                                {usage.periodStart && usage.periodEnd ? 
+                                  `${format(new Date(usage.periodStart), "MMM dd")} - ${format(new Date(usage.periodEnd), "MMM dd, yyyy")}` : 
+                                  '-'}
+                              </TableCell>
+                              <TableCell>{usage.memberCount}</TableCell>
+                              <TableCell>{usage.automationsUsed}</TableCell>
+                              <TableCell>{usage.emailsSent}</TableCell>
+                              <TableCell>{usage.proposalsCreated}</TableCell>
+                              <TableCell>{parseFloat(usage.storageMbUsed || 0).toFixed(2)}</TableCell>
                             </TableRow>
                           ))
                         )}
