@@ -1,4 +1,5 @@
 import express, { type Request, Response, NextFunction } from "express";
+import cors from "cors";
 import { registerRoutes } from "./routes";
 import { securityHeaders, apiRateLimiter, inputSanitizationMiddleware } from "./security";
 import { initializeAITables } from "./db";
@@ -30,6 +31,12 @@ export async function createApp(): Promise<express.Express> {
   appPromise = (async () => {
     const app = express();
 
+    app.use(cors({
+      origin: true,
+      credentials: true,
+      methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
+      allowedHeaders: ['Content-Type', 'Authorization'],
+    }));
     app.use(securityHeaders);
     app.use('/api', apiRateLimiter);
     app.use(inputSanitizationMiddleware);
