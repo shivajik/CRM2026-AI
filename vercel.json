@@ -1,9 +1,9 @@
 {
-  "buildCommand": "npx vite build",
+  "buildCommand": "npx vite build && npx esbuild api/[...path].ts --bundle --platform=node --format=esm --outfile=api/index.mjs --packages=external",
   "outputDirectory": "dist/public",
   "framework": null,
   "functions": {
-    "api/[...path].ts": {
+    "api/index.mjs": {
       "maxDuration": 30,
       "memory": 1024
     },
@@ -14,7 +14,7 @@
   },
   "rewrites": [
     { "source": "/api/health", "destination": "/api/health" },
-    { "source": "/api/:path*", "destination": "/api/[...path]" },
+    { "source": "/api/:path*", "destination": "/api/index" },
     { "source": "/(.*)", "destination": "/index.html" }
   ]
 }
