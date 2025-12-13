@@ -70,9 +70,21 @@ export async function registerRoutes(
     });
   });
   
-  await initializeModules();
-  await initializeDefaultPackages();
-  await initializeSuperAdmin();
+  // Skip seeding in serverless/production - should be done via migrations
+  const isServerless = process.env.VERCEL === '1' || process.env.AWS_LAMBDA_FUNCTION_NAME;
+  const isProduction = process.env.NODE_ENV === 'production';
+  
+  if (!isServerless && !isProduction) {
+    try {
+      await initializeModules();
+      await initializeDefaultPackages();
+      await initializeSuperAdmin();
+    } catch (error) {
+      console.error('Seeding error (non-critical):', error);
+    }
+  } else {
+    console.log('[Routes] Skipping seed initialization in serverless/production environment');
+  }
   
   // ==================== AUTH ROUTES ====================
   
