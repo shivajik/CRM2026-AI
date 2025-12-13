@@ -1,5 +1,6 @@
 import type { VercelRequest, VercelResponse } from "@vercel/node";
 import serverless from "serverless-http";
+import { createApp } from "../server/app";
 
 let handler: any = null;
 let initError: Error | null = null;
@@ -22,7 +23,6 @@ async function initHandler() {
     console.log("Environment check - DATABASE_URL exists:", !!process.env.DATABASE_URL);
     console.log("Environment check - JWT_SECRET exists:", !!process.env.JWT_SECRET);
     
-    const { createApp } = await import("../server/app");
     const app = await createApp();
     handler = serverless(app);
     console.log("Serverless handler initialized successfully");
