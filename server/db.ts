@@ -12,11 +12,29 @@ if (!connectionString) {
   );
 }
 
-export const pool = new Pool({
-  connectionString,
-  ssl: process.env.SUPABASE_DATABASE_URL ? { rejectUnauthorized: false } : undefined,
-});
+declare global {
+  var _pgPool: pg.Pool | undefined;
+}
 
+function getPool(): pg.Pool {
+  if (globalThis._pgPool) {
+    return globalThis._pgPool;
+  }
+
+  const pool = new Pool({
+    connectionString,
+    ssl: process.env.SUPABASE_DATABASE_URL ? { rejectUnauthorized: false } : undefined,
+    max: 10,
+    idleTimeoutMillis: 30000,
+    connectionTimeoutMillis: 10000,
+    allowExitOnIdle: true,
+  });
+
+  globalThis._pgPool = pool;
+  return pool;
+}
+
+export const pool = getPool();
 export const db = drizzle(pool, { schema });
 
 export async function initializeAITables() {
