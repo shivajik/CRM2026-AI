@@ -84,6 +84,7 @@ export interface IStorage {
   // Tenant operations
   createTenant(tenant: InsertTenant): Promise<Tenant>;
   getTenant(id: string): Promise<Tenant | undefined>;
+  updateTenantPackage(tenantId: string, packageId: string | null): Promise<Tenant | undefined>;
   
   // User operations
   createUser(user: InsertUser): Promise<User>;
@@ -630,6 +631,14 @@ export class DatabaseStorage implements IStorage {
   
   async getTenant(id: string): Promise<Tenant | undefined> {
     const [tenant] = await db.select().from(schema.tenants).where(eq(schema.tenants.id, id));
+    return tenant;
+  }
+  
+  async updateTenantPackage(tenantId: string, packageId: string | null): Promise<Tenant | undefined> {
+    const [tenant] = await db.update(schema.tenants)
+      .set({ packageId })
+      .where(eq(schema.tenants.id, tenantId))
+      .returning();
     return tenant;
   }
   
@@ -1551,7 +1560,7 @@ export class DatabaseStorage implements IStorage {
     deals: Deal[];
     invoices: Invoice[];
     quotations: Quotation[];
-    subscription: (WorkspaceSubscription & { plan?: WorkspacePlan }) | null;
+    subscription: (WorkspaceSubscription & { plan?: Package; planId?: string | null }) | null;
     workspaceInvoices: WorkspaceInvoice[];
     usage: WorkspaceUsage[];
     stats: {
@@ -1589,12 +1598,14 @@ export class DatabaseStorage implements IStorage {
       d.stage !== 'closed-won' && d.stage !== 'closed-lost'
     ).length;
 
-    let subscription: (WorkspaceSubscription & { plan?: WorkspacePlan }) | null = null;
+    let subscription: (WorkspaceSubscription & { plan?: Package; planId?: string | null }) | null = null;
     if (subscriptionData.length > 0) {
       const sub = subscriptionData[0];
-      if (sub.planId) {
-        const [plan] = await db.select().from(schema.workspacePlans).where(eq(schema.workspacePlans.id, sub.planId));
-        subscription = { ...sub, plan: plan || undefined };
+      // Get the package from tenant.packageId (SaaS Admin packages, not workspace_plans)
+      if (tenant.packageId) {
+        const [pkg] = await db.select().from(schema.packages).where(eq(schema.packages.id, tenant.packageId));
+        // Return packageId as planId for frontend compatibility
+        subscription = { ...sub, plan: pkg || undefined, planId: tenant.packageId };
       } else {
         subscription = sub;
       }

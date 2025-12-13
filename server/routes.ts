@@ -2337,25 +2337,34 @@ export async function registerRoutes(
       const { status, planId } = req.body;
       const tenantId = req.params.id;
       
+      // Update the tenant's packageId if planId is provided (planId here is actually package ID)
+      if (planId) {
+        await storage.updateTenantPackage(tenantId, planId);
+      }
+      
+      // Only update status in workspace_subscriptions, not planId (which references workspace_plans)
       const updated = await storage.updateWorkspaceSubscription(tenantId, {
         ...(status && { status }),
-        ...(planId && { planId }),
       });
       
       if (!updated) {
         const created = await storage.createWorkspaceSubscription({
           workspaceId: tenantId,
           status: status || 'active',
-          planId: planId || null,
           billingCycle: 'monthly',
           trialEndsAt: null,
           currentPeriodStart: new Date(),
           currentPeriodEnd: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000),
         });
-        return res.json(created);
+        
+        // Get the package details to return with the response
+        const packageDetails = planId ? await storage.getPackageById(planId) : null;
+        return res.json({ ...created, plan: packageDetails });
       }
       
-      res.json(updated);
+      // Get the package details to return with the response
+      const packageDetails = planId ? await storage.getPackageById(planId) : null;
+      res.json({ ...updated, plan: packageDetails });
     } catch (error) {
       console.error("Update tenant subscription error:", error);
       res.status(500).json({ message: "Failed to update subscription" });
