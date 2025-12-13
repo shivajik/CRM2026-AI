@@ -10554,6 +10554,64 @@ async function path_default(req, res) {
       return;
     }
   }
+  if (req.url === "/api/test-login" || req.url?.startsWith("/api/test-login")) {
+    try {
+      const { pool: pool2 } = await Promise.resolve().then(() => (init_db(), db_exports));
+      const body = req.body;
+      if (!body || !body.email) {
+        res.json({
+          status: "no_body",
+          receivedBody: body,
+          contentType: req.headers["content-type"],
+          method: req.method
+        });
+        return;
+      }
+      const client = await pool2.connect();
+      const result = await client.query(
+        "SELECT id, email, first_name FROM users WHERE LOWER(email) = LOWER($1) LIMIT 1",
+        [body.email]
+      );
+      client.release();
+      res.json({
+        status: "success",
+        userFound: result.rows.length > 0,
+        email: body.email,
+        userPreview: result.rows[0] ? { id: result.rows[0].id.substring(0, 8), email: result.rows[0].email } : null
+      });
+      return;
+    } catch (error) {
+      res.status(500).json({
+        status: "test_login_failed",
+        error: error.message,
+        code: error.code
+      });
+      return;
+    }
+  }
+  if (req.url === "/api/test-db" || req.url?.startsWith("/api/test-db")) {
+    try {
+      const { pool: pool2 } = await Promise.resolve().then(() => (init_db(), db_exports));
+      const startTime = Date.now();
+      const client = await pool2.connect();
+      const result = await client.query("SELECT NOW() as time, current_database() as db");
+      client.release();
+      const duration = Date.now() - startTime;
+      res.json({
+        status: "db_connected",
+        queryDuration: `${duration}ms`,
+        result: result.rows[0]
+      });
+      return;
+    } catch (error) {
+      res.status(500).json({
+        status: "db_failed",
+        error: error.message,
+        code: error.code
+      });
+      return;
+    }
+  }
   try {
     const h = await initHandler();
     return await h(req, res);

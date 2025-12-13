@@ -71,6 +71,73 @@ export default async function (req: VercelRequest, res: VercelResponse) {
     }
   }
 
+  // Test login endpoint to debug request body
+  if (req.url === "/api/test-login" || req.url?.startsWith("/api/test-login")) {
+    try {
+      const { pool } = await import("../server/db");
+      const body = req.body;
+      
+      // Test if we can read request body
+      if (!body || !body.email) {
+        res.json({
+          status: "no_body",
+          receivedBody: body,
+          contentType: req.headers['content-type'],
+          method: req.method
+        });
+        return;
+      }
+
+      // Test database query
+      const client = await pool.connect();
+      const result = await client.query(
+        "SELECT id, email, first_name FROM users WHERE LOWER(email) = LOWER($1) LIMIT 1",
+        [body.email]
+      );
+      client.release();
+
+      res.json({
+        status: "success",
+        userFound: result.rows.length > 0,
+        email: body.email,
+        userPreview: result.rows[0] ? { id: result.rows[0].id.substring(0, 8), email: result.rows[0].email } : null
+      });
+      return;
+    } catch (error: any) {
+      res.status(500).json({
+        status: "test_login_failed",
+        error: error.message,
+        code: error.code
+      });
+      return;
+    }
+  }
+
+  // Test database connection endpoint
+  if (req.url === "/api/test-db" || req.url?.startsWith("/api/test-db")) {
+    try {
+      const { pool } = await import("../server/db");
+      const startTime = Date.now();
+      const client = await pool.connect();
+      const result = await client.query("SELECT NOW() as time, current_database() as db");
+      client.release();
+      const duration = Date.now() - startTime;
+      res.json({
+        status: "db_connected",
+        queryDuration: `${duration}ms`,
+        result: result.rows[0]
+      });
+      return;
+    } catch (error: any) {
+      res.status(500).json({
+        status: "db_failed",
+        error: error.message,
+        code: error.code
+      });
+      return;
+    }
+  }
+
   try {
     const h = await initHandler();
     return await h(req, res);
