@@ -3131,6 +3131,7 @@ export class DatabaseStorage implements IStorage {
   // ==================== FEATURE FLAGS ====================
   
   async getFeatureFlag(key: string, tenantId?: string): Promise<boolean> {
+    console.log(`[getFeatureFlag] Checking key=${key}, tenantId=${tenantId}`);
     // First check tenant-specific flag, then global
     if (tenantId) {
       const [tenantFlag] = await db.select()
@@ -3139,6 +3140,7 @@ export class DatabaseStorage implements IStorage {
           eq(schema.featureFlags.key, key),
           eq(schema.featureFlags.tenantId, tenantId)
         ));
+      console.log(`[getFeatureFlag] Tenant flag result:`, tenantFlag);
       if (tenantFlag) return tenantFlag.enabled;
     }
     
@@ -3149,6 +3151,7 @@ export class DatabaseStorage implements IStorage {
         eq(schema.featureFlags.key, key),
         isNull(schema.featureFlags.tenantId)
       ));
+    console.log(`[getFeatureFlag] Global flag result:`, globalFlag);
     return globalFlag?.enabled ?? false;
   }
 
