@@ -1279,18 +1279,22 @@ export class DatabaseStorage implements IStorage {
   }> {
     const tenants = await db.select().from(schema.tenants);
     const users = await db.select().from(schema.users);
-    const invoices = await db.select().from(schema.invoices);
+    const workspaceInvoices = await db.select().from(schema.workspaceInvoices);
+    const subscriptions = await db.select().from(schema.workspaceSubscriptions);
+    const plans = await db.select().from(schema.workspacePlans);
     
     const now = new Date();
     const currentMonth = now.getMonth();
     const currentYear = now.getFullYear();
     
-    const monthlyRevenue = invoices
+    const monthlyRevenue = workspaceInvoices
       .filter(inv => {
         const invDate = new Date(inv.createdAt);
-        return invDate.getMonth() === currentMonth && invDate.getFullYear() === currentYear;
+        return invDate.getMonth() === currentMonth && 
+               invDate.getFullYear() === currentYear && 
+               inv.status === 'paid';
       })
-      .reduce((sum, inv) => sum + Number(inv.paidAmount || 0), 0);
+      .reduce((sum, inv) => sum + Number(inv.amount || 0), 0);
     
     const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
     const revenueData: { month: string; revenue: number; users: number }[] = [];
@@ -1299,46 +1303,49 @@ export class DatabaseStorage implements IStorage {
       const targetMonth = (currentMonth - i + 12) % 12;
       const targetYear = currentMonth - i < 0 ? currentYear - 1 : currentYear;
       
-      const monthRevenue = invoices
+      const monthRevenue = workspaceInvoices
         .filter(inv => {
           const invDate = new Date(inv.createdAt);
-          return invDate.getMonth() === targetMonth && invDate.getFullYear() === targetYear;
+          return invDate.getMonth() === targetMonth && 
+                 invDate.getFullYear() === targetYear && 
+                 inv.status === 'paid';
         })
-        .reduce((sum, inv) => sum + Number(inv.paidAmount || 0), 0);
+        .reduce((sum, inv) => sum + Number(inv.amount || 0), 0);
       
       const endOfTargetMonth = new Date(targetYear, targetMonth + 1, 0, 23, 59, 59, 999);
-      const monthUsers = users.filter(u => {
-        const uDate = new Date(u.createdAt);
-        return uDate <= endOfTargetMonth;
+      const monthTenants = tenants.filter(t => {
+        const tDate = new Date(t.createdAt);
+        return tDate <= endOfTargetMonth;
       }).length;
       
       revenueData.push({
         month: months[targetMonth],
         revenue: monthRevenue,
-        users: monthUsers,
+        users: monthTenants,
       });
     }
     
-    const enterpriseTenants = tenants.filter(t => {
-      const userCount = users.filter(u => u.tenantId === t.id).length;
-      return userCount >= 10;
-    }).length;
+    const planCounts: { [key: string]: number } = {};
+    subscriptions.forEach(sub => {
+      if (sub.planId && sub.status === 'active') {
+        const plan = plans.find(p => p.id === sub.planId);
+        const planName = plan?.displayName || plan?.name || 'Unknown';
+        planCounts[planName] = (planCounts[planName] || 0) + 1;
+      } else if (sub.status === 'trial') {
+        planCounts['Trial'] = (planCounts['Trial'] || 0) + 1;
+      }
+    });
     
-    const professionalTenants = tenants.filter(t => {
-      const userCount = users.filter(u => u.tenantId === t.id).length;
-      return userCount >= 3 && userCount < 10;
-    }).length;
+    const tenantsWithSub = new Set(subscriptions.map(s => s.workspaceId));
+    const tenantsWithoutSub = tenants.filter(t => !tenantsWithSub.has(t.id)).length;
+    if (tenantsWithoutSub > 0) {
+      planCounts['Free/No Plan'] = tenantsWithoutSub;
+    }
     
-    const starterTenants = tenants.filter(t => {
-      const userCount = users.filter(u => u.tenantId === t.id).length;
-      return userCount < 3;
-    }).length;
-    
-    const tenantDistribution = [
-      { name: "Enterprise", value: enterpriseTenants },
-      { name: "Professional", value: professionalTenants },
-      { name: "Starter", value: starterTenants },
-    ].filter(d => d.value > 0);
+    const tenantDistribution = Object.entries(planCounts)
+      .map(([name, value]) => ({ name, value }))
+      .filter(d => d.value > 0)
+      .sort((a, b) => b.value - a.value);
     
     const activeUsers = users.filter(u => u.isActive).length;
     

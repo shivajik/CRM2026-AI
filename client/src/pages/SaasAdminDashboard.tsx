@@ -474,14 +474,14 @@ export default function SaasAdminDashboard() {
                 </Card>
                 <Card>
                   <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                    <CardTitle className="text-sm font-medium">Monthly Revenue</CardTitle>
+                    <CardTitle className="text-sm font-medium">Subscription Revenue</CardTitle>
                     <DollarSign className="h-4 w-4 text-muted-foreground" />
                   </CardHeader>
                   <CardContent>
                     <div className="text-2xl font-bold" data-testid="stat-monthly-revenue">
                       ${(stats?.monthlyRevenue ?? 0).toLocaleString()}
                     </div>
-                    <p className="text-xs text-muted-foreground">This month's revenue</p>
+                    <p className="text-xs text-muted-foreground">From agency subscriptions this month</p>
                   </CardContent>
                 </Card>
                 <Card>
@@ -503,8 +503,8 @@ export default function SaasAdminDashboard() {
                 <div className="grid gap-4 md:grid-cols-2">
                   <Card>
                     <CardHeader>
-                      <CardTitle>Revenue Trend</CardTitle>
-                      <CardDescription>Monthly revenue over the last 6 months</CardDescription>
+                      <CardTitle>Subscription Revenue Trend</CardTitle>
+                      <CardDescription>Platform subscription income over the last 6 months</CardDescription>
                     </CardHeader>
                     <CardContent>
                       {revenueData.length > 0 ? (
@@ -524,7 +524,7 @@ export default function SaasAdminDashboard() {
                         </ResponsiveContainer>
                       ) : (
                         <div className="h-[300px] flex items-center justify-center text-muted-foreground">
-                          No revenue data available yet
+                          No subscription revenue yet
                         </div>
                       )}
                     </CardContent>
@@ -558,7 +558,7 @@ export default function SaasAdminDashboard() {
                         </ResponsiveContainer>
                       ) : (
                         <div className="h-[300px] flex items-center justify-center text-muted-foreground">
-                          No agency data available yet
+                          No subscription data available yet
                         </div>
                       )}
                     </CardContent>
