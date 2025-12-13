@@ -52,6 +52,16 @@ export const pool = getPool();
 export const db = drizzle(pool, { schema });
 
 export async function initializeAITables() {
+  // Skip table initialization in serverless/production environments
+  // Tables should be created via migrations, not at runtime
+  const isServerless = process.env.VERCEL === '1' || process.env.AWS_LAMBDA_FUNCTION_NAME;
+  const isProduction = process.env.NODE_ENV === 'production';
+  
+  if (isServerless || isProduction) {
+    console.log("[DB] Skipping AI table initialization in serverless/production environment");
+    return;
+  }
+
   const client = await pool.connect();
   try {
     await client.query(`
