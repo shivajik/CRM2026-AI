@@ -14,6 +14,28 @@ export async function registerRoutes(
   app: Express
 ): Promise<Server> {
   
+  // ==================== HEALTH CHECK ====================
+  app.get("/api/health", async (_req, res) => {
+    try {
+      const { pool } = await import("./db");
+      const client = await pool.connect();
+      await client.query("SELECT 1");
+      client.release();
+      res.json({ 
+        status: "ok", 
+        timestamp: new Date().toISOString(),
+        environment: process.env.NODE_ENV || "development",
+        database: "connected"
+      });
+    } catch (error: any) {
+      res.status(500).json({ 
+        status: "error", 
+        message: error.message,
+        database: "disconnected"
+      });
+    }
+  });
+  
   await initializeModules();
   await initializeDefaultPackages();
   await initializeSuperAdmin();

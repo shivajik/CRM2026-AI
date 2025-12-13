@@ -7,8 +7,10 @@ const { Pool } = pg;
 const connectionString = process.env.SUPABASE_DATABASE_URL || process.env.DATABASE_URL;
 
 if (!connectionString) {
+  console.error("DATABASE CONNECTION ERROR: No database URL configured");
+  console.error("Available env vars:", Object.keys(process.env).filter(k => k.includes('DATABASE') || k.includes('SUPABASE') || k.includes('PG')));
   throw new Error(
-    "Database connection string must be set. Please configure SUPABASE_DATABASE_URL or DATABASE_URL.",
+    "Database connection string must be set. Please configure SUPABASE_DATABASE_URL or DATABASE_URL in your Vercel environment variables.",
   );
 }
 
@@ -21,13 +23,26 @@ function getPool(): pg.Pool {
     return globalThis._pgPool;
   }
 
+  console.log("[DB] Creating new database pool...");
+  
+  const isProduction = process.env.NODE_ENV === 'production';
+  const hasSupabaseUrl = !!process.env.SUPABASE_DATABASE_URL;
+  
   const pool = new Pool({
     connectionString,
-    ssl: process.env.SUPABASE_DATABASE_URL ? { rejectUnauthorized: false } : undefined,
-    max: 10,
+    ssl: (isProduction || hasSupabaseUrl) ? { rejectUnauthorized: false } : undefined,
+    max: 5,
     idleTimeoutMillis: 30000,
-    connectionTimeoutMillis: 10000,
+    connectionTimeoutMillis: 15000,
     allowExitOnIdle: true,
+  });
+
+  pool.on('error', (err) => {
+    console.error('[DB] Pool error:', err.message);
+  });
+
+  pool.on('connect', () => {
+    console.log('[DB] New client connected to pool');
   });
 
   globalThis._pgPool = pool;
