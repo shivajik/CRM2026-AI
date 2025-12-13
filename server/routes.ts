@@ -3650,44 +3650,71 @@ export async function registerRoutes(
   app.post("/api/email/ai-assist", requireAuth, validateTenant, async (req, res) => {
     try {
       const { action, content, context } = req.body;
-      
-      // Simulated AI responses based on action
-      let result = content;
-      
-      switch (action) {
-        case 'improve_tone':
-          result = content.replace(/\b(please|kindly)\b/gi, 'we would appreciate if you')
-            .replace(/\bASAP\b/gi, 'at your earliest convenience')
-            .replace(/\bfyi\b/gi, 'for your information');
-          break;
-        case 'shorten':
-          const sentences = content.split(/[.!?]+/).filter((s: string) => s.trim());
-          result = sentences.slice(0, Math.ceil(sentences.length / 2)).join('. ') + '.';
-          break;
-        case 'make_persuasive':
-          result = content + "\n\nWe believe this opportunity aligns perfectly with your goals, and we're confident you'll see exceptional value in moving forward. Don't miss this chance to elevate your business.";
-          break;
-        case 'fix_grammar':
-          result = content.replace(/\s+/g, ' ').trim();
-          break;
-        case 'generate_subject':
-          const words = content.split(' ').slice(0, 5).join(' ');
-          result = `Re: ${words}...`;
-          break;
-        case 'expand':
-          result = content + "\n\nWe would like to provide you with more details about our services. Our team is dedicated to delivering exceptional results tailored to your specific needs. We look forward to the opportunity to discuss how we can help you achieve your goals.";
-          break;
-        case 'formal':
-          result = `Dear Valued Customer,\n\n${content}\n\nBest regards`;
-          break;
-        case 'friendly':
-          result = `Hi there!\n\n${content}\n\nCheers!`;
-          break;
-        default:
-          result = content;
+      const tenantId = req.user!.tenantId;
+      const userId = req.user!.userId;
+
+      // Check if AI is enabled for this tenant
+      const aiEnabled = await storage.getFeatureFlag('ai_enhancement_enabled', tenantId);
+      if (!aiEnabled) {
+        return res.status(403).json({ message: "AI features are not enabled for this workspace", code: "AI_DISABLED" });
       }
+
+      // Get AI settings for this tenant
+      const aiSettings = await storage.getAiSettings(tenantId);
+      if (aiSettings && !aiSettings.emailAiEnabled) {
+        return res.status(403).json({ message: "Email AI features are disabled", code: "EMAIL_AI_DISABLED" });
+      }
+
+      // Check token limits
+      if (aiSettings && aiSettings.tokensUsedThisMonth >= aiSettings.monthlyTokenLimit) {
+        return res.status(429).json({ message: "Monthly AI token limit reached", code: "TOKEN_LIMIT_EXCEEDED" });
+      }
+
+      const { aiService } = await import("./ai-service");
+      const startTime = Date.now();
       
-      res.json({ result, action });
+      const response = await aiService.processRequest({
+        tenantId,
+        userId,
+        module: 'email',
+        action,
+        content,
+        context
+      }, aiSettings);
+
+      // Log AI usage
+      await storage.createAiUsage({
+        tenantId,
+        userId,
+        module: 'email',
+        action,
+        tokensUsed: response.tokensUsed,
+        inputTokens: response.inputTokens,
+        outputTokens: response.outputTokens,
+        model: response.model,
+        success: response.success,
+        latencyMs: Date.now() - startTime,
+      });
+
+      // Increment token usage
+      if (response.tokensUsed > 0) {
+        await storage.incrementAiTokenUsage(tenantId, response.tokensUsed);
+      }
+
+      // Log the interaction
+      await storage.createAiLog({
+        tenantId,
+        userId,
+        module: 'email',
+        action,
+        inputContent: content?.substring(0, 1000),
+        outputContent: response.result?.substring(0, 1000),
+        contextData: context ? JSON.stringify(context) : undefined,
+        resourceType: 'email',
+        errorMessage: response.error,
+      });
+      
+      res.json({ result: response.result, action, success: response.success });
     } catch (error) {
       console.error("AI assist error:", error);
       res.status(500).json({ message: "Failed to process AI request" });
@@ -4451,45 +4478,72 @@ export async function registerRoutes(
   app.post("/api/proposals/ai-assist", requireAuth, validateTenant, async (req, res) => {
     try {
       const { action, content, context } = req.body;
-      
-      let result = content || '';
-      
-      switch (action) {
-        case 'generate_introduction':
-          result = `We are pleased to present this proposal for ${context?.projectName || 'your project'}. Our team has carefully analyzed your requirements and developed a comprehensive solution that addresses your specific needs.\n\nWith our proven track record and expertise, we are confident in our ability to deliver exceptional results that exceed your expectations.`;
-          break;
-        case 'generate_scope':
-          result = `## Scope of Work\n\nThis engagement includes the following key deliverables:\n\n1. **Discovery & Planning** - Comprehensive analysis of requirements and project roadmap\n2. **Design & Development** - Creation of solutions aligned with your objectives\n3. **Testing & Quality Assurance** - Rigorous testing to ensure reliability\n4. **Deployment & Launch** - Seamless implementation and go-live support\n5. **Training & Documentation** - Knowledge transfer and user guides`;
-          break;
-        case 'generate_timeline':
-          result = `## Project Timeline\n\n| Phase | Duration | Milestones |\n|-------|----------|------------|\n| Discovery | Week 1-2 | Requirements finalized |\n| Design | Week 3-4 | Designs approved |\n| Development | Week 5-8 | Core features complete |\n| Testing | Week 9-10 | QA sign-off |\n| Launch | Week 11-12 | Go-live |`;
-          break;
-        case 'generate_terms':
-          result = `## Terms & Conditions\n\n**Payment Terms**\n- 50% deposit upon project commencement\n- 25% upon design approval\n- 25% upon project completion\n\n**Project Modifications**\nAny changes to the scope will be documented and may affect timeline and cost.\n\n**Intellectual Property**\nUpon full payment, all deliverables become your property.\n\n**Confidentiality**\nBoth parties agree to maintain confidentiality of sensitive information.`;
-          break;
-        case 'improve_tone':
-          result = content.replace(/\b(please|kindly)\b/gi, 'we would appreciate if you')
-            .replace(/\bASAP\b/gi, 'at your earliest convenience');
-          break;
-        case 'make_formal':
-          result = content.replace(/\b(hey|hi)\b/gi, 'Dear')
-            .replace(/\b(thanks)\b/gi, 'Thank you');
-          break;
-        case 'make_persuasive':
-          result = content + "\n\nThis solution represents an exceptional opportunity to achieve your goals efficiently and effectively. We are committed to delivering outstanding results and building a lasting partnership.";
-          break;
-        case 'shorten':
-          const sentences = content.split(/[.!?]+/).filter((s: string) => s.trim());
-          result = sentences.slice(0, Math.ceil(sentences.length / 2)).join('. ') + '.';
-          break;
-        case 'expand':
-          result = content + "\n\nOur approach is designed to maximize value while minimizing risk. We bring together industry best practices, innovative thinking, and a deep commitment to your success.";
-          break;
-        default:
-          result = content;
+      const tenantId = req.user!.tenantId;
+      const userId = req.user!.userId;
+
+      // Check if AI is enabled for this tenant
+      const aiEnabled = await storage.getFeatureFlag('ai_enhancement_enabled', tenantId);
+      if (!aiEnabled) {
+        return res.status(403).json({ message: "AI features are not enabled for this workspace", code: "AI_DISABLED" });
       }
+
+      // Get AI settings for this tenant
+      const aiSettings = await storage.getAiSettings(tenantId);
+      if (aiSettings && !aiSettings.proposalAiEnabled) {
+        return res.status(403).json({ message: "Proposal AI features are disabled", code: "PROPOSAL_AI_DISABLED" });
+      }
+
+      // Check token limits
+      if (aiSettings && aiSettings.tokensUsedThisMonth >= aiSettings.monthlyTokenLimit) {
+        return res.status(429).json({ message: "Monthly AI token limit reached", code: "TOKEN_LIMIT_EXCEEDED" });
+      }
+
+      const { aiService } = await import("./ai-service");
+      const startTime = Date.now();
       
-      res.json({ result, action });
+      const response = await aiService.processRequest({
+        tenantId,
+        userId,
+        module: 'proposal',
+        action,
+        content: content || '',
+        context
+      }, aiSettings);
+
+      // Log AI usage
+      await storage.createAiUsage({
+        tenantId,
+        userId,
+        module: 'proposal',
+        action,
+        tokensUsed: response.tokensUsed,
+        inputTokens: response.inputTokens,
+        outputTokens: response.outputTokens,
+        model: response.model,
+        success: response.success,
+        latencyMs: Date.now() - startTime,
+      });
+
+      // Increment token usage
+      if (response.tokensUsed > 0) {
+        await storage.incrementAiTokenUsage(tenantId, response.tokensUsed);
+      }
+
+      // Log the interaction
+      await storage.createAiLog({
+        tenantId,
+        userId,
+        module: 'proposal',
+        action,
+        inputContent: content?.substring(0, 1000),
+        outputContent: response.result?.substring(0, 1000),
+        contextData: context ? JSON.stringify(context) : undefined,
+        resourceType: 'proposal',
+        resourceId: context?.proposalId,
+        errorMessage: response.error,
+      });
+      
+      res.json({ result: response.result, action, success: response.success });
     } catch (error) {
       console.error("AI assist error:", error);
       res.status(500).json({ message: "Failed to process AI request" });
@@ -5521,6 +5575,351 @@ export async function registerRoutes(
     } catch (error) {
       console.error("Reopen onboarding error:", error);
       res.status(500).json({ message: "Failed to reopen onboarding" });
+    }
+  });
+
+  // ==================== AI ENHANCEMENT MODULE ROUTES ====================
+
+  // Get AI settings for current workspace
+  app.get("/api/ai/settings", requireAuth, validateTenant, async (req, res) => {
+    try {
+      const tenantId = req.user!.tenantId;
+      const settings = await storage.getAiSettings(tenantId);
+      const aiEnabled = await storage.getFeatureFlag('ai_enhancement_enabled', tenantId);
+      
+      if (!settings) {
+        // Return default settings if none exist
+        return res.json({
+          aiEnabled,
+          settings: null,
+          defaults: {
+            monthlyTokenLimit: 100000,
+            emailAiEnabled: true,
+            taskAiEnabled: true,
+            proposalAiEnabled: true,
+            clientAiEnabled: true,
+            reportAiEnabled: true,
+          }
+        });
+      }
+      
+      res.json({ aiEnabled, settings });
+    } catch (error) {
+      console.error("Get AI settings error:", error);
+      res.status(500).json({ message: "Failed to get AI settings" });
+    }
+  });
+
+  // Update AI settings for current workspace (admin only)
+  app.put("/api/ai/settings", requireAuth, validateTenant, requireAgencyAdmin, async (req, res) => {
+    try {
+      const tenantId = req.user!.tenantId;
+      const { emailAiEnabled, taskAiEnabled, proposalAiEnabled, clientAiEnabled, reportAiEnabled, customInstructions } = req.body;
+      
+      const updates: any = {};
+      if (typeof emailAiEnabled === 'boolean') updates.emailAiEnabled = emailAiEnabled;
+      if (typeof taskAiEnabled === 'boolean') updates.taskAiEnabled = taskAiEnabled;
+      if (typeof proposalAiEnabled === 'boolean') updates.proposalAiEnabled = proposalAiEnabled;
+      if (typeof clientAiEnabled === 'boolean') updates.clientAiEnabled = clientAiEnabled;
+      if (typeof reportAiEnabled === 'boolean') updates.reportAiEnabled = reportAiEnabled;
+      if (customInstructions !== undefined) updates.customInstructions = customInstructions;
+      
+      let settings = await storage.getAiSettings(tenantId);
+      if (!settings) {
+        settings = await storage.createOrUpdateAiSettings({ tenantId, ...updates });
+      } else {
+        settings = await storage.updateAiSettings(tenantId, updates) || settings;
+      }
+      
+      res.json(settings);
+    } catch (error) {
+      console.error("Update AI settings error:", error);
+      res.status(500).json({ message: "Failed to update AI settings" });
+    }
+  });
+
+  // Get AI usage stats
+  app.get("/api/ai/usage", requireAuth, validateTenant, async (req, res) => {
+    try {
+      const tenantId = req.user!.tenantId;
+      const stats = await storage.getAiUsageStats(tenantId);
+      const settings = await storage.getAiSettings(tenantId);
+      
+      res.json({
+        ...stats,
+        monthlyLimit: settings?.monthlyTokenLimit || 100000,
+        tokensUsedThisMonth: settings?.tokensUsedThisMonth || 0,
+        tokenResetDate: settings?.tokenResetDate,
+      });
+    } catch (error) {
+      console.error("Get AI usage error:", error);
+      res.status(500).json({ message: "Failed to get AI usage" });
+    }
+  });
+
+  // Get AI logs (admin only)
+  app.get("/api/ai/logs", requireAuth, validateTenant, requireAgencyAdmin, async (req, res) => {
+    try {
+      const tenantId = req.user!.tenantId;
+      const limit = parseInt(req.query.limit as string) || 100;
+      const logs = await storage.getAiLogs(tenantId, limit);
+      res.json(logs);
+    } catch (error) {
+      console.error("Get AI logs error:", error);
+      res.status(500).json({ message: "Failed to get AI logs" });
+    }
+  });
+
+  // Submit AI feedback
+  app.post("/api/ai/feedback", requireAuth, validateTenant, async (req, res) => {
+    try {
+      const { logId, rating, comment } = req.body;
+      if (!logId || !rating) {
+        return res.status(400).json({ message: "Log ID and rating are required" });
+      }
+      const log = await storage.updateAiLogFeedback(logId, rating, comment);
+      res.json(log);
+    } catch (error) {
+      console.error("Submit AI feedback error:", error);
+      res.status(500).json({ message: "Failed to submit feedback" });
+    }
+  });
+
+  // AI assist for tasks
+  app.post("/api/tasks/ai-assist", requireAuth, validateTenant, async (req, res) => {
+    try {
+      const { action, content, context } = req.body;
+      const tenantId = req.user!.tenantId;
+      const userId = req.user!.userId;
+
+      const aiEnabled = await storage.getFeatureFlag('ai_enhancement_enabled', tenantId);
+      if (!aiEnabled) {
+        return res.status(403).json({ message: "AI features are not enabled", code: "AI_DISABLED" });
+      }
+
+      const aiSettings = await storage.getAiSettings(tenantId);
+      if (aiSettings && !aiSettings.taskAiEnabled) {
+        return res.status(403).json({ message: "Task AI features are disabled", code: "TASK_AI_DISABLED" });
+      }
+
+      if (aiSettings && aiSettings.tokensUsedThisMonth >= aiSettings.monthlyTokenLimit) {
+        return res.status(429).json({ message: "Monthly AI token limit reached", code: "TOKEN_LIMIT_EXCEEDED" });
+      }
+
+      const { aiService } = await import("./ai-service");
+      const startTime = Date.now();
+      
+      const response = await aiService.processRequest({
+        tenantId,
+        userId,
+        module: 'task',
+        action,
+        content,
+        context
+      }, aiSettings);
+
+      await storage.createAiUsage({
+        tenantId,
+        userId,
+        module: 'task',
+        action,
+        tokensUsed: response.tokensUsed,
+        inputTokens: response.inputTokens,
+        outputTokens: response.outputTokens,
+        model: response.model,
+        success: response.success,
+        latencyMs: Date.now() - startTime,
+      });
+
+      if (response.tokensUsed > 0) {
+        await storage.incrementAiTokenUsage(tenantId, response.tokensUsed);
+      }
+
+      await storage.createAiLog({
+        tenantId,
+        userId,
+        module: 'task',
+        action,
+        inputContent: content?.substring(0, 1000),
+        outputContent: response.result?.substring(0, 1000),
+        contextData: context ? JSON.stringify(context) : undefined,
+        resourceType: 'task',
+        resourceId: context?.taskId,
+        errorMessage: response.error,
+      });
+      
+      res.json({ result: response.result, action, success: response.success });
+    } catch (error) {
+      console.error("Task AI assist error:", error);
+      res.status(500).json({ message: "Failed to process AI request" });
+    }
+  });
+
+  // AI assist for clients/leads
+  app.post("/api/clients/ai-assist", requireAuth, validateTenant, async (req, res) => {
+    try {
+      const { action, content, context } = req.body;
+      const tenantId = req.user!.tenantId;
+      const userId = req.user!.userId;
+
+      const aiEnabled = await storage.getFeatureFlag('ai_enhancement_enabled', tenantId);
+      if (!aiEnabled) {
+        return res.status(403).json({ message: "AI features are not enabled", code: "AI_DISABLED" });
+      }
+
+      const aiSettings = await storage.getAiSettings(tenantId);
+      if (aiSettings && !aiSettings.clientAiEnabled) {
+        return res.status(403).json({ message: "Client AI features are disabled", code: "CLIENT_AI_DISABLED" });
+      }
+
+      if (aiSettings && aiSettings.tokensUsedThisMonth >= aiSettings.monthlyTokenLimit) {
+        return res.status(429).json({ message: "Monthly AI token limit reached", code: "TOKEN_LIMIT_EXCEEDED" });
+      }
+
+      const { aiService } = await import("./ai-service");
+      const startTime = Date.now();
+      
+      const response = await aiService.processRequest({
+        tenantId,
+        userId,
+        module: 'client',
+        action,
+        content,
+        context
+      }, aiSettings);
+
+      await storage.createAiUsage({
+        tenantId,
+        userId,
+        module: 'client',
+        action,
+        tokensUsed: response.tokensUsed,
+        inputTokens: response.inputTokens,
+        outputTokens: response.outputTokens,
+        model: response.model,
+        success: response.success,
+        latencyMs: Date.now() - startTime,
+      });
+
+      if (response.tokensUsed > 0) {
+        await storage.incrementAiTokenUsage(tenantId, response.tokensUsed);
+      }
+
+      await storage.createAiLog({
+        tenantId,
+        userId,
+        module: 'client',
+        action,
+        inputContent: content?.substring(0, 1000),
+        outputContent: response.result?.substring(0, 1000),
+        contextData: context ? JSON.stringify(context) : undefined,
+        resourceType: 'customer',
+        resourceId: context?.customerId,
+        errorMessage: response.error,
+      });
+      
+      res.json({ result: response.result, action, success: response.success });
+    } catch (error) {
+      console.error("Client AI assist error:", error);
+      res.status(500).json({ message: "Failed to process AI request" });
+    }
+  });
+
+  // AI assist for reports
+  app.post("/api/reports/ai-assist", requireAuth, validateTenant, async (req, res) => {
+    try {
+      const { action, content, context } = req.body;
+      const tenantId = req.user!.tenantId;
+      const userId = req.user!.userId;
+
+      const aiEnabled = await storage.getFeatureFlag('ai_enhancement_enabled', tenantId);
+      if (!aiEnabled) {
+        return res.status(403).json({ message: "AI features are not enabled", code: "AI_DISABLED" });
+      }
+
+      const aiSettings = await storage.getAiSettings(tenantId);
+      if (aiSettings && !aiSettings.reportAiEnabled) {
+        return res.status(403).json({ message: "Report AI features are disabled", code: "REPORT_AI_DISABLED" });
+      }
+
+      if (aiSettings && aiSettings.tokensUsedThisMonth >= aiSettings.monthlyTokenLimit) {
+        return res.status(429).json({ message: "Monthly AI token limit reached", code: "TOKEN_LIMIT_EXCEEDED" });
+      }
+
+      const { aiService } = await import("./ai-service");
+      const startTime = Date.now();
+      
+      const response = await aiService.processRequest({
+        tenantId,
+        userId,
+        module: 'report',
+        action,
+        content,
+        context
+      }, aiSettings);
+
+      await storage.createAiUsage({
+        tenantId,
+        userId,
+        module: 'report',
+        action,
+        tokensUsed: response.tokensUsed,
+        inputTokens: response.inputTokens,
+        outputTokens: response.outputTokens,
+        model: response.model,
+        success: response.success,
+        latencyMs: Date.now() - startTime,
+      });
+
+      if (response.tokensUsed > 0) {
+        await storage.incrementAiTokenUsage(tenantId, response.tokensUsed);
+      }
+
+      await storage.createAiLog({
+        tenantId,
+        userId,
+        module: 'report',
+        action,
+        inputContent: content?.substring(0, 1000),
+        outputContent: response.result?.substring(0, 1000),
+        contextData: context ? JSON.stringify(context) : undefined,
+        resourceType: 'report',
+        errorMessage: response.error,
+      });
+      
+      res.json({ result: response.result, action, success: response.success });
+    } catch (error) {
+      console.error("Report AI assist error:", error);
+      res.status(500).json({ message: "Failed to process AI request" });
+    }
+  });
+
+  // Check if AI is available for tenant
+  app.get("/api/ai/status", requireAuth, validateTenant, async (req, res) => {
+    try {
+      const tenantId = req.user!.tenantId;
+      const aiEnabled = await storage.getFeatureFlag('ai_enhancement_enabled', tenantId);
+      const settings = await storage.getAiSettings(tenantId);
+      
+      const hasApiKey = !!process.env.OPENAI_API_KEY;
+      const tokenLimitReached = settings ? settings.tokensUsedThisMonth >= settings.monthlyTokenLimit : false;
+      
+      res.json({
+        available: aiEnabled && hasApiKey && !tokenLimitReached,
+        enabled: aiEnabled,
+        hasApiKey,
+        tokenLimitReached,
+        modules: {
+          email: settings?.emailAiEnabled ?? true,
+          task: settings?.taskAiEnabled ?? true,
+          proposal: settings?.proposalAiEnabled ?? true,
+          client: settings?.clientAiEnabled ?? true,
+          report: settings?.reportAiEnabled ?? true,
+        }
+      });
+    } catch (error) {
+      console.error("Get AI status error:", error);
+      res.status(500).json({ message: "Failed to get AI status" });
     }
   });
 

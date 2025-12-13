@@ -74,6 +74,10 @@ import type {
   InsertCustomerPortalActivityLog, CustomerPortalActivityLog,
   InsertPasswordResetToken, PasswordResetToken,
   InsertClientDocument, ClientDocument,
+  InsertAiSettings, AiSettings,
+  InsertAiUsage, AiUsage,
+  InsertAiLog, AiLog,
+  InsertAiContentVersion, AiContentVersion,
 } from "@shared/schema";
 
 export interface IStorage {
@@ -544,6 +548,20 @@ export interface IStorage {
   getFeatureFlagRecord(key: string, tenantId?: string): Promise<FeatureFlag | undefined>;
   setFeatureFlag(key: string, enabled: boolean, tenantId?: string, description?: string): Promise<FeatureFlag>;
   getAllFeatureFlags(tenantId?: string): Promise<FeatureFlag[]>;
+
+  // ==================== AI ENHANCEMENT MODULE ====================
+  getAiSettings(tenantId: string): Promise<AiSettings | undefined>;
+  createOrUpdateAiSettings(data: InsertAiSettings): Promise<AiSettings>;
+  updateAiSettings(tenantId: string, updates: Partial<InsertAiSettings>): Promise<AiSettings | undefined>;
+  createAiUsage(data: InsertAiUsage): Promise<AiUsage>;
+  getAiUsageByTenant(tenantId: string, limit?: number): Promise<AiUsage[]>;
+  getAiUsageStats(tenantId: string): Promise<{ total: number; thisMonth: number; byModule: Record<string, number> }>;
+  createAiLog(data: InsertAiLog): Promise<AiLog>;
+  getAiLogs(tenantId: string, limit?: number): Promise<AiLog[]>;
+  updateAiLogFeedback(id: string, rating: number, comment?: string): Promise<AiLog | undefined>;
+  createAiContentVersion(data: InsertAiContentVersion): Promise<AiContentVersion>;
+  getAiContentVersions(tenantId: string, resourceType: string, resourceId: string): Promise<AiContentVersion[]>;
+  incrementAiTokenUsage(tenantId: string, tokens: number): Promise<void>;
 
   // ==================== WORKSPACE OPERATIONS (Multi-Workspace Support) ====================
   // These operations are only active when multi_workspace_enabled flag is ON
@@ -4138,6 +4156,145 @@ export class DatabaseStorage implements IStorage {
         eq(schema.tasks.customerId, customerId)
       ))
       .orderBy(desc(schema.tasks.createdAt));
+  }
+
+  // ==================== AI ENHANCEMENT MODULE ====================
+
+  async getAiSettings(tenantId: string): Promise<AiSettings | undefined> {
+    const [settings] = await db.select()
+      .from(schema.aiSettings)
+      .where(eq(schema.aiSettings.tenantId, tenantId));
+    return settings;
+  }
+
+  async createOrUpdateAiSettings(data: InsertAiSettings): Promise<AiSettings> {
+    const existing = await this.getAiSettings(data.tenantId);
+    if (existing) {
+      const [updated] = await db.update(schema.aiSettings)
+        .set({ ...data, updatedAt: new Date() })
+        .where(eq(schema.aiSettings.id, existing.id))
+        .returning();
+      return updated;
+    }
+    const [created] = await db.insert(schema.aiSettings)
+      .values(data)
+      .returning();
+    return created;
+  }
+
+  async updateAiSettings(tenantId: string, updates: Partial<InsertAiSettings>): Promise<AiSettings | undefined> {
+    const existing = await this.getAiSettings(tenantId);
+    if (!existing) return undefined;
+    
+    const [updated] = await db.update(schema.aiSettings)
+      .set({ ...updates, updatedAt: new Date() })
+      .where(eq(schema.aiSettings.id, existing.id))
+      .returning();
+    return updated;
+  }
+
+  async createAiUsage(data: InsertAiUsage): Promise<AiUsage> {
+    const [created] = await db.insert(schema.aiUsage)
+      .values(data)
+      .returning();
+    return created;
+  }
+
+  async getAiUsageByTenant(tenantId: string, limit: number = 100): Promise<AiUsage[]> {
+    return db.select()
+      .from(schema.aiUsage)
+      .where(eq(schema.aiUsage.tenantId, tenantId))
+      .orderBy(desc(schema.aiUsage.createdAt))
+      .limit(limit);
+  }
+
+  async getAiUsageStats(tenantId: string): Promise<{ total: number; thisMonth: number; byModule: Record<string, number> }> {
+    const startOfMonth = new Date();
+    startOfMonth.setDate(1);
+    startOfMonth.setHours(0, 0, 0, 0);
+
+    const allUsage = await db.select()
+      .from(schema.aiUsage)
+      .where(eq(schema.aiUsage.tenantId, tenantId));
+
+    const total = allUsage.reduce((sum, u) => sum + (u.tokensUsed || 0), 0);
+    const thisMonth = allUsage
+      .filter(u => new Date(u.createdAt) >= startOfMonth)
+      .reduce((sum, u) => sum + (u.tokensUsed || 0), 0);
+
+    const byModule: Record<string, number> = {};
+    for (const usage of allUsage) {
+      byModule[usage.module] = (byModule[usage.module] || 0) + (usage.tokensUsed || 0);
+    }
+
+    return { total, thisMonth, byModule };
+  }
+
+  async createAiLog(data: InsertAiLog): Promise<AiLog> {
+    const [created] = await db.insert(schema.aiLogs)
+      .values(data)
+      .returning();
+    return created;
+  }
+
+  async getAiLogs(tenantId: string, limit: number = 100): Promise<AiLog[]> {
+    return db.select()
+      .from(schema.aiLogs)
+      .where(eq(schema.aiLogs.tenantId, tenantId))
+      .orderBy(desc(schema.aiLogs.createdAt))
+      .limit(limit);
+  }
+
+  async updateAiLogFeedback(id: string, rating: number, comment?: string): Promise<AiLog | undefined> {
+    const [updated] = await db.update(schema.aiLogs)
+      .set({ feedbackRating: rating, feedbackComment: comment })
+      .where(eq(schema.aiLogs.id, id))
+      .returning();
+    return updated;
+  }
+
+  async createAiContentVersion(data: InsertAiContentVersion): Promise<AiContentVersion> {
+    const [created] = await db.insert(schema.aiContentVersions)
+      .values(data)
+      .returning();
+    return created;
+  }
+
+  async getAiContentVersions(tenantId: string, resourceType: string, resourceId: string): Promise<AiContentVersion[]> {
+    return db.select()
+      .from(schema.aiContentVersions)
+      .where(and(
+        eq(schema.aiContentVersions.tenantId, tenantId),
+        eq(schema.aiContentVersions.resourceType, resourceType),
+        eq(schema.aiContentVersions.resourceId, resourceId)
+      ))
+      .orderBy(desc(schema.aiContentVersions.createdAt));
+  }
+
+  async incrementAiTokenUsage(tenantId: string, tokens: number): Promise<void> {
+    const settings = await this.getAiSettings(tenantId);
+    if (settings) {
+      const now = new Date();
+      const resetDate = new Date(settings.tokenResetDate);
+      
+      // Reset if we're in a new month
+      if (now.getMonth() !== resetDate.getMonth() || now.getFullYear() !== resetDate.getFullYear()) {
+        await db.update(schema.aiSettings)
+          .set({ 
+            tokensUsedThisMonth: tokens, 
+            tokenResetDate: now,
+            updatedAt: now 
+          })
+          .where(eq(schema.aiSettings.id, settings.id));
+      } else {
+        await db.update(schema.aiSettings)
+          .set({ 
+            tokensUsedThisMonth: settings.tokensUsedThisMonth + tokens,
+            updatedAt: now 
+          })
+          .where(eq(schema.aiSettings.id, settings.id));
+      }
+    }
   }
 }
 
