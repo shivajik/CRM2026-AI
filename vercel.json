@@ -1,9 +1,9 @@
 {
-  "buildCommand": "npx vite build && npx esbuild api/[...path].ts --bundle --platform=node --format=esm --outfile=api/handler.mjs --external:@vercel/node",
+  "buildCommand": "npx vite build",
   "outputDirectory": "dist/public",
   "framework": null,
   "functions": {
-    "api/handler.mjs": {
+    "api/[...path].ts": {
       "maxDuration": 30,
       "memory": 1024
     },
@@ -14,7 +14,7 @@
   },
   "rewrites": [
     { "source": "/api/health", "destination": "/api/health" },
-    { "source": "/api/:path*", "destination": "/api/handler" },
+    { "source": "/api/:path*", "destination": "/api/[...path]" },
     { "source": "/(.*)", "destination": "/index.html" }
   ]
 }
