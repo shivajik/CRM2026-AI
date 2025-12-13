@@ -1,8 +1,8 @@
 import type { VercelRequest, VercelResponse } from "@vercel/node";
 import serverless from "serverless-http";
-import { createApp } from "../server/app";
 
 let handler: any = null;
+let initError: Error | null = null;
 
 function setCorsHeaders(req: VercelRequest, res: VercelResponse) {
   const origin = req.headers.origin || "*";
@@ -10,6 +10,29 @@ function setCorsHeaders(req: VercelRequest, res: VercelResponse) {
   res.setHeader("Access-Control-Allow-Methods", "GET,POST,PUT,DELETE,PATCH,OPTIONS");
   res.setHeader("Access-Control-Allow-Headers", "Content-Type, Authorization");
   res.setHeader("Access-Control-Allow-Credentials", "true");
+}
+
+async function initHandler() {
+  if (handler) return handler;
+  if (initError) throw initError;
+  
+  try {
+    console.log("Initializing serverless handler...");
+    console.log("Environment check - SUPABASE_DATABASE_URL exists:", !!process.env.SUPABASE_DATABASE_URL);
+    console.log("Environment check - DATABASE_URL exists:", !!process.env.DATABASE_URL);
+    console.log("Environment check - JWT_SECRET exists:", !!process.env.JWT_SECRET);
+    
+    const { createApp } = await import("../server/app");
+    const app = await createApp();
+    handler = serverless(app);
+    console.log("Serverless handler initialized successfully");
+    return handler;
+  } catch (error: any) {
+    console.error("Failed to initialize handler:", error.message);
+    console.error("Stack:", error.stack);
+    initError = error;
+    throw error;
+  }
 }
 
 export default async function (req: VercelRequest, res: VercelResponse) {
@@ -21,23 +44,14 @@ export default async function (req: VercelRequest, res: VercelResponse) {
   }
 
   try {
-    if (!handler) {
-      console.log("Initializing serverless handler...");
-      console.log("Environment check - SUPABASE_DATABASE_URL exists:", !!process.env.SUPABASE_DATABASE_URL);
-      console.log("Environment check - DATABASE_URL exists:", !!process.env.DATABASE_URL);
-      console.log("Environment check - JWT_SECRET exists:", !!process.env.JWT_SECRET);
-      const app = await createApp();
-      handler = serverless(app);
-      console.log("Serverless handler initialized successfully");
-    }
-    return await handler(req, res);
+    const h = await initHandler();
+    return await h(req, res);
   } catch (error: any) {
-    console.error("Serverless handler error:", error);
-    console.error("Error stack:", error.stack);
-    handler = null;
+    console.error("Request handler error:", error.message);
     res.status(500).json({ 
-      message: "Internal server error",
-      error: process.env.NODE_ENV !== "production" ? error.message : undefined
+      message: "Server initialization failed",
+      error: error.message,
+      hint: "Check Vercel function logs for more details"
     });
   }
 }
