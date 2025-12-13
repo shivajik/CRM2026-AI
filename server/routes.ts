@@ -36,6 +36,40 @@ export async function registerRoutes(
     }
   });
   
+  // Debug endpoint for Vercel deployment troubleshooting
+  app.get("/api/debug", async (_req, res) => {
+    const envCheck = {
+      SUPABASE_DATABASE_URL: !!process.env.SUPABASE_DATABASE_URL,
+      DATABASE_URL: !!process.env.DATABASE_URL,
+      JWT_SECRET: !!process.env.JWT_SECRET,
+      NODE_ENV: process.env.NODE_ENV || "not set",
+    };
+    
+    let dbStatus = "unknown";
+    let dbError = null;
+    
+    try {
+      const { pool } = await import("./db");
+      const client = await pool.connect();
+      await client.query("SELECT 1");
+      client.release();
+      dbStatus = "connected";
+    } catch (error: any) {
+      dbStatus = "failed";
+      dbError = error.message;
+    }
+    
+    res.json({
+      status: "debug",
+      timestamp: new Date().toISOString(),
+      environment: envCheck,
+      database: {
+        status: dbStatus,
+        error: dbError
+      }
+    });
+  });
+  
   await initializeModules();
   await initializeDefaultPackages();
   await initializeSuperAdmin();

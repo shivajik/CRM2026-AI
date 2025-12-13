@@ -1,13 +1,18 @@
 import jwt from "jsonwebtoken";
-import bcrypt from "bcrypt";
+import bcrypt from "bcryptjs";
 import crypto from "crypto";
 import type { User, UserType } from "@shared/schema";
 
-const JWT_SECRET_ENV = process.env.JWT_SECRET;
-if (!JWT_SECRET_ENV) {
-  throw new Error("FATAL: JWT_SECRET environment variable is not set. This is required for secure operation.");
+function getJwtSecret(): string {
+  const secret = process.env.JWT_SECRET;
+  if (!secret) {
+    console.error("FATAL: JWT_SECRET environment variable is not set");
+    throw new Error("JWT_SECRET environment variable is not set. Please configure it in your deployment settings.");
+  }
+  return secret;
 }
-const JWT_SECRET: string = JWT_SECRET_ENV;
+
+const JWT_SECRET: string = getJwtSecret();
 
 const JWT_EXPIRES_IN = "15m";
 const REFRESH_TOKEN_EXPIRES_IN = "7d";
