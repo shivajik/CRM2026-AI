@@ -1,10 +1,48 @@
 import OpenAI from "openai";
 import type { AiSettings, InsertAiUsage, InsertAiLog } from "@shared/schema";
+import { storage } from "./storage";
+import { decrypt } from "./encryption";
 
 // the newest OpenAI model is "gpt-5" which was released August 7, 2025. do not change this unless explicitly requested by the user
 const DEFAULT_MODEL = "gpt-5";
 
-const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY || "" });
+async function getOpenAIKey(userId?: string): Promise<string | null> {
+  // 1. Check user's personal key first
+  if (userId) {
+    try {
+      const userSettings = await storage.getUserAiSettings(userId);
+      if (userSettings?.isEnabled && userSettings?.apiKey) {
+        const decryptedKey = decrypt(userSettings.apiKey);
+        if (decryptedKey) {
+          return decryptedKey;
+        }
+      }
+    } catch (error) {
+      console.error("Error fetching user AI settings:", error);
+    }
+  }
+  
+  // 2. Check platform-wide key
+  try {
+    const platformSettings = await storage.getPlatformSettings('ai');
+    const platformKey = platformSettings.find(s => s.key === 'openai_api_key');
+    if (platformKey?.value) {
+      const decryptedKey = decrypt(platformKey.value);
+      if (decryptedKey) {
+        return decryptedKey;
+      }
+    }
+  } catch (error) {
+    console.error("Error fetching platform AI settings:", error);
+  }
+  
+  // 3. Fall back to environment variable
+  return process.env.OPENAI_API_KEY || null;
+}
+
+function createOpenAIClient(apiKey: string): OpenAI {
+  return new OpenAI({ apiKey });
+}
 
 export interface AIRequestOptions {
   tenantId: string;
@@ -84,10 +122,12 @@ export class AIService {
   private model: string = DEFAULT_MODEL;
 
   async processRequest(options: AIRequestOptions, settings?: AiSettings | null): Promise<AIResponse> {
-    const { action, content, context } = options;
+    const { action, content, context, userId } = options;
     const startTime = Date.now();
 
-    if (!process.env.OPENAI_API_KEY) {
+    // Get API key from user settings, platform settings, or environment
+    const apiKey = await getOpenAIKey(userId);
+    if (!apiKey) {
       return this.getFallbackResponse(action, content, context);
     }
 
@@ -100,6 +140,8 @@ export class AIService {
     const model = settings?.preferredModel || this.model;
 
     try {
+      // Create OpenAI client with resolved API key
+      const openai = createOpenAIClient(apiKey);
       // gpt-5 doesn't support temperature parameter
       const completion = await openai.chat.completions.create({
         model,
