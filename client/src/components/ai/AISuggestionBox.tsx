@@ -244,7 +244,7 @@ export function AISuggestionBox({
         </CardTitle>
       </CardHeader>
       <CardContent className="space-y-4">
-        <div className="text-sm bg-background rounded-md p-3 border">
+        <div className="text-sm bg-background rounded-md p-3 border max-h-64 overflow-y-auto">
           {insightData ? (
             <FormattedInsight data={insightData} />
           ) : (
