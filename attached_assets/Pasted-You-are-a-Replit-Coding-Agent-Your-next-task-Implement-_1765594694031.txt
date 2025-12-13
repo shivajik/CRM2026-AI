@@ -1,0 +1,232 @@
+You are a Replit Coding Agent.
+
+Your next task: Implement the COMPLETE AI Enhancement Module across the CRM — but ONLY after performing a full audit of the existing codebase.
+
+The AI module should enhance:
+- Emails
+- Tasks
+- Proposals
+- Clients
+- Leads
+- Reporting
+- Workflow automation
+
+IMPORTANT:
+Do NOT overwrite existing features.
+Do NOT assume features are missing — AUDIT FIRST.
+Wrap all new features in a feature flag: `ai_enhancement_enabled`.
+
+===========================================================
+PHASE 1 — AI FEATURE AUDIT REPORT (MANDATORY)
+===========================================================
+Before writing any code, analyze the existing CRM and determine whether these AI components already exist:
+
+A. AI EMAIL UTILITIES
+1. AI rewrite email  
+2. AI generate new email  
+3. AI follow-up generator  
+4. AI tone change (formal, casual, persuasive)  
+5. AI subject line generator  
+
+B. AI TASK ASSISTANT
+1. Generate subtasks  
+2. Suggest due dates  
+3. Prioritize tasks  
+4. Summarize long task descriptions  
+5. Explain tasks  
+
+C. AI PROPOSAL BUILDER
+1. Generate full proposal from:
+   - Client details
+   - Services
+   - Quotation
+   - Timeline  
+2. Rewrite proposal sections  
+3. Improve tone  
+4. Summarize proposal  
+
+D. AI CLIENT & LEAD ENHANCEMENT
+1. AI lead scoring  
+2. AI client summary card  
+3. AI next-step recommendations  
+
+E. AI WORKFLOW AUTOMATION (if exists)
+Check if:
+- AI can auto-generate automation rules  
+- AI can monitor events and provide suggestions  
+
+F. AI DATA MODELS / STORAGE
+Check if:
+- AI logs exist  
+- AI feedback stored  
+- AI-generated content versions stored  
+
+G. FRONTEND AI COMPONENTS
+Check if:
+- AI input modal exists  
+- AI buttons exist (Rewrite, Expand, Summarize)  
+- AI suggestion popups exist  
+
+H. PERMISSIONS
+Check if workspace admin can:
+- Enable/disable AI  
+- Set AI limits  
+- Control which modules use AI  
+
+DO NOT implement anything until this audit is produced.
+
+===========================================================
+PHASE 2 — DECISION LOGIC
+===========================================================
+After generating the audit:
+
+1. If any AI feature already exists → DO NOT rewrite it.  
+2. If partially implemented → Only complete missing parts.  
+3. If missing → Implement full feature.  
+4. All new code MUST be:
+   - Backward compatible  
+   - Feature-flagged  
+   - Following existing coding patterns  
+   - Additive & modular  
+
+===========================================================
+PHASE 3 — IMPLEMENT ONLY MISSING AI FEATURES
+===========================================================
+Based on the audit, implement missing components from the list below.
+
+-----------------------------------------------------------
+1. AI EMAIL WRITING SUITE
+-----------------------------------------------------------
+Add missing:
+- Rewrite email  
+- Improve tone  
+- Summarize email  
+- Shorten / Expand  
+- Generate subject lines  
+- Create follow-up messages  
+- Generate full email based on client + purpose  
+
+Integrate into:
+- Email composer  
+- Proposal send modal  
+- Quotation send modal  
+- Invoice send modal  
+
+Store AI output history.
+
+-----------------------------------------------------------
+2. AI TASK ASSISTANT
+-----------------------------------------------------------
+Add missing:
+- Generate subtasks  
+- Suggest due dates  
+- Auto-prioritize  
+- Summarize task  
+- Rewrite description  
+- Suggest workflow  
+
+Integrate into Task module UI.
+
+-----------------------------------------------------------
+3. AI PROPOSAL BUILDER
+-----------------------------------------------------------
+Add missing:
+- Auto-generate proposal sections:
+  - Introduction  
+  - Scope  
+  - Deliverables  
+  - Timeline  
+  - Pricing justification  
+- Rewrite proposal content  
+- Improve tone  
+- Summarize proposal  
+- Generate full proposal draft from client + services  
+
+Integrate inside proposal editor.
+
+-----------------------------------------------------------
+4. AI LEAD & CLIENT INTELLIGENCE
+-----------------------------------------------------------
+Add missing:
+- AI lead scoring model  
+- AI-generated client summary  
+- AI recommended next actions  
+
+Add to client details sidebar.
+
+-----------------------------------------------------------
+5. AI INSIGHTS (REPORTS)
+-----------------------------------------------------------
+Add missing:
+- AI summary of workspace analytics  
+- AI recommendations for growth  
+- AI risk detection  
+
+-----------------------------------------------------------
+6. AI WORKFLOW SUGGESTIONS
+-----------------------------------------------------------
+If automation system exists or is planned:
+
+- Suggest automation rules  
+- Example: “Send reminder after 3 days if invoice unpaid”  
+- Example: “After proposal accepted, auto-create project”  
+
+-----------------------------------------------------------
+7. AI LIMITS & PERMISSIONS
+-----------------------------------------------------------
+Add missing settings:
+- Workspace admin can enable/disable AI  
+- AI usage counter per workspace  
+- AI quota for Free plan  
+- AI logs & analytics  
+
+Database additions if missing:
+- ai_usage  
+- ai_logs  
+
+-----------------------------------------------------------
+8. UI COMPONENTS (ONLY IF MISSING)
+-----------------------------------------------------------
+Create missing components:
+- AI floating panel  
+- AI actions menu  
+- AI suggestion box  
+- AI rewrite modal  
+- Loading animation  
+
+===========================================================
+PHASE 4 — TESTING REQUIREMENTS
+===========================================================
+ONLY write tests for new or modified parts.
+
+Tests must include:
+- Feature-flag behavior  
+- AI generation endpoints  
+- AI suggestions  
+- Task agent  
+- Proposal agent  
+- Email rewrite agent  
+- Workspace AI limits enforcement  
+
+===========================================================
+PHASE 5 — DELIVERABLES
+===========================================================
+Output must include:
+
+1. Only missing backend logic  
+2. Only missing frontend AI components  
+3. Only missing migrations  
+4. Only missing APIs  
+5. Tests for the new features  
+6. Updated documentation:  
+   - ai_features.md  
+   - ai_usage_limits.md  
+   - feature_flags.md  
+
+7. Final summary:
+   - What already existed  
+   - What was missing  
+   - What was added  
+   - What was untouched  
+
+Start now by generating the **AI Enhancement Audit Report** BEFORE writing any code.
