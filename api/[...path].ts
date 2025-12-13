@@ -43,6 +43,34 @@ export default async function (req: VercelRequest, res: VercelResponse) {
     return;
   }
 
+  // Debug endpoint for troubleshooting
+  if (req.url === "/api/debug-handler" || req.url?.startsWith("/api/debug-handler")) {
+    try {
+      const startTime = Date.now();
+      await initHandler();
+      const duration = Date.now() - startTime;
+      res.json({
+        status: "handler_initialized",
+        initDuration: `${duration}ms`,
+        env: {
+          SUPABASE_DATABASE_URL: !!process.env.SUPABASE_DATABASE_URL,
+          DATABASE_URL: !!process.env.DATABASE_URL,
+          JWT_SECRET: !!process.env.JWT_SECRET,
+          NODE_ENV: process.env.NODE_ENV,
+          VERCEL: process.env.VERCEL
+        }
+      });
+      return;
+    } catch (error: any) {
+      res.status(500).json({
+        status: "init_failed",
+        error: error.message,
+        stack: error.stack?.split('\n').slice(0, 5)
+      });
+      return;
+    }
+  }
+
   try {
     const h = await initHandler();
     return await h(req, res);

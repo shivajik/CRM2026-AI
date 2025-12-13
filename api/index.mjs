@@ -1906,14 +1906,19 @@ function getPool() {
   }
   console.log("[DB] Creating new database pool...");
   const isProduction = process.env.NODE_ENV === "production";
+  const isServerless = process.env.VERCEL === "1" || process.env.AWS_LAMBDA_FUNCTION_NAME;
   const hasSupabaseUrl = !!process.env.SUPABASE_DATABASE_URL;
   const pool2 = new Pool({
     connectionString: connectionString || FALLBACK_CONNECTION,
     ssl: isProduction || hasSupabaseUrl ? { rejectUnauthorized: false } : void 0,
-    max: 5,
-    idleTimeoutMillis: 3e4,
-    connectionTimeoutMillis: 15e3,
-    allowExitOnIdle: true
+    max: isServerless ? 1 : 5,
+    idleTimeoutMillis: isServerless ? 1e4 : 3e4,
+    connectionTimeoutMillis: isServerless ? 1e4 : 15e3,
+    allowExitOnIdle: true,
+    // Disable prepared statements for PgBouncer compatibility
+    ...hasSupabaseUrl && {
+      statement_timeout: 1e4
+    }
   });
   pool2.on("error", (err) => {
     console.error("[DB] Pool error:", err.message);
@@ -10522,6 +10527,32 @@ async function path_default(req, res) {
   if (req.method === "OPTIONS") {
     res.status(200).end();
     return;
+  }
+  if (req.url === "/api/debug-handler" || req.url?.startsWith("/api/debug-handler")) {
+    try {
+      const startTime = Date.now();
+      await initHandler();
+      const duration = Date.now() - startTime;
+      res.json({
+        status: "handler_initialized",
+        initDuration: `${duration}ms`,
+        env: {
+          SUPABASE_DATABASE_URL: !!process.env.SUPABASE_DATABASE_URL,
+          DATABASE_URL: !!process.env.DATABASE_URL,
+          JWT_SECRET: !!process.env.JWT_SECRET,
+          NODE_ENV: process.env.NODE_ENV,
+          VERCEL: process.env.VERCEL
+        }
+      });
+      return;
+    } catch (error) {
+      res.status(500).json({
+        status: "init_failed",
+        error: error.message,
+        stack: error.stack?.split("\n").slice(0, 5)
+      });
+      return;
+    }
   }
   try {
     const h = await initHandler();

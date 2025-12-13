@@ -25,15 +25,21 @@ function getPool(): pg.Pool {
   console.log("[DB] Creating new database pool...");
   
   const isProduction = process.env.NODE_ENV === 'production';
+  const isServerless = process.env.VERCEL === '1' || process.env.AWS_LAMBDA_FUNCTION_NAME;
   const hasSupabaseUrl = !!process.env.SUPABASE_DATABASE_URL;
   
+  // For serverless with Supabase PgBouncer, use minimal pool settings
   const pool = new Pool({
     connectionString: connectionString || FALLBACK_CONNECTION,
     ssl: (isProduction || hasSupabaseUrl) ? { rejectUnauthorized: false } : undefined,
-    max: 5,
-    idleTimeoutMillis: 30000,
-    connectionTimeoutMillis: 15000,
+    max: isServerless ? 1 : 5,
+    idleTimeoutMillis: isServerless ? 10000 : 30000,
+    connectionTimeoutMillis: isServerless ? 10000 : 15000,
     allowExitOnIdle: true,
+    // Disable prepared statements for PgBouncer compatibility
+    ...(hasSupabaseUrl && { 
+      statement_timeout: 10000,
+    }),
   });
 
   pool.on('error', (err) => {
