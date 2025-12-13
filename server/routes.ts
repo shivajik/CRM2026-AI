@@ -6,6 +6,7 @@ import { requireAuth, validateTenant, requireAgencyAdmin, requireSaasAdmin, deny
 import { authRateLimiter, strictRateLimiter, getClientIp, validateEmail } from "./security";
 import crypto from "crypto";
 import { z } from "zod";
+import { encrypt, decrypt, maskApiKey } from "./encryption";
 import { insertContactSchema, insertDealSchema, insertTaskSchema, insertProductSchema, insertCustomerSchema, insertQuotationSchema, insertQuotationItemSchema, insertInvoiceSchema, insertInvoiceItemSchema, insertPaymentSchema, insertActivitySchema, insertProposalSchema, insertProposalTemplateSchema, insertProposalSectionSchema, insertProposalPricingItemSchema, insertTemplateSectionSchema, PROPOSAL_SECTION_TYPES, AUDIT_LOG_ACTIONS } from "@shared/schema";
 
 export async function registerRoutes(
@@ -2333,8 +2334,17 @@ export async function registerRoutes(
   // Platform Settings routes
   app.get("/api/saas-admin/settings", requireAuth, requireSaasAdmin, async (req, res) => {
     try {
-      const settings = await storage.getPlatformSettings();
-      res.json(settings);
+      const { category } = req.query;
+      const settings = await storage.getPlatformSettings(category as string | undefined);
+      
+      // Mask sensitive values in response
+      const maskedSettings = settings.map(setting => ({
+        ...setting,
+        value: setting.isSensitive ? maskApiKey(decrypt(setting.value)) : setting.value,
+        hasValue: setting.isSensitive ? !!setting.value : undefined,
+      }));
+      
+      res.json(maskedSettings);
     } catch (error) {
       console.error("Get platform settings error:", error);
       res.status(500).json({ message: "Failed to fetch settings" });
@@ -2343,16 +2353,22 @@ export async function registerRoutes(
 
   app.put("/api/saas-admin/settings", requireAuth, requireSaasAdmin, async (req, res) => {
     try {
-      const { key, value, category, description } = req.body;
+      const { key, value, category, description, isSensitive } = req.body;
       if (!key || value === undefined) {
         return res.status(400).json({ message: "Key and value are required" });
       }
 
+      // Encrypt sensitive values before storing
+      const storedValue = isSensitive 
+        ? encrypt(typeof value === 'string' ? value : JSON.stringify(value))
+        : (typeof value === 'string' ? value : JSON.stringify(value));
+
       const setting = await storage.upsertPlatformSetting({
         key,
-        value: typeof value === 'string' ? value : JSON.stringify(value),
+        value: storedValue,
         category: category || 'general',
         description,
+        isSensitive: isSensitive || false,
         updatedBy: req.user!.userId,
       });
 
@@ -2363,10 +2379,14 @@ export async function registerRoutes(
         targetId: setting.id,
         action: 'update_setting',
         description: `Updated platform setting: ${key}`,
-        metadata: JSON.stringify({ key, value }),
+        metadata: JSON.stringify({ key, isSensitive }),
       });
 
-      res.json(setting);
+      // Return masked value for sensitive settings
+      res.json({
+        ...setting,
+        value: setting.isSensitive ? maskApiKey(value) : setting.value,
+      });
     } catch (error) {
       console.error("Update platform setting error:", error);
       res.status(500).json({ message: "Failed to update setting" });
@@ -2390,6 +2410,46 @@ export async function registerRoutes(
     } catch (error) {
       console.error("Delete platform setting error:", error);
       res.status(500).json({ message: "Failed to delete setting" });
+    }
+  });
+
+  // User AI Settings routes
+  app.get("/api/user/ai-settings", requireAuth, async (req, res) => {
+    try {
+      const settings = await storage.getUserAiSettings(req.user!.userId);
+      if (!settings) {
+        return res.json({ provider: 'openai', isEnabled: false, hasKey: false });
+      }
+      res.json({
+        provider: settings.provider,
+        isEnabled: settings.isEnabled,
+        hasKey: !!settings.apiKey,
+        maskedKey: settings.apiKey ? maskApiKey(decrypt(settings.apiKey)) : null,
+        lastUsedAt: settings.lastUsedAt,
+      });
+    } catch (error) {
+      console.error("Get user AI settings error:", error);
+      res.status(500).json({ message: "Failed to fetch AI settings" });
+    }
+  });
+
+  app.put("/api/user/ai-settings", requireAuth, async (req, res) => {
+    try {
+      const { apiKey, isEnabled, provider } = req.body;
+      const encryptedKey = apiKey ? encrypt(apiKey) : undefined;
+      const settings = await storage.upsertUserAiSettings(req.user!.userId, {
+        provider: provider || 'openai',
+        apiKey: encryptedKey,
+        isEnabled: isEnabled ?? true,
+      });
+      res.json({
+        provider: settings.provider,
+        isEnabled: settings.isEnabled,
+        hasKey: !!settings.apiKey,
+      });
+    } catch (error) {
+      console.error("Update user AI settings error:", error);
+      res.status(500).json({ message: "Failed to update AI settings" });
     }
   });
 

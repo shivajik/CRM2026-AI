@@ -40,7 +40,10 @@ export default function SaasAdminDashboard() {
   const [showSettingsSheet, setShowSettingsSheet] = useState(false);
   const [showActivityLogs, setShowActivityLogs] = useState(false);
   const [profileForm, setProfileForm] = useState({ firstName: "", lastName: "", email: "" });
-  const [settingForm, setSettingForm] = useState({ key: "", value: "", category: "general", description: "" });
+  const [settingForm, setSettingForm] = useState({ key: "", value: "", category: "general", description: "", isSensitive: false });
+  const [aiSettingsForm, setAiSettingsForm] = useState({ openaiApiKey: "", provider: "openai" });
+  const [emailSettingsForm, setEmailSettingsForm] = useState({ smtpHost: "", smtpPort: "", smtpUser: "", smtpPassword: "", senderEmail: "", senderName: "" });
+  const [settingsTab, setSettingsTab] = useState("ai");
   const [activityFilters, setActivityFilters] = useState({ action: "", targetType: "", limit: 50 });
   const [showPackageDialog, setShowPackageDialog] = useState(false);
   const [editingPackage, setEditingPackage] = useState<any>(null);
@@ -139,7 +142,7 @@ export default function SaasAdminDashboard() {
     onSuccess: () => {
       toast.success("Setting saved successfully");
       queryClient.invalidateQueries({ queryKey: ["platformSettings"] });
-      setSettingForm({ key: "", value: "", category: "general", description: "" });
+      setSettingForm({ key: "", value: "", category: "general", description: "", isSensitive: false });
     },
     onError: () => {
       toast.error("Failed to save setting");
@@ -1639,113 +1642,301 @@ export default function SaasAdminDashboard() {
 
         {/* Platform Settings Sheet */}
         <Sheet open={showSettingsSheet} onOpenChange={setShowSettingsSheet}>
-          <SheetContent className="w-full sm:max-w-xl overflow-y-auto">
+          <SheetContent className="w-full sm:max-w-2xl overflow-y-auto">
             <SheetHeader>
               <SheetTitle className="flex items-center gap-2">
                 <Settings className="w-5 h-5" />
                 Platform Settings
               </SheetTitle>
-              <SheetDescription>Configure platform-wide settings</SheetDescription>
+              <SheetDescription>Configure platform-wide settings for AI, Email, and more</SheetDescription>
             </SheetHeader>
             
-            <div className="mt-6 space-y-6">
-              {/* Add/Edit Setting Form */}
-              <Card>
-                <CardHeader>
-                  <CardTitle className="text-sm">Add/Update Setting</CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <form onSubmit={(e) => {
-                    e.preventDefault();
-                    if (settingForm.key && settingForm.value) {
-                      updateSettingMutation.mutate(settingForm);
-                    }
-                  }} className="space-y-4">
+            <Tabs value={settingsTab} onValueChange={setSettingsTab} className="mt-6">
+              <TabsList className="grid w-full grid-cols-3">
+                <TabsTrigger value="ai" data-testid="tab-settings-ai">AI Configuration</TabsTrigger>
+                <TabsTrigger value="email" data-testid="tab-settings-email">Email SMTP</TabsTrigger>
+                <TabsTrigger value="advanced" data-testid="tab-settings-advanced">Advanced</TabsTrigger>
+              </TabsList>
+              
+              {/* AI Configuration Tab */}
+              <TabsContent value="ai" className="mt-6 space-y-4">
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="text-sm flex items-center gap-2">
+                      <span className="w-8 h-8 rounded-lg bg-green-100 dark:bg-green-900/30 flex items-center justify-center">
+                        <svg className="w-5 h-5 text-green-600" viewBox="0 0 24 24" fill="currentColor">
+                          <path d="M22.2819 9.8211a5.9847 5.9847 0 0 0-.5157-4.9108 6.0462 6.0462 0 0 0-6.5098-2.9A6.0651 6.0651 0 0 0 4.9807 4.1818a5.9847 5.9847 0 0 0-3.9977 2.9 6.0462 6.0462 0 0 0 .7427 7.0966 5.98 5.98 0 0 0 .511 4.9107 6.051 6.051 0 0 0 6.5146 2.9001A5.9847 5.9847 0 0 0 13.2599 24a6.0557 6.0557 0 0 0 5.7718-4.2058 5.9894 5.9894 0 0 0 3.9977-2.9001 6.0557 6.0557 0 0 0-.7475-7.0729zm-9.022 12.6081a4.4755 4.4755 0 0 1-2.8764-1.0408l.1419-.0804 4.7783-2.7582a.7948.7948 0 0 0 .3927-.6813v-6.7369l2.02 1.1686a.071.071 0 0 1 .038.052v5.5826a4.504 4.504 0 0 1-4.4945 4.4944zm-9.6607-4.1254a4.4708 4.4708 0 0 1-.5346-3.0137l.142.0852 4.783 2.7582a.7712.7712 0 0 0 .7806 0l5.8428-3.3685v2.3324a.0804.0804 0 0 1-.0332.0615L9.74 19.9502a4.4992 4.4992 0 0 1-6.1408-1.6464zM2.3408 7.8956a4.485 4.485 0 0 1 2.3655-1.9728V11.6a.7664.7664 0 0 0 .3879.6765l5.8144 3.3543-2.0201 1.1685a.0757.0757 0 0 1-.071 0l-4.8303-2.7865A4.504 4.504 0 0 1 2.3408 7.872zm16.5963 3.8558L13.1038 8.364l2.0201-1.1685a.0757.0757 0 0 1 .071 0l4.8303 2.7913a4.4944 4.4944 0 0 1-.6765 8.1042v-5.6772a.79.79 0 0 0-.407-.667zm2.0107-3.0231l-.142-.0852-4.7735-2.7818a.7759.7759 0 0 0-.7854 0L9.409 9.2297V6.8974a.0662.0662 0 0 1 .0284-.0615l4.8303-2.7866a4.4992 4.4992 0 0 1 6.6802 4.66zM8.3065 12.863l-2.02-1.1638a.0804.0804 0 0 1-.038-.0567V6.0742a4.4992 4.4992 0 0 1 7.3757-3.4537l-.142.0805L8.704 5.459a.7948.7948 0 0 0-.3927.6813zm1.0976-2.3654l2.602-1.4998 2.6069 1.4998v2.9994l-2.5974 1.4997-2.6067-1.4997Z"/>
+                        </svg>
+                      </span>
+                      OpenAI Configuration
+                    </CardTitle>
+                    <CardDescription>Configure the platform-wide OpenAI API key for AI features</CardDescription>
+                  </CardHeader>
+                  <CardContent className="space-y-4">
+                    <div className="space-y-2">
+                      <Label htmlFor="openaiApiKey">OpenAI API Key</Label>
+                      <div className="flex gap-2">
+                        <Input
+                          id="openaiApiKey"
+                          type="password"
+                          value={aiSettingsForm.openaiApiKey}
+                          onChange={(e) => setAiSettingsForm({...aiSettingsForm, openaiApiKey: e.target.value})}
+                          placeholder={settings.find((s: any) => s.key === 'openai_api_key')?.hasValue ? '••••••••' : 'sk-...'}
+                          data-testid="input-openai-api-key"
+                        />
+                        <Button 
+                          onClick={() => {
+                            if (aiSettingsForm.openaiApiKey) {
+                              updateSettingMutation.mutate({
+                                key: 'openai_api_key',
+                                value: aiSettingsForm.openaiApiKey,
+                                category: 'ai',
+                                description: 'Platform OpenAI API Key',
+                                isSensitive: true,
+                              });
+                              setAiSettingsForm({...aiSettingsForm, openaiApiKey: ''});
+                            }
+                          }}
+                          disabled={!aiSettingsForm.openaiApiKey || updateSettingMutation.isPending}
+                          data-testid="button-save-openai-key"
+                        >
+                          <Save className="w-4 h-4 mr-2" />
+                          Save
+                        </Button>
+                      </div>
+                      <p className="text-xs text-muted-foreground">
+                        This key will be used for all AI features when users don't have their own key configured.
+                        {settings.find((s: any) => s.key === 'openai_api_key')?.value && (
+                          <span className="ml-2 text-green-600">Current: {settings.find((s: any) => s.key === 'openai_api_key')?.value}</span>
+                        )}
+                      </p>
+                    </div>
+                    <div className="p-3 bg-blue-50 dark:bg-blue-900/20 rounded-lg border border-blue-200 dark:border-blue-800">
+                      <p className="text-sm text-blue-700 dark:text-blue-300">
+                        <strong>Note:</strong> Users can configure their own OpenAI API key in their settings. 
+                        User keys take priority over the platform key.
+                      </p>
+                    </div>
+                  </CardContent>
+                </Card>
+              </TabsContent>
+              
+              {/* Email SMTP Tab */}
+              <TabsContent value="email" className="mt-6 space-y-4">
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="text-sm">Email SMTP Configuration</CardTitle>
+                    <CardDescription>Configure email sending for notifications and transactional emails</CardDescription>
+                  </CardHeader>
+                  <CardContent className="space-y-4">
                     <div className="grid grid-cols-2 gap-4">
                       <div className="space-y-2">
-                        <Label htmlFor="settingKey">Key</Label>
+                        <Label htmlFor="smtpHost">SMTP Host</Label>
                         <Input
-                          id="settingKey"
-                          value={settingForm.key}
-                          onChange={(e) => setSettingForm({...settingForm, key: e.target.value})}
-                          placeholder="setting.key"
-                          data-testid="input-setting-key"
+                          id="smtpHost"
+                          value={emailSettingsForm.smtpHost}
+                          onChange={(e) => setEmailSettingsForm({...emailSettingsForm, smtpHost: e.target.value})}
+                          placeholder="smtp.example.com"
+                          data-testid="input-smtp-host"
                         />
                       </div>
                       <div className="space-y-2">
-                        <Label htmlFor="settingCategory">Category</Label>
-                        <Select 
-                          value={settingForm.category} 
-                          onValueChange={(v) => setSettingForm({...settingForm, category: v})}
-                        >
-                          <SelectTrigger data-testid="select-setting-category">
-                            <SelectValue />
-                          </SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="general">General</SelectItem>
-                            <SelectItem value="branding">Branding</SelectItem>
-                            <SelectItem value="email">Email</SelectItem>
-                            <SelectItem value="billing">Billing</SelectItem>
-                            <SelectItem value="security">Security</SelectItem>
-                          </SelectContent>
-                        </Select>
+                        <Label htmlFor="smtpPort">SMTP Port</Label>
+                        <Input
+                          id="smtpPort"
+                          value={emailSettingsForm.smtpPort}
+                          onChange={(e) => setEmailSettingsForm({...emailSettingsForm, smtpPort: e.target.value})}
+                          placeholder="587"
+                          data-testid="input-smtp-port"
+                        />
                       </div>
                     </div>
-                    <div className="space-y-2">
-                      <Label htmlFor="settingValue">Value</Label>
-                      <Input
-                        id="settingValue"
-                        value={settingForm.value}
-                        onChange={(e) => setSettingForm({...settingForm, value: e.target.value})}
-                        placeholder="Setting value"
-                        data-testid="input-setting-value"
-                      />
+                    <div className="grid grid-cols-2 gap-4">
+                      <div className="space-y-2">
+                        <Label htmlFor="smtpUser">SMTP Username</Label>
+                        <Input
+                          id="smtpUser"
+                          value={emailSettingsForm.smtpUser}
+                          onChange={(e) => setEmailSettingsForm({...emailSettingsForm, smtpUser: e.target.value})}
+                          placeholder="user@example.com"
+                          data-testid="input-smtp-user"
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <Label htmlFor="smtpPassword">SMTP Password</Label>
+                        <Input
+                          id="smtpPassword"
+                          type="password"
+                          value={emailSettingsForm.smtpPassword}
+                          onChange={(e) => setEmailSettingsForm({...emailSettingsForm, smtpPassword: e.target.value})}
+                          placeholder="••••••••"
+                          data-testid="input-smtp-password"
+                        />
+                      </div>
                     </div>
-                    <div className="space-y-2">
-                      <Label htmlFor="settingDescription">Description (optional)</Label>
-                      <Input
-                        id="settingDescription"
-                        value={settingForm.description}
-                        onChange={(e) => setSettingForm({...settingForm, description: e.target.value})}
-                        placeholder="What this setting does..."
-                        data-testid="input-setting-description"
-                      />
+                    <div className="grid grid-cols-2 gap-4">
+                      <div className="space-y-2">
+                        <Label htmlFor="senderEmail">Sender Email</Label>
+                        <Input
+                          id="senderEmail"
+                          value={emailSettingsForm.senderEmail}
+                          onChange={(e) => setEmailSettingsForm({...emailSettingsForm, senderEmail: e.target.value})}
+                          placeholder="noreply@example.com"
+                          data-testid="input-sender-email"
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <Label htmlFor="senderName">Sender Name</Label>
+                        <Input
+                          id="senderName"
+                          value={emailSettingsForm.senderName}
+                          onChange={(e) => setEmailSettingsForm({...emailSettingsForm, senderName: e.target.value})}
+                          placeholder="My Platform"
+                          data-testid="input-sender-name"
+                        />
+                      </div>
                     </div>
-                    <Button type="submit" className="w-full" disabled={updateSettingMutation.isPending} data-testid="button-save-setting">
+                    <Button 
+                      className="w-full"
+                      onClick={() => {
+                        const emailSettings = [
+                          { key: 'smtp_host', value: emailSettingsForm.smtpHost, category: 'email', description: 'SMTP Server Host', isSensitive: false },
+                          { key: 'smtp_port', value: emailSettingsForm.smtpPort, category: 'email', description: 'SMTP Server Port', isSensitive: false },
+                          { key: 'smtp_user', value: emailSettingsForm.smtpUser, category: 'email', description: 'SMTP Username', isSensitive: false },
+                          { key: 'smtp_password', value: emailSettingsForm.smtpPassword, category: 'email', description: 'SMTP Password', isSensitive: true },
+                          { key: 'sender_email', value: emailSettingsForm.senderEmail, category: 'email', description: 'Default Sender Email', isSensitive: false },
+                          { key: 'sender_name', value: emailSettingsForm.senderName, category: 'email', description: 'Default Sender Name', isSensitive: false },
+                        ];
+                        emailSettings.filter(s => s.value).forEach(s => updateSettingMutation.mutate(s));
+                      }}
+                      disabled={updateSettingMutation.isPending}
+                      data-testid="button-save-email-settings"
+                    >
                       <Save className="w-4 h-4 mr-2" />
-                      Save Setting
+                      Save Email Settings
                     </Button>
-                  </form>
-                </CardContent>
-              </Card>
-
-              {/* Current Settings */}
-              <Card>
-                <CardHeader>
-                  <CardTitle className="text-sm">Current Settings</CardTitle>
-                </CardHeader>
-                <CardContent>
-                  {settings.length === 0 ? (
-                    <p className="text-muted-foreground text-center py-4">No settings configured yet</p>
-                  ) : (
-                    <div className="space-y-3">
-                      {settings.map((setting: any) => (
-                        <div key={setting.id} className="flex items-center justify-between p-3 bg-muted rounded-lg">
-                          <div>
-                            <p className="font-medium text-sm">{setting.key}</p>
-                            <p className="text-xs text-muted-foreground">{setting.description || setting.category}</p>
-                          </div>
-                          <div className="text-right">
-                            <p className="text-sm">{setting.value}</p>
-                            <Badge variant="outline" className="text-xs">{setting.category}</Badge>
-                          </div>
+                  </CardContent>
+                </Card>
+              </TabsContent>
+              
+              {/* Advanced Tab */}
+              <TabsContent value="advanced" className="mt-6 space-y-4">
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="text-sm">Add Custom Setting</CardTitle>
+                    <CardDescription>Add or update any platform setting manually</CardDescription>
+                  </CardHeader>
+                  <CardContent>
+                    <form onSubmit={(e) => {
+                      e.preventDefault();
+                      if (settingForm.key && settingForm.value) {
+                        updateSettingMutation.mutate(settingForm);
+                      }
+                    }} className="space-y-4">
+                      <div className="grid grid-cols-2 gap-4">
+                        <div className="space-y-2">
+                          <Label htmlFor="settingKey">Key</Label>
+                          <Input
+                            id="settingKey"
+                            value={settingForm.key}
+                            onChange={(e) => setSettingForm({...settingForm, key: e.target.value})}
+                            placeholder="setting.key"
+                            data-testid="input-setting-key"
+                          />
                         </div>
-                      ))}
-                    </div>
-                  )}
-                </CardContent>
-              </Card>
-            </div>
+                        <div className="space-y-2">
+                          <Label htmlFor="settingCategory">Category</Label>
+                          <Select 
+                            value={settingForm.category} 
+                            onValueChange={(v) => setSettingForm({...settingForm, category: v})}
+                          >
+                            <SelectTrigger data-testid="select-setting-category">
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="general">General</SelectItem>
+                              <SelectItem value="branding">Branding</SelectItem>
+                              <SelectItem value="email">Email</SelectItem>
+                              <SelectItem value="ai">AI</SelectItem>
+                              <SelectItem value="billing">Billing</SelectItem>
+                              <SelectItem value="security">Security</SelectItem>
+                            </SelectContent>
+                          </Select>
+                        </div>
+                      </div>
+                      <div className="space-y-2">
+                        <Label htmlFor="settingValue">Value</Label>
+                        <Input
+                          id="settingValue"
+                          value={settingForm.value}
+                          onChange={(e) => setSettingForm({...settingForm, value: e.target.value})}
+                          placeholder="Setting value"
+                          data-testid="input-setting-value"
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <Label htmlFor="settingDescription">Description (optional)</Label>
+                        <Input
+                          id="settingDescription"
+                          value={settingForm.description}
+                          onChange={(e) => setSettingForm({...settingForm, description: e.target.value})}
+                          placeholder="What this setting does..."
+                          data-testid="input-setting-description"
+                        />
+                      </div>
+                      <div className="flex items-center space-x-2">
+                        <Checkbox
+                          id="isSensitive"
+                          checked={settingForm.isSensitive}
+                          onCheckedChange={(checked) => setSettingForm({...settingForm, isSensitive: checked as boolean})}
+                          data-testid="checkbox-is-sensitive"
+                        />
+                        <Label htmlFor="isSensitive" className="text-sm">This is a sensitive value (will be encrypted)</Label>
+                      </div>
+                      <Button type="submit" className="w-full" disabled={updateSettingMutation.isPending} data-testid="button-save-setting">
+                        <Save className="w-4 h-4 mr-2" />
+                        Save Setting
+                      </Button>
+                    </form>
+                  </CardContent>
+                </Card>
+
+                {/* Current Settings */}
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="text-sm">All Platform Settings</CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    {settings.length === 0 ? (
+                      <p className="text-muted-foreground text-center py-4">No settings configured yet</p>
+                    ) : (
+                      <div className="space-y-3">
+                        {settings.map((setting: any) => (
+                          <div key={setting.id} className="flex items-center justify-between p-3 bg-muted rounded-lg" data-testid={`setting-${setting.key}`}>
+                            <div>
+                              <p className="font-medium text-sm">{setting.key}</p>
+                              <p className="text-xs text-muted-foreground">{setting.description || setting.category}</p>
+                            </div>
+                            <div className="text-right flex items-center gap-2">
+                              <div>
+                                <p className="text-sm font-mono">{setting.isSensitive ? (setting.value || '(not set)') : setting.value}</p>
+                                <Badge variant="outline" className="text-xs">{setting.category}</Badge>
+                              </div>
+                              {setting.isSensitive && (
+                                <Badge variant="secondary" className="text-xs">
+                                  <Shield className="w-3 h-3 mr-1" />
+                                  Encrypted
+                                </Badge>
+                              )}
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </CardContent>
+                </Card>
+              </TabsContent>
+            </Tabs>
           </SheetContent>
         </Sheet>
       </div>

@@ -310,7 +310,7 @@ export const saasAdminApi = {
   
   // Platform Settings
   getSettings: () => apiRequest("/saas-admin/settings"),
-  updateSetting: (data: { key: string; value: string; category?: string; description?: string }) =>
+  updateSetting: (data: { key: string; value: string; category?: string; description?: string; isSensitive?: boolean }) =>
     apiRequest("/saas-admin/settings", { method: "PUT", body: JSON.stringify(data) }),
   deleteSetting: (key: string) => apiRequest(`/saas-admin/settings/${key}`, { method: "DELETE" }),
   
@@ -377,6 +377,13 @@ export const saasAdminApi = {
 // Public Packages API (for pricing page)
 export const packagesApi = {
   getAll: () => apiRequest("/packages"),
+};
+
+// User AI Settings API
+export const userAiApi = {
+  getSettings: () => apiRequest("/user/ai-settings"),
+  updateSettings: (data: { apiKey?: string; isEnabled?: boolean; provider?: string }) =>
+    apiRequest("/user/ai-settings", { method: "PUT", body: JSON.stringify(data) }),
 };
 
 // Email Module API

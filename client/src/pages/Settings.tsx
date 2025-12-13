@@ -9,13 +9,13 @@ import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { getUser, setUser } from "@/lib/auth";
-import { usersApi, companyProfileApi, emailApi } from "@/lib/api";
+import { usersApi, companyProfileApi, emailApi, userAiApi } from "@/lib/api";
 import { Badge } from "@/components/ui/badge";
 import { useState, useEffect, useRef } from "react";
 import { useToast } from "@/hooks/use-toast";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { User, Mail, Shield, Building2, Globe, Phone, MapPin, FileText, DollarSign, Upload, Camera, ImageIcon, Server, Check, X, Loader2 } from "lucide-react";
+import { User, Mail, Shield, Building2, Globe, Phone, MapPin, FileText, DollarSign, Upload, Camera, ImageIcon, Server, Check, X, Loader2, Sparkles, Key, Eye, EyeOff } from "lucide-react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 export default function Settings() {
@@ -71,9 +71,50 @@ export default function Settings() {
     isEnabled: true,
   });
 
+  const [aiSettings, setAiSettings] = useState({
+    openaiApiKey: "",
+    isEnabled: false,
+    provider: "openai",
+  });
+  const [showApiKey, setShowApiKey] = useState(false);
+
   const { data: smtpSettings, isLoading: isLoadingSmtp } = useQuery({
     queryKey: ["smtp-settings"],
     queryFn: emailApi.getSmtpSettings,
+  });
+
+  const { data: userAiSettings, isLoading: isLoadingAi } = useQuery({
+    queryKey: ["user-ai-settings"],
+    queryFn: userAiApi.getSettings,
+  });
+
+  useEffect(() => {
+    if (userAiSettings) {
+      setAiSettings({
+        openaiApiKey: "",
+        isEnabled: userAiSettings.isEnabled || false,
+        provider: userAiSettings.provider || "openai",
+      });
+    }
+  }, [userAiSettings]);
+
+  const updateAiSettingsMutation = useMutation({
+    mutationFn: userAiApi.updateSettings,
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["user-ai-settings"] });
+      toast({
+        title: "AI settings updated",
+        description: "Your AI preferences have been saved successfully.",
+      });
+      setAiSettings(prev => ({ ...prev, openaiApiKey: "" }));
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Update failed",
+        description: error.message || "Failed to update AI settings. Please try again.",
+        variant: "destructive",
+      });
+    },
   });
 
   useEffect(() => {
@@ -360,10 +401,11 @@ export default function Settings() {
           </div>
 
           <Tabs defaultValue="profile" className="w-full">
-            <TabsList className="grid w-full grid-cols-4">
-              <TabsTrigger value="profile" data-testid="tab-profile">Personal Profile</TabsTrigger>
-              <TabsTrigger value="company" data-testid="tab-company">Company Profile</TabsTrigger>
-              <TabsTrigger value="email" data-testid="tab-email">Email Settings</TabsTrigger>
+            <TabsList className="grid w-full grid-cols-5">
+              <TabsTrigger value="profile" data-testid="tab-profile">Profile</TabsTrigger>
+              <TabsTrigger value="company" data-testid="tab-company">Company</TabsTrigger>
+              <TabsTrigger value="email" data-testid="tab-email">Email</TabsTrigger>
+              <TabsTrigger value="ai" data-testid="tab-ai">AI Preferences</TabsTrigger>
               <TabsTrigger value="notifications" data-testid="tab-notifications">Notifications</TabsTrigger>
             </TabsList>
 
@@ -1100,6 +1142,98 @@ export default function Settings() {
                   </CardContent>
                 </Card>
               </form>
+            </TabsContent>
+
+            <TabsContent value="ai" className="space-y-6 mt-6">
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2">
+                    <Sparkles className="h-5 w-5" />
+                    AI Preferences
+                  </CardTitle>
+                  <CardDescription>Configure your personal AI settings and API key.</CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-6">
+                  <div className="p-4 bg-blue-50 dark:bg-blue-900/20 rounded-lg border border-blue-200 dark:border-blue-800">
+                    <p className="text-sm text-blue-700 dark:text-blue-300">
+                      <strong>Your Personal AI Key:</strong> When configured, your OpenAI API key will be used for all AI features instead of the platform's shared key. This gives you more control over usage and costs.
+                    </p>
+                  </div>
+                  
+                  <div className="space-y-4">
+                    <div className="flex items-center justify-between">
+                      <div className="space-y-0.5">
+                        <Label className="text-base">Enable Personal AI Key</Label>
+                        <p className="text-sm text-muted-foreground">Use your own OpenAI API key for AI features</p>
+                      </div>
+                      <Switch 
+                        checked={aiSettings.isEnabled}
+                        onCheckedChange={(checked) => setAiSettings(prev => ({ ...prev, isEnabled: checked }))}
+                        data-testid="switch-ai-enabled"
+                      />
+                    </div>
+                    
+                    {aiSettings.isEnabled && (
+                      <>
+                        <Separator />
+                        <div className="space-y-2">
+                          <Label htmlFor="openaiApiKey" className="flex items-center gap-2">
+                            <Key className="h-4 w-4" />
+                            OpenAI API Key
+                          </Label>
+                          <div className="flex gap-2">
+                            <div className="relative flex-1">
+                              <Input
+                                id="openaiApiKey"
+                                type={showApiKey ? "text" : "password"}
+                                value={aiSettings.openaiApiKey}
+                                onChange={(e) => setAiSettings(prev => ({ ...prev, openaiApiKey: e.target.value }))}
+                                placeholder={userAiSettings?.hasKey ? "••••••••••••" : "sk-..."}
+                                data-testid="input-user-openai-key"
+                              />
+                              <Button
+                                type="button"
+                                variant="ghost"
+                                size="sm"
+                                className="absolute right-1 top-1/2 -translate-y-1/2 h-7 w-7 p-0"
+                                onClick={() => setShowApiKey(!showApiKey)}
+                                data-testid="button-toggle-key-visibility"
+                              >
+                                {showApiKey ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                              </Button>
+                            </div>
+                          </div>
+                          {userAiSettings?.hasKey && (
+                            <p className="text-xs text-green-600 flex items-center gap-1">
+                              <Check className="h-3 w-3" />
+                              API key configured: {userAiSettings.maskedKey}
+                            </p>
+                          )}
+                          <p className="text-xs text-muted-foreground">
+                            Get your API key from <a href="https://platform.openai.com/api-keys" target="_blank" rel="noopener noreferrer" className="text-primary underline">OpenAI's dashboard</a>
+                          </p>
+                        </div>
+                      </>
+                    )}
+                  </div>
+                  
+                  <Separator />
+                  
+                  <Button
+                    onClick={() => {
+                      updateAiSettingsMutation.mutate({
+                        apiKey: aiSettings.openaiApiKey || undefined,
+                        isEnabled: aiSettings.isEnabled,
+                        provider: aiSettings.provider,
+                      });
+                    }}
+                    disabled={updateAiSettingsMutation.isPending || isLoadingAi}
+                    data-testid="button-save-ai-settings"
+                  >
+                    {updateAiSettingsMutation.isPending ? "Saving..." : "Save AI Settings"}
+                  </Button>
+                </CardContent>
+              </Card>
             </TabsContent>
 
             <TabsContent value="notifications" className="space-y-6 mt-6">
