@@ -663,12 +663,23 @@ export type InsertTaskActivityLog = z.infer<typeof insertTaskActivityLogSchema>;
 export type TaskActivityLog = typeof taskActivityLog.$inferSelect;
 
 // ==================== PLATFORM SETTINGS (SaaS Admin) ====================
+export const PLATFORM_SETTING_CATEGORIES = {
+  GENERAL: 'general',
+  EMAIL: 'email',
+  AI: 'ai',
+  SECURITY: 'security',
+  BRANDING: 'branding',
+} as const;
+
+export type PlatformSettingCategory = typeof PLATFORM_SETTING_CATEGORIES[keyof typeof PLATFORM_SETTING_CATEGORIES];
+
 export const platformSettings = pgTable("platform_settings", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   key: text("key").notNull().unique(),
   value: text("value").notNull(),
   category: text("category").notNull().default("general"),
   description: text("description"),
+  isSensitive: boolean("is_sensitive").default(false).notNull(),
   updatedBy: varchar("updated_by").references(() => users.id),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });
@@ -679,6 +690,27 @@ export const insertPlatformSettingSchema = createInsertSchema(platformSettings).
 });
 export type InsertPlatformSetting = z.infer<typeof insertPlatformSettingSchema>;
 export type PlatformSetting = typeof platformSettings.$inferSelect;
+
+// ==================== USER AI SETTINGS (Personal API Keys) ====================
+export const userAiSettings = pgTable("user_ai_settings", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  userId: varchar("user_id").references(() => users.id, { onDelete: "cascade" }).notNull().unique(),
+  provider: text("provider").notNull().default("openai"),
+  apiKey: text("api_key"),
+  isEnabled: boolean("is_enabled").default(true).notNull(),
+  lastUsedAt: timestamp("last_used_at"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+export const insertUserAiSettingSchema = createInsertSchema(userAiSettings).omit({ 
+  id: true, 
+  createdAt: true,
+  updatedAt: true,
+  lastUsedAt: true,
+});
+export type InsertUserAiSetting = z.infer<typeof insertUserAiSettingSchema>;
+export type UserAiSetting = typeof userAiSettings.$inferSelect;
 
 // ==================== COMPANY PROFILES (Agency/Tenant Extended Profile) ====================
 export const companyProfiles = pgTable("company_profiles", {
