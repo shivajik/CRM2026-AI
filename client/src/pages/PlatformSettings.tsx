@@ -7,10 +7,11 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { ProtectedRoute } from "@/components/ProtectedRoute";
+import { Layout } from "@/components/layout/Layout";
 import { saasAdminApi, authApi } from "@/lib/api";
 import { useLocation } from "wouter";
 import { 
-  Settings, ArrowLeft, Save, Shield, Mail, Sparkles, 
+  Settings, Save, Shield, Mail, Sparkles, 
   Eye, EyeOff, Key, Check, AlertCircle
 } from "lucide-react";
 import { toast } from "sonner";
@@ -128,9 +129,11 @@ export default function PlatformSettings() {
   if (loadingUser || loadingSettings) {
     return (
       <ProtectedRoute>
-        <div className="min-h-screen bg-background flex items-center justify-center">
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
-        </div>
+        <Layout>
+          <div className="flex items-center justify-center h-64">
+            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+          </div>
+        </Layout>
       </ProtectedRoute>
     );
   }
@@ -138,47 +141,34 @@ export default function PlatformSettings() {
   if (currentUser?.userType !== "saas_admin") {
     return (
       <ProtectedRoute>
-        <div className="min-h-screen bg-background flex items-center justify-center">
-          <Card>
-            <CardContent className="pt-6">
-              <p className="text-muted-foreground">Access denied. Super admin privileges required.</p>
-            </CardContent>
-          </Card>
-        </div>
+        <Layout>
+          <div className="flex items-center justify-center h-64">
+            <Card>
+              <CardContent className="pt-6">
+                <p className="text-muted-foreground">Access denied. Super admin privileges required.</p>
+              </CardContent>
+            </Card>
+          </div>
+        </Layout>
       </ProtectedRoute>
     );
   }
 
   return (
     <ProtectedRoute>
-      <div className="min-h-screen bg-background">
-        <div className="border-b bg-card">
-          <div className="container max-w-5xl mx-auto px-4 py-6">
-            <div className="flex items-center gap-4">
-              <Button 
-                variant="ghost" 
-                size="icon"
-                onClick={() => setLocation("/saas-admin")}
-                data-testid="button-back-to-dashboard"
-              >
-                <ArrowLeft className="h-5 w-5" />
-              </Button>
-              <div className="flex-1">
-                <div className="flex items-center gap-3">
-                  <div className="h-10 w-10 rounded-lg bg-primary/10 flex items-center justify-center">
-                    <Settings className="h-5 w-5 text-primary" />
-                  </div>
-                  <div>
-                    <h1 className="text-2xl font-bold tracking-tight">Platform Settings</h1>
-                    <p className="text-muted-foreground text-sm">Configure platform-wide settings for AI, Email, and more</p>
-                  </div>
-                </div>
-              </div>
+      <Layout>
+        <div className="space-y-6">
+          <div className="flex items-center gap-3">
+            <div className="h-10 w-10 rounded-lg bg-primary/10 flex items-center justify-center">
+              <Settings className="h-5 w-5 text-primary" />
+            </div>
+            <div>
+              <h1 className="text-2xl font-bold tracking-tight">Platform Settings</h1>
+              <p className="text-muted-foreground text-sm">Configure platform-wide settings for AI, Email, and more</p>
             </div>
           </div>
-        </div>
 
-        <div className="container max-w-5xl mx-auto px-4 py-8">
+          <div className="max-w-5xl">
           <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
             <TabsList className="grid w-full grid-cols-3 max-w-md">
               <TabsTrigger value="ai" className="flex items-center gap-2" data-testid="tab-settings-ai">
@@ -428,8 +418,9 @@ export default function PlatformSettings() {
               </Card>
             </TabsContent>
           </Tabs>
+          </div>
         </div>
-      </div>
+      </Layout>
     </ProtectedRoute>
   );
 }
