@@ -155,7 +155,7 @@ function Router() {
         <Route path="/team/:id">{() => <AdminPage component={TeamMemberDetail} />}</Route>
         <Route path="/team-dashboard">{() => <ProtectedPage component={TeamDashboard} />}</Route>
         <Route path="/saas-admin">{() => <ProtectedPage component={SaasAdminDashboard} />}</Route>
-        <Route path="/saas-admin/settings">{() => <ProtectedPage component={PlatformSettings} />}</Route>
+        <Route path="/saas-admin/settings">{() => <Redirect to="/saas-admin" />}</Route>
         <Route path="/customer-portal">{() => <ProtectedPage component={CustomerPortal} />}</Route>
         
         <Route component={NotFound} />

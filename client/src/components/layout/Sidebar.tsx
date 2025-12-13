@@ -5,7 +5,7 @@ import { cn } from "@/lib/utils";
 import { 
   LayoutDashboard, Users, Briefcase, CheckSquare, Settings,
   Package, Building2, FileText, Receipt, Activity, BarChart3, UsersRound, Mail, FileEdit,
-  ChevronDown, Rocket, Wallet, Zap, Target, HeartHandshake, Shield, Cog
+  ChevronDown, Rocket, Wallet, Zap, Target, HeartHandshake
 } from "lucide-react";
 import { getUser } from "@/lib/auth";
 import { authApi } from "@/lib/api";
@@ -151,33 +151,10 @@ const teamMemberGroups: SidebarGroup[] = [
   },
 ];
 
-const saasAdminGroups: SidebarGroup[] = [
-  {
-    id: "overview",
-    icon: Rocket,
-    label: "Overview",
-    description: "Platform command center",
-    color: "text-blue-500",
-    items: [
-      { icon: LayoutDashboard, label: "Dashboard", href: "/saas-admin", description: "Platform metrics" },
-    ],
-  },
-  {
-    id: "platform",
-    icon: Shield,
-    label: "Platform",
-    description: "Manage your platform",
-    color: "text-purple-500",
-    items: [
-      { icon: Cog, label: "Platform Settings", href: "/saas-admin/settings", description: "Configure platform" },
-    ],
-  },
-];
-
 export function Sidebar() {
   const [location] = useLocation();
   const user = getUser();
-  const [openGroups, setOpenGroups] = useState<string[]>(["overview", "sales", "commerce", "operations", "platform"]);
+  const [openGroups, setOpenGroups] = useState<string[]>(["overview", "sales", "commerce", "operations"]);
 
   const { data: currentUser } = useQuery({
     queryKey: ["currentUser"],
@@ -187,17 +164,11 @@ export function Sidebar() {
 
   if (!user) return null;
   
-  if (currentUser?.userType === 'customer') {
+  if (currentUser?.userType === 'saas_admin' || currentUser?.userType === 'customer') {
     return null;
   }
 
-  const getSidebarGroups = () => {
-    if (currentUser?.userType === 'saas_admin') return saasAdminGroups;
-    if (currentUser?.userType === 'team_member') return teamMemberGroups;
-    return agencyAdminGroups;
-  };
-  
-  const sidebarGroups = getSidebarGroups();
+  const sidebarGroups = currentUser?.userType === 'team_member' ? teamMemberGroups : agencyAdminGroups;
   const showTeamLink = currentUser?.isAdmin || currentUser?.userType === 'agency_admin';
 
   const toggleGroup = (groupId: string) => {
@@ -211,7 +182,6 @@ export function Sidebar() {
   const isGroupActive = (group: SidebarGroup) => {
     return group.items.some(item => 
       location === item.href || 
-      location.startsWith(item.href + "/") ||
       (item.href === "/agency-dashboard" && location === "/") ||
       (item.href === "/team-dashboard" && location === "/")
     );
@@ -288,8 +258,7 @@ export function Sidebar() {
                     }
                     const isActive = location === item.href || 
                       (item.href === "/agency-dashboard" && location === "/") ||
-                      (item.href === "/team-dashboard" && location === "/") ||
-                      (item.href === "/saas-admin" && location === "/saas-admin");
+                      (item.href === "/team-dashboard" && location === "/");
                     return (
                       <Link
                         key={item.href}
