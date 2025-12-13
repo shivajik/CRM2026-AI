@@ -1,10 +1,151 @@
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Sparkles, Check, X, ThumbsUp, ThumbsDown, Copy, RotateCcw, Loader2 } from "lucide-react";
+import { Progress } from "@/components/ui/progress";
+import { Sparkles, Check, X, ThumbsUp, ThumbsDown, Copy, RotateCcw, Loader2, TrendingUp, Clock, DollarSign, Target } from "lucide-react";
 import { aiApi } from "@/lib/aiApi";
 import { useToast } from "@/hooks/use-toast";
+
+interface InsightData {
+  score?: number;
+  reasoning?: string;
+  factors?: {
+    engagement?: number;
+    budget?: number;
+    timeline?: number;
+    fit?: number;
+  };
+}
+
+function parseInsightData(text: string): InsightData | null {
+  try {
+    const parsed = JSON.parse(text);
+    if (parsed && (parsed.score !== undefined || parsed.reasoning || parsed.factors)) {
+      return parsed;
+    }
+    return null;
+  } catch {
+    return null;
+  }
+}
+
+function getScoreColor(score: number): string {
+  if (score >= 70) return "text-green-600";
+  if (score >= 40) return "text-yellow-600";
+  return "text-red-600";
+}
+
+function getProgressColor(value: number): string {
+  if (value >= 70) return "bg-green-500";
+  if (value >= 40) return "bg-yellow-500";
+  return "bg-red-500";
+}
+
+function FormattedInsight({ data }: { data: InsightData }) {
+  return (
+    <div className="space-y-4">
+      {data.score !== undefined && (
+        <div className="flex items-center gap-3">
+          <div className="flex items-center gap-2">
+            <Target className="h-5 w-5 text-primary" />
+            <span className="font-medium">Score:</span>
+          </div>
+          <span className={`text-2xl font-bold ${getScoreColor(data.score)}`}>
+            {data.score}
+          </span>
+          <span className="text-muted-foreground">/ 100</span>
+        </div>
+      )}
+      
+      {data.reasoning && (
+        <div className="space-y-1">
+          <span className="text-sm font-medium text-muted-foreground">Analysis</span>
+          <p className="text-sm leading-relaxed">{data.reasoning}</p>
+        </div>
+      )}
+      
+      {data.factors && (
+        <div className="space-y-3">
+          <span className="text-sm font-medium text-muted-foreground">Key Factors</span>
+          <div className="grid grid-cols-2 gap-3">
+            {data.factors.engagement !== undefined && (
+              <div className="space-y-1">
+                <div className="flex items-center justify-between text-xs">
+                  <span className="flex items-center gap-1">
+                    <TrendingUp className="h-3 w-3" />
+                    Engagement
+                  </span>
+                  <span className="font-medium">{data.factors.engagement}%</span>
+                </div>
+                <div className="h-2 bg-muted rounded-full overflow-hidden">
+                  <div 
+                    className={`h-full ${getProgressColor(data.factors.engagement)} transition-all`}
+                    style={{ width: `${data.factors.engagement}%` }}
+                  />
+                </div>
+              </div>
+            )}
+            
+            {data.factors.budget !== undefined && (
+              <div className="space-y-1">
+                <div className="flex items-center justify-between text-xs">
+                  <span className="flex items-center gap-1">
+                    <DollarSign className="h-3 w-3" />
+                    Budget
+                  </span>
+                  <span className="font-medium">{data.factors.budget}%</span>
+                </div>
+                <div className="h-2 bg-muted rounded-full overflow-hidden">
+                  <div 
+                    className={`h-full ${getProgressColor(data.factors.budget)} transition-all`}
+                    style={{ width: `${data.factors.budget}%` }}
+                  />
+                </div>
+              </div>
+            )}
+            
+            {data.factors.timeline !== undefined && (
+              <div className="space-y-1">
+                <div className="flex items-center justify-between text-xs">
+                  <span className="flex items-center gap-1">
+                    <Clock className="h-3 w-3" />
+                    Timeline
+                  </span>
+                  <span className="font-medium">{data.factors.timeline}%</span>
+                </div>
+                <div className="h-2 bg-muted rounded-full overflow-hidden">
+                  <div 
+                    className={`h-full ${getProgressColor(data.factors.timeline)} transition-all`}
+                    style={{ width: `${data.factors.timeline}%` }}
+                  />
+                </div>
+              </div>
+            )}
+            
+            {data.factors.fit !== undefined && (
+              <div className="space-y-1">
+                <div className="flex items-center justify-between text-xs">
+                  <span className="flex items-center gap-1">
+                    <Target className="h-3 w-3" />
+                    ICP Fit
+                  </span>
+                  <span className="font-medium">{data.factors.fit}%</span>
+                </div>
+                <div className="h-2 bg-muted rounded-full overflow-hidden">
+                  <div 
+                    className={`h-full ${getProgressColor(data.factors.fit)} transition-all`}
+                    style={{ width: `${data.factors.fit}%` }}
+                  />
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
 
 interface AISuggestionBoxProps {
   suggestion: string;
@@ -32,6 +173,8 @@ export function AISuggestionBox({
   const [feedbackSubmitted, setFeedbackSubmitted] = useState(false);
   const [copied, setCopied] = useState(false);
   const { toast } = useToast();
+  
+  const insightData = useMemo(() => parseInsightData(suggestion), [suggestion]);
 
   const handleCopy = async () => {
     try {
@@ -101,8 +244,12 @@ export function AISuggestionBox({
         </CardTitle>
       </CardHeader>
       <CardContent className="space-y-4">
-        <div className="text-sm whitespace-pre-wrap bg-background rounded-md p-3 border">
-          {suggestion}
+        <div className="text-sm bg-background rounded-md p-3 border">
+          {insightData ? (
+            <FormattedInsight data={insightData} />
+          ) : (
+            <div className="whitespace-pre-wrap">{suggestion}</div>
+          )}
         </div>
 
         <div className="flex items-center justify-between">
