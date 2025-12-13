@@ -156,37 +156,6 @@ export default function CustomerDetail() {
                   <p className="text-sm text-muted-foreground">Segment: {customer.segment || "-"}</p>
                   <p className="text-sm text-muted-foreground">Payment Terms: {customer.paymentTerms || "-"}</p>
                 </div>
-                <div className="border-t pt-4 mt-4">
-                  <div className="flex items-center justify-between mb-2">
-                    <p className="text-sm font-medium">AI Insights</p>
-                    <AIButton
-                      module="client"
-                      content={JSON.stringify({
-                        name: customer.name,
-                        email: customer.email,
-                        type: customer.customerType,
-                        industry: customer.industry,
-                        segment: customer.segment,
-                        deals: summary.totalDeals,
-                        wonDeals: summary.wonDeals,
-                        totalValue: summary.totalDealValue,
-                        revenue: summary.totalRevenue,
-                      })}
-                      context={{ customerId: customer.id }}
-                      onResult={(result) => setAiInsight(result)}
-                      size="sm"
-                    />
-                  </div>
-                  {aiInsight && (
-                    <AISuggestionBox
-                      suggestion={aiInsight}
-                      title="Client Insights"
-                      onAccept={() => {}}
-                      onReject={() => setAiInsight(null)}
-                      showFeedback={false}
-                    />
-                  )}
-                </div>
               </CardContent>
             </Card>
 
@@ -234,6 +203,46 @@ export default function CustomerDetail() {
               </CardContent>
             </Card>
           </div>
+
+          {/* AI Insights Section */}
+          <Card data-testid="card-ai-insights">
+            <CardHeader>
+              <CardTitle className="flex items-center justify-between">
+                <span>AI Insights</span>
+                <AIButton
+                  module="client"
+                  content={JSON.stringify({
+                    name: customer.name,
+                    email: customer.email,
+                    type: customer.customerType,
+                    industry: customer.industry,
+                    segment: customer.segment,
+                    deals: summary.totalDeals,
+                    wonDeals: summary.wonDeals,
+                    totalValue: summary.totalDealValue,
+                    revenue: summary.totalRevenue,
+                  })}
+                  context={{ customerId: customer.id }}
+                  onResult={(result) => setAiInsight(result)}
+                  size="sm"
+                />
+              </CardTitle>
+              <p className="text-sm text-muted-foreground">
+                Get AI-powered insights about this client's engagement, potential, and recommended actions.
+              </p>
+            </CardHeader>
+            {aiInsight && (
+              <CardContent>
+                <AISuggestionBox
+                  suggestion={aiInsight}
+                  title="Client Insights"
+                  onAccept={() => {}}
+                  onReject={() => setAiInsight(null)}
+                  showFeedback={false}
+                />
+              </CardContent>
+            )}
+          </Card>
 
           <Tabs defaultValue="timeline" className="w-full">
             <TabsList>
