@@ -1372,16 +1372,17 @@ export class DatabaseStorage implements IStorage {
     const tenants = await db.select().from(schema.tenants).orderBy(desc(schema.tenants.createdAt));
     const users = await db.select().from(schema.users);
     const subscriptions = await db.select().from(schema.workspaceSubscriptions);
-    const plans = await db.select().from(schema.workspacePlans);
+    const packages = await db.select().from(schema.packages);
     
     return tenants.map(tenant => {
       const subscription = subscriptions.find(s => s.workspaceId === tenant.id);
-      const plan = subscription?.planId ? plans.find(p => p.id === subscription.planId) : undefined;
+      // Get plan from packages table using tenant.packageId (not subscription.planId)
+      const pkg = tenant.packageId ? packages.find(p => p.id === tenant.packageId) : undefined;
       return {
         ...tenant,
         userCount: users.filter(u => u.tenantId === tenant.id).length,
         subscriptionStatus: subscription?.status,
-        planName: plan?.displayName || plan?.name,
+        planName: pkg?.displayName || pkg?.name,
       };
     });
   }
