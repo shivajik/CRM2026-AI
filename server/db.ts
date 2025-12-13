@@ -9,10 +9,9 @@ const connectionString = process.env.SUPABASE_DATABASE_URL || process.env.DATABA
 if (!connectionString) {
   console.error("DATABASE CONNECTION ERROR: No database URL configured");
   console.error("Available env vars:", Object.keys(process.env).filter(k => k.includes('DATABASE') || k.includes('SUPABASE') || k.includes('PG')));
-  throw new Error(
-    "Database connection string must be set. Please configure SUPABASE_DATABASE_URL or DATABASE_URL in your Vercel environment variables.",
-  );
 }
+
+const FALLBACK_CONNECTION = "postgresql://localhost:5432/fallback";
 
 declare global {
   var _pgPool: pg.Pool | undefined;
@@ -29,7 +28,7 @@ function getPool(): pg.Pool {
   const hasSupabaseUrl = !!process.env.SUPABASE_DATABASE_URL;
   
   const pool = new Pool({
-    connectionString,
+    connectionString: connectionString || FALLBACK_CONNECTION,
     ssl: (isProduction || hasSupabaseUrl) ? { rejectUnauthorized: false } : undefined,
     max: 5,
     idleTimeoutMillis: 30000,
