@@ -386,7 +386,7 @@ export default function SaasAdminDashboard() {
                 System
               </div>
               <button 
-                onClick={() => { setShowSettingsSheet(true); }}
+                onClick={() => { setLocation("/saas-admin/settings"); }}
                 className="w-full flex items-center gap-3 px-3 py-2.5 rounded-md text-sm font-medium text-slate-300 hover:bg-slate-800"
                 data-testid="link-saas-settings"
               >
