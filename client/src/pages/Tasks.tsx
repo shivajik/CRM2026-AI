@@ -22,6 +22,7 @@ import {
   CheckSquare, MessageSquare, Paperclip, AlertCircle, LayoutGrid, List,
   Filter, ChevronRight, Play, Pause, X, Check, Eye
 } from "lucide-react";
+import { AIButton } from "@/components/ai";
 import { cn } from "@/lib/utils";
 import {
   DropdownMenu,
@@ -688,6 +689,16 @@ export default function Tasks() {
                     placeholder="Additional details about this task..."
                     data-testid="input-task-description"
                   />
+                  <div className="flex justify-end">
+                    <AIButton
+                      module="task"
+                      content={formData.title + (formData.description ? ": " + formData.description : "")}
+                      context={{ title: formData.title, priority: formData.priority, status: formData.status }}
+                      onResult={(result) => setFormData({ ...formData, description: result })}
+                      disabled={!formData.title}
+                      size="sm"
+                    />
+                  </div>
                 </div>
 
                 <div className="grid grid-cols-2 gap-4">

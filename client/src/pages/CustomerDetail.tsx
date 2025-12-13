@@ -12,7 +12,10 @@ import {
   TrendingUp, FileText, Receipt, CheckCircle, Clock, AlertCircle,
   Phone as PhoneIcon, Mail as MailIcon, Calendar, MessageSquare, ClipboardList
 } from "lucide-react";
+import { AIButton } from "@/components/ai";
+import { AISuggestionBox } from "@/components/ai";
 import { format } from "date-fns";
+import { useState } from "react";
 
 const typeIcons: Record<string, any> = {
   call: PhoneIcon,
@@ -66,6 +69,7 @@ export default function CustomerDetail() {
   const params = useParams();
   const [, navigate] = useLocation();
   const customerId = params.id;
+  const [aiInsight, setAiInsight] = useState<string | null>(null);
 
   const { data: journeyData, isLoading } = useQuery({
     queryKey: ["customer-journey", customerId],
@@ -151,6 +155,37 @@ export default function CustomerDetail() {
                   <p className="text-sm text-muted-foreground">Industry: {customer.industry || "-"}</p>
                   <p className="text-sm text-muted-foreground">Segment: {customer.segment || "-"}</p>
                   <p className="text-sm text-muted-foreground">Payment Terms: {customer.paymentTerms || "-"}</p>
+                </div>
+                <div className="border-t pt-4 mt-4">
+                  <div className="flex items-center justify-between mb-2">
+                    <p className="text-sm font-medium">AI Insights</p>
+                    <AIButton
+                      module="client"
+                      content={JSON.stringify({
+                        name: customer.name,
+                        email: customer.email,
+                        type: customer.customerType,
+                        industry: customer.industry,
+                        segment: customer.segment,
+                        deals: summary.totalDeals,
+                        wonDeals: summary.wonDeals,
+                        totalValue: summary.totalDealValue,
+                        revenue: summary.totalRevenue,
+                      })}
+                      context={{ customerId: customer.id }}
+                      onResult={(result) => setAiInsight(result)}
+                      size="sm"
+                    />
+                  </div>
+                  {aiInsight && (
+                    <AISuggestionBox
+                      suggestion={aiInsight}
+                      title="Client Insights"
+                      onAccept={() => {}}
+                      onReject={() => setAiInsight(null)}
+                      showFeedback={false}
+                    />
+                  )}
                 </div>
               </CardContent>
             </Card>

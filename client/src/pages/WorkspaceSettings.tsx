@@ -5,8 +5,9 @@ import {
   Building2, Users, Palette, AlertTriangle, Trash2, 
   Mail, UserPlus, MoreVertical, Shield, Eye, UserMinus,
   Send, XCircle, Clock, Check, CreditCard, BarChart3,
-  TrendingUp, DollarSign, FileText, Zap, Globe
+  TrendingUp, DollarSign, FileText, Zap, Globe, Sparkles
 } from "lucide-react";
+import { AIPanel } from "@/components/ai";
 import { Switch } from "@/components/ui/switch";
 import { Layout } from "@/components/layout/Layout";
 import { Button } from "@/components/ui/button";
@@ -320,7 +321,7 @@ export default function WorkspaceSettings() {
         </div>
 
         <Tabs defaultValue={defaultTab} className="space-y-6">
-          <TabsList className="grid w-full grid-cols-4 sm:grid-cols-7">
+          <TabsList className="grid w-full grid-cols-4 sm:grid-cols-8">
             <TabsTrigger value="info" className="flex items-center gap-2" data-testid="tab-workspace-info">
               <Building2 className="h-4 w-4" />
               <span className="hidden sm:inline">Info</span>
@@ -344,6 +345,10 @@ export default function WorkspaceSettings() {
             <TabsTrigger value="analytics" className="flex items-center gap-2" data-testid="tab-workspace-analytics">
               <BarChart3 className="h-4 w-4" />
               <span className="hidden sm:inline">Analytics</span>
+            </TabsTrigger>
+            <TabsTrigger value="ai" className="flex items-center gap-2" data-testid="tab-workspace-ai">
+              <Sparkles className="h-4 w-4" />
+              <span className="hidden sm:inline">AI</span>
             </TabsTrigger>
             <TabsTrigger value="danger" className="flex items-center gap-2" data-testid="tab-workspace-danger">
               <AlertTriangle className="h-4 w-4" />
@@ -864,6 +869,10 @@ export default function WorkspaceSettings() {
 
           <TabsContent value="portal" className="space-y-6">
             <PortalSettingsTab workspaceId={workspaceId} />
+          </TabsContent>
+
+          <TabsContent value="ai" className="space-y-6">
+            <AIPanel />
           </TabsContent>
 
           <TabsContent value="danger" className="space-y-6">
