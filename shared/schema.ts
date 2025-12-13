@@ -1948,3 +1948,130 @@ export const clientDocuments = pgTable("client_documents", {
 export const insertClientDocumentSchema = createInsertSchema(clientDocuments).omit({ id: true, createdAt: true, updatedAt: true });
 export type InsertClientDocument = z.infer<typeof insertClientDocumentSchema>;
 export type ClientDocument = typeof clientDocuments.$inferSelect;
+
+// ==================== AI ENHANCEMENT MODULE ====================
+
+// AI Action Types
+export const AI_ACTIONS = {
+  REWRITE: 'rewrite',
+  IMPROVE_TONE: 'improve_tone',
+  EXPAND: 'expand',
+  SHORTEN: 'shorten',
+  SUMMARIZE: 'summarize',
+  GENERATE: 'generate',
+  TRANSLATE: 'translate',
+  FIX_GRAMMAR: 'fix_grammar',
+  MAKE_FORMAL: 'make_formal',
+  MAKE_FRIENDLY: 'make_friendly',
+  MAKE_PERSUASIVE: 'make_persuasive',
+  GENERATE_SUBJECT: 'generate_subject',
+  GENERATE_FOLLOWUP: 'generate_followup',
+  GENERATE_SUBTASKS: 'generate_subtasks',
+  SUGGEST_DUE_DATE: 'suggest_due_date',
+  PRIORITIZE: 'prioritize',
+  EXPLAIN: 'explain',
+  LEAD_SCORE: 'lead_score',
+  CLIENT_SUMMARY: 'client_summary',
+  NEXT_STEPS: 'next_steps',
+  REPORT_INSIGHTS: 'report_insights',
+} as const;
+
+export type AIAction = typeof AI_ACTIONS[keyof typeof AI_ACTIONS];
+
+// AI Module Types
+export const AI_MODULES = {
+  EMAIL: 'email',
+  TASK: 'task',
+  PROPOSAL: 'proposal',
+  CLIENT: 'client',
+  LEAD: 'lead',
+  REPORT: 'report',
+  WORKFLOW: 'workflow',
+} as const;
+
+export type AIModule = typeof AI_MODULES[keyof typeof AI_MODULES];
+
+// AI Settings - workspace-level AI configuration
+export const aiSettings = pgTable("ai_settings", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  tenantId: varchar("tenant_id").references(() => tenants.id, { onDelete: "cascade" }).notNull().unique(),
+  aiEnabled: boolean("ai_enabled").default(true).notNull(),
+  emailAiEnabled: boolean("email_ai_enabled").default(true).notNull(),
+  taskAiEnabled: boolean("task_ai_enabled").default(true).notNull(),
+  proposalAiEnabled: boolean("proposal_ai_enabled").default(true).notNull(),
+  clientAiEnabled: boolean("client_ai_enabled").default(true).notNull(),
+  reportAiEnabled: boolean("report_ai_enabled").default(true).notNull(),
+  monthlyTokenLimit: integer("monthly_token_limit").default(100000).notNull(),
+  tokensUsedThisMonth: integer("tokens_used_this_month").default(0).notNull(),
+  tokenResetDate: timestamp("token_reset_date").defaultNow().notNull(),
+  preferredModel: text("preferred_model").default("gpt-4o-mini"),
+  customInstructions: text("custom_instructions"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+export const insertAiSettingsSchema = createInsertSchema(aiSettings).omit({ id: true, createdAt: true, updatedAt: true });
+export type InsertAiSettings = z.infer<typeof insertAiSettingsSchema>;
+export type AiSettings = typeof aiSettings.$inferSelect;
+
+// AI Usage - track AI usage per request
+export const aiUsage = pgTable("ai_usage", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  tenantId: varchar("tenant_id").references(() => tenants.id, { onDelete: "cascade" }).notNull(),
+  userId: varchar("user_id").references(() => users.id, { onDelete: "set null" }),
+  module: text("module").notNull(), // email, task, proposal, client, lead, report
+  action: text("action").notNull(), // rewrite, generate, summarize, etc.
+  tokensUsed: integer("tokens_used").notNull().default(0),
+  inputTokens: integer("input_tokens").default(0),
+  outputTokens: integer("output_tokens").default(0),
+  model: text("model").default("gpt-4o-mini"),
+  success: boolean("success").default(true).notNull(),
+  latencyMs: integer("latency_ms"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+export const insertAiUsageSchema = createInsertSchema(aiUsage).omit({ id: true, createdAt: true });
+export type InsertAiUsage = z.infer<typeof insertAiUsageSchema>;
+export type AiUsage = typeof aiUsage.$inferSelect;
+
+// AI Logs - detailed logs of AI interactions
+export const aiLogs = pgTable("ai_logs", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  tenantId: varchar("tenant_id").references(() => tenants.id, { onDelete: "cascade" }).notNull(),
+  userId: varchar("user_id").references(() => users.id, { onDelete: "set null" }),
+  module: text("module").notNull(),
+  action: text("action").notNull(),
+  inputContent: text("input_content"),
+  outputContent: text("output_content"),
+  contextData: text("context_data"), // JSON string with additional context
+  resourceType: text("resource_type"), // email, task, proposal, customer, etc.
+  resourceId: varchar("resource_id"),
+  feedbackRating: integer("feedback_rating"), // 1-5 rating from user
+  feedbackComment: text("feedback_comment"),
+  errorMessage: text("error_message"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+export const insertAiLogSchema = createInsertSchema(aiLogs).omit({ id: true, createdAt: true });
+export type InsertAiLog = z.infer<typeof insertAiLogSchema>;
+export type AiLog = typeof aiLogs.$inferSelect;
+
+// AI Generated Content Versions - store AI content history
+export const aiContentVersions = pgTable("ai_content_versions", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  tenantId: varchar("tenant_id").references(() => tenants.id, { onDelete: "cascade" }).notNull(),
+  userId: varchar("user_id").references(() => users.id, { onDelete: "set null" }),
+  module: text("module").notNull(),
+  resourceType: text("resource_type").notNull(),
+  resourceId: varchar("resource_id").notNull(),
+  fieldName: text("field_name").notNull(), // body, description, content, etc.
+  originalContent: text("original_content"),
+  generatedContent: text("generated_content").notNull(),
+  action: text("action").notNull(),
+  isApplied: boolean("is_applied").default(false).notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+export const insertAiContentVersionSchema = createInsertSchema(aiContentVersions).omit({ id: true, createdAt: true });
+export type InsertAiContentVersion = z.infer<typeof insertAiContentVersionSchema>;
+export type AiContentVersion = typeof aiContentVersions.$inferSelect;
