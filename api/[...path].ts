@@ -59,14 +59,9 @@ async function initHandler() {
 }
 
 export default async function (req: VercelRequest, res: VercelResponse) {
-  // Vercel pre-parses the body, but serverless-http expects it as a string
-  // Convert object body back to string if needed so Express can parse it properly
-  const originalBody = req.body;
-  if (req.body && typeof req.body === 'object' && req.headers['content-type']?.includes('application/json')) {
-    // serverless-http will try to parse this with express.json()
-    // If Vercel already parsed it, we need to keep it as an object
-    // because Express will use the already-parsed body
-  }
+  // CRITICAL FIX: Vercel pre-parses JSON body into req.body (object)
+  // Express body parser middleware is smart enough to handle this,
+  // but we need to ensure it's available to the handler
   
   setCorsHeaders(req, res);
   
@@ -107,14 +102,22 @@ export default async function (req: VercelRequest, res: VercelResponse) {
   if ((req.url === "/api/auth/login" || req.url?.startsWith("/api/auth/login")) && req.method === "POST") {
     try {
       const body = req.body || {};
-      console.log("[Vercel Auth] Login request body:", typeof body, Object.keys(body || {}));
+      const email = body.email || (typeof body === 'string' ? JSON.parse(body).email : undefined);
+      const password = body.password || (typeof body === 'string' ? JSON.parse(body).password : undefined);
       
-      // Use the serverless handler - it should have Express with proper body parsing
+      console.log("[Vercel Auth] Login attempt for:", email);
+      
+      if (!email || !password) {
+        res.status(400).json({ message: "Email and password are required" });
+        return;
+      }
+      
+      // Use the serverless handler for full auth flow
       const h = await initHandler();
       return await h(req, res);
     } catch (error: any) {
       console.error("[Vercel Auth] Login error:", error.message);
-      res.status(500).json({ message: "Login failed" });
+      res.status(500).json({ message: "Login failed: " + error.message });
       return;
     }
   }
