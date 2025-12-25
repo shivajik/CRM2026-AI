@@ -3941,6 +3941,30 @@ export async function registerRoutes(
   app.get("/api/proposals/analytics", requireAuth, validateTenant, resolveWorkspaceContext, async (req, res) => {
     try {
       const analytics = await storage.getProposalAnalytics(req.workspaceId!);
+      
+      // If totalValue is 0, we need to calculate it from pricing items of all proposals
+      // since the current analytics might be relying on persisted totalAmount which could be 0
+      if (analytics.totalValue === 0) {
+        const proposals = await storage.getProposalsByTenant(req.workspaceId!);
+        let calculatedTotalValue = 0;
+        
+        for (const proposal of proposals) {
+          const pricingItems = await storage.getProposalPricingItems(proposal.id);
+          const proposalSubtotal = pricingItems.reduce((sum, item) => {
+            if (item.isSelected) {
+              return sum + (parseFloat(item.totalPrice as string) || 0);
+            }
+            return sum;
+          }, 0);
+          calculatedTotalValue += proposalSubtotal;
+        }
+        
+        analytics.totalValue = calculatedTotalValue;
+        if (analytics.totalProposals > 0) {
+          analytics.averageValue = calculatedTotalValue / analytics.totalProposals;
+        }
+      }
+      
       res.json(analytics);
     } catch (error) {
       console.error("Get proposal analytics error:", error);
