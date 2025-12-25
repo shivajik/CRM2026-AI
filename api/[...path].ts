@@ -13,6 +13,27 @@ function setCorsHeaders(req: VercelRequest, res: VercelResponse) {
   res.setHeader("Access-Control-Allow-Credentials", "true");
 }
 
+// Parse Vercel request body into req.body
+function parseBody(req: VercelRequest): any {
+  if (!req.body) return undefined;
+  
+  // If body is already an object, return it
+  if (typeof req.body === 'object') {
+    return req.body;
+  }
+  
+  // If body is a string, try to parse as JSON
+  if (typeof req.body === 'string') {
+    try {
+      return JSON.parse(req.body);
+    } catch {
+      return req.body;
+    }
+  }
+  
+  return req.body;
+}
+
 async function initHandler() {
   if (handler) return handler;
   if (initError) throw initError;
@@ -24,7 +45,9 @@ async function initHandler() {
     console.log("Environment check - JWT_SECRET exists:", !!process.env.JWT_SECRET);
     
     const app = await createApp();
-    handler = serverless(app);
+    handler = serverless(app, {
+      binary: ['application/octet-stream', 'image/*'],
+    });
     console.log("Serverless handler initialized successfully");
     return handler;
   } catch (error: any) {
@@ -36,6 +59,15 @@ async function initHandler() {
 }
 
 export default async function (req: VercelRequest, res: VercelResponse) {
+  // Ensure body is properly parsed for JSON requests
+  if (req.body && typeof req.body === 'string' && req.headers['content-type']?.includes('application/json')) {
+    try {
+      req.body = JSON.parse(req.body);
+    } catch (e) {
+      console.error("Failed to parse request body:", e);
+    }
+  }
+  
   setCorsHeaders(req, res);
   
   if (req.method === "OPTIONS") {

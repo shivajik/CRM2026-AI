@@ -51,6 +51,19 @@ export async function createApp(): Promise<express.Express> {
 
     app.use(express.urlencoded({ extended: false }));
 
+    // Middleware to handle cases where body might not be parsed correctly (serverless environments)
+    app.use((req, res, next) => {
+      // If body is a string and looks like JSON, parse it
+      if (typeof req.body === 'string' && req.body.startsWith('{')) {
+        try {
+          req.body = JSON.parse(req.body);
+        } catch {
+          // If parsing fails, leave as is
+        }
+      }
+      next();
+    });
+
     app.use((req, res, next) => {
       const start = Date.now();
       const path = req.path;
