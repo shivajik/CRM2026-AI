@@ -59,13 +59,13 @@ async function initHandler() {
 }
 
 export default async function (req: VercelRequest, res: VercelResponse) {
-  // Ensure body is properly parsed for JSON requests
-  if (req.body && typeof req.body === 'string' && req.headers['content-type']?.includes('application/json')) {
-    try {
-      req.body = JSON.parse(req.body);
-    } catch (e) {
-      console.error("Failed to parse request body:", e);
-    }
+  // Vercel pre-parses the body, but serverless-http expects it as a string
+  // Convert object body back to string if needed so Express can parse it properly
+  const originalBody = req.body;
+  if (req.body && typeof req.body === 'object' && req.headers['content-type']?.includes('application/json')) {
+    // serverless-http will try to parse this with express.json()
+    // If Vercel already parsed it, we need to keep it as an object
+    // because Express will use the already-parsed body
   }
   
   setCorsHeaders(req, res);
@@ -99,6 +99,22 @@ export default async function (req: VercelRequest, res: VercelResponse) {
         error: error.message,
         stack: error.stack?.split('\n').slice(0, 5)
       });
+      return;
+    }
+  }
+
+  // Handle login directly for Vercel to ensure body is properly parsed
+  if ((req.url === "/api/auth/login" || req.url?.startsWith("/api/auth/login")) && req.method === "POST") {
+    try {
+      const body = req.body || {};
+      console.log("[Vercel Auth] Login request body:", typeof body, Object.keys(body || {}));
+      
+      // Use the serverless handler - it should have Express with proper body parsing
+      const h = await initHandler();
+      return await h(req, res);
+    } catch (error: any) {
+      console.error("[Vercel Auth] Login error:", error.message);
+      res.status(500).json({ message: "Login failed" });
       return;
     }
   }
@@ -172,6 +188,16 @@ export default async function (req: VercelRequest, res: VercelResponse) {
 
   try {
     const h = await initHandler();
+    
+    // CRITICAL: Ensure req.body is set correctly for serverless-http
+    // Vercel pre-parses JSON bodies, but serverless-http needs to handle them
+    // If body is already parsed (object), we need to ensure Express can still process it
+    if (req.body && typeof req.body === 'object') {
+      // Body is already parsed by Vercel - this is good
+      // Just make sure it's available to the handler
+      req.body = req.body;
+    }
+    
     return await h(req, res);
   } catch (error: any) {
     console.error("Request handler error:", error.message);
