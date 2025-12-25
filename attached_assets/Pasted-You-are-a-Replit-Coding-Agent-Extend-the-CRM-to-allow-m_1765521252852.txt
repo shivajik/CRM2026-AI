@@ -1,0 +1,74 @@
+You are a Replit Coding Agent. Extend the CRM to allow multi-workspace (multi-agency) usage for a single user — but **do not break** the current production product. The existing product is in active use and must remain functional at all times. Do NOT recommend or mention any technical stack. Use the CRM’s current architecture and tenantId logic. Any change must be backward-compatible, tested, reversible, and behind safe toggles.
+
+PRIORITY CONSTRAINTS (MANDATORY)
+1. **Non-breaking requirement:** No user-visible regression or data-loss. Existing tenants, users, APIs, and flows must continue to work exactly as before when the new feature is *disabled*.
+2. **Feature flag gating:** All new behaviors must be behind a global feature flag (`multi_workspace_enabled`) and per-workspace opt-in. Default state: **off**.
+3. **Safe DB migrations:** Migrations must be additive only (no destructive ALTER that drops or renames columns). Provide reversible migration scripts and a clear rollback script.
+4. **Staging-first rollout:** Implement and verify all changes in a staging environment that mirrors production. Do not deploy to production until automated regression and smoke tests pass.
+5. **Automated regression:** Add/extend integration and E2E tests that cover core existing flows (login, single-tenant workflows, quotations, invoices, proposals, tasks). These must run successfully before merge.
+6. **Backups & rollback plan:** Before applying migrations on production, ensure backup procedure (DB dump) is documented and automated; provide step-by-step rollback instructions.
+7. **Minimal surface change:** Default UI/UX for single-tenant users must remain unchanged until the workspace switcher is explicitly enabled for their account.
+8. **Audit & monitoring:** Add telemetry for new endpoints and workspace events; provide a short checklist of monitoring/alert rules to detect anomalies after rollout.
+9. **Clear assumptions & approvals:** Document all assumptions in `ASSUMPTIONS.md`. Any assumption that impacts production must be listed and require sign-off in `RELEASE_NOTES.md`.
+
+FEATURES (must follow constraints above)
+- Implement `workspace_users` linking model (additive schema only).
+- Middleware to validate workspace context — middleware must be no-op unless feature flag is ON.
+- Workspace Switcher UI — hidden unless `multi_workspace_enabled` flag is ON for the user.
+- Create New Workspace flow — creation code must not change existing tenant creation flow when flag is OFF.
+- Invitation system — invitations only available when feature flag ON.
+- Workspace Settings page — hidden until enabled.
+- Onboarding wizard — runs only for newly created workspaces and only if flag ON.
+- Update API endpoints to accept optional `workspaceId` parameter; if `multi_workspace_enabled` = OFF, endpoints behave exactly as before (use tenantId from session).
+- All DB writes must populate workspaceId only if feature flag ON; otherwise continue using existing tenantId behavior.
+
+SAFETY & TESTING DELIVERABLES (required before merge)
+1. **Migration scripts**: Additive SQL with `up` and `down`. Include verification queries to confirm migration success.
+2. **Unit tests**: For new models, middleware, and utility functions.
+3. **Integration tests**: Ensure old single-tenant flows still work. Tests must include:
+   - User registration (creates single tenant as before)
+   - Login and resource access (customers, quotations, invoices)
+   - Quotation → Invoice conversion
+   - Task assignment & notifications
+4. **E2E tests**: Cover workspace creation, invite acceptance, workspace switch, and a rollback smoke test.
+5. **Regression test suite**: Run existing test suite; patch any flaky tests and document fixes.
+6. **Staging deployment checklist**: Steps to deploy to staging, run tests, manual sanity checks, and sign-off procedure.
+7. **Production rollout plan**:
+   - Create DB backup
+   - Deploy code with feature flag OFF
+   - Run migrations
+   - Run smoke tests
+   - Enable feature flag for a small pilot tenant
+   - Monitor metrics and logs for 24–72 hours
+   - Gradually enable for more tenants
+8. **Rollback plan**: Exact commands to revert code and database to previous state if needed.
+
+DELIVERABLES (required in repo)
+- `migrations/` with additive `up` and `down` scripts and verify steps.
+- `feature_flags.md` describing `multi_workspace_enabled` and how to toggle (env var + per-tenant toggle).
+- New `workspace_users` model file (schema only) and tests.
+- Middleware implementation guarded by feature flag (no-op when OFF).
+- Workspace switcher UI component — hidden by default; tests asserting hidden behavior when flag OFF.
+- Invitation flow implementation guarded by flag.
+- Integration & E2E test suites and CI configuration update to run them on PRs.
+- `STAGING_DEPLOYMENT.md` with step-by-step staging checks.
+- `PRODUCTION_ROLLOUT.md` containing backup, migration, pilot enable, monitoring checklist, and rollback commands.
+- `ASSUMPTIONS.md` updated with all production-impacting assumptions.
+- `RELEASE_NOTES.md` with migration notes, required environment variables, and a sign-off checklist.
+- `FINAL_REPORT.md` describing architecture changes, security considerations, monitoring, and post-rollout validation steps.
+
+ACCEPTANCE CRITERIA (hard stop: do not merge until all satisfied)
+1. All existing automated tests pass unchanged when feature flag OFF.
+2. New tests covering multi-workspace features pass.
+3. Staging deployment passes full regression test suite and manual sanity checklist.
+4. Migration `down` script successfully restores the staging DB to pre-migration state during testing.
+5. Documentation for backup and rollback is present and verified.
+6. A pilot activation on production can be performed by toggling `multi_workspace_enabled` for a single tenant; that pilot activation must not affect other tenants.
+7. The product owner (you) must sign-off in `RELEASE_NOTES.md` before enabling feature flag broadly.
+
+COMMUNICATION & COMMITTING RULES
+- Work in small, descriptive commits. Mark commits with `feat(workspace): ...`, `test(workspace): ...`, `chore(migrations): ...`.
+- Create a PR titled: `feat: workspace support (flagged, non-breaking)` and include staging test results and screenshots.
+- Provide a one-paragraph summary in `RELEASE_NOTES.md` for reviewers highlighting risk areas and mitigation steps.
+
+Begin implementation now, but treat this as an incremental ship — **never enable new behavior in production until all testing and sign-offs are complete**. If any change requires replacing or removing existing columns/data, stop and document the exact reason and get explicit approval before proceeding.

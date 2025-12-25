@@ -1,0 +1,247 @@
+You are a Replit Coding Agent.  
+Extend the CRM’s Workspace System with ALL advanced modules:  
+Billing, White-Label Branding, Custom Roles & Permissions, Analytics, Workspace Deletion/Restore, and Onboarding Wizard.
+
+IMPORTANT: The CRM is in production.  
+All enhancements must be:
+- Non-breaking  
+- Backward-compatible  
+- Feature-flagged  
+- Fully tested  
+- Safe for staging → production rollout  
+
+DO NOT recommend or mention any technical stack.
+
+===========================================================
+GLOBAL HARD REQUIREMENTS
+===========================================================
+1. No regression for existing users or single-workspace tenants.  
+2. Every new feature MUST be behind one or more global flags:
+   - `workspace_billing_enabled`
+   - `workspace_branding_enabled`
+   - `workspace_permissions_enabled`
+   - `workspace_analytics_enabled`
+   - `workspace_deletion_enabled`
+   - `workspace_onboarding_enabled`
+3. DB migrations must be additive only (no removals, no renames).  
+4. All new UI must be hidden unless feature flag = ON.  
+5. Existing tenantId logic and workspace behavior must remain unchanged unless new features are enabled.  
+6. Provide reversible `up` and `down` SQL migrations.  
+7. Update tests and ensure old flows continue to work.  
+8. Add safeguarding for billing, deletion, roles, and analytics.  
+9. Produce documentation for each module.
+
+===========================================================
+MODULE 1 — WORKSPACE BILLING SYSTEM (SUBSCRIPTIONS)
+===========================================================
+Add a per-workspace billing system.
+
+### Features:
+- Workspace plans: Free / Pro / Agency  
+- Plan features and limits:
+  - Member count  
+  - Automation limits  
+  - Email send limits  
+  - Proposal count  
+  - File storage usage  
+- Payment flow (use placeholder UI; no real gateway)  
+- Trial system with expiration date  
+- Renewal reminders and warnings  
+- Upgrade/downgrade handling  
+- Enforcement middleware:
+  - Block restricted actions when limit reached  
+  - Show upgrade modal  
+
+### Backend Requirements:
+Tables (additive):
+- `workspace_plans`
+- `workspace_subscriptions`
+- `workspace_usage`
+- `workspace_invoices` (placeholder)
+- `workspace_payment_methods` (placeholder)
+
+### UI/UX:
+- Billing Dashboard  
+- Current Plan  
+- Usage graphs  
+- Change Plan UI  
+- Trial status  
+- Payment history (placeholder)  
+- Upgrade CTA modals  
+
+### Safety:
+- No existing tenant impacted until flag ON  
+- Cannot lock user out of their only workspace  
+- Billing errors must fail gracefully  
+
+===========================================================
+MODULE 2 — WHITE-LABEL BRANDING SYSTEM
+===========================================================
+Allow each workspace to customize:
+
+- Logo  
+- Primary & secondary colors  
+- Email signature templates  
+- PDF branding for proposals, invoices, quotations  
+- Custom domain (placeholder only; no DNS setup)  
+- Public proposal page branding  
+
+### Backend:
+Table additions:
+- `workspace_branding`  
+- `workspace_pdf_settings`  
+
+### UI:
+Workspace Settings → Branding  
+Live preview of:
+- Proposal PDF  
+- Invoice PDF  
+- Email template  
+
+===========================================================
+MODULE 3 — CUSTOM ROLE & PERMISSION BUILDER
+===========================================================
+Allow Workspace Admins to create custom roles.
+
+### Features:
+- Define role name  
+- Toggle permissions per module:
+  - Clients  
+  - Projects  
+  - Tasks  
+  - Invoices  
+  - Proposals  
+  - Automations  
+  - Email Module  
+  - Billing  
+  - Reports  
+- Save custom roles  
+- Assign custom roles to members  
+- Prevent removal of last Admin  
+- Permission enforcement middleware
+
+### Backend:
+Add tables:
+- `workspace_roles_custom`
+- `workspace_role_permissions`
+
+===========================================================
+MODULE 4 — WORKSPACE ANALYTICS DASHBOARD
+===========================================================
+Add performance dashboards showing:
+
+### Metrics:
+- Revenue collected  
+- Unpaid invoices  
+- Total proposals sent  
+- Proposal acceptance rate  
+- Leads created vs. converted  
+- Team productivity (tasks completed)  
+- Client activity  
+- Email engagement metrics  
+- Workspace usage metrics (based on plan)
+
+### Backend:
+Add:
+- `workspace_analytics_cache` table  
+- Daily cron placeholder (no real cron)  
+
+### UI:
+Analytics dashboard with:
+- Charts  
+- Filters  
+- Export CSV button  
+
+===========================================================
+MODULE 5 — WORKSPACE DELETION & RESTORE SYSTEM
+===========================================================
+Soft-delete workspaces with restore capability.
+
+### Features:
+- Delete workspace → mark as `deleted_at`  
+- All workspace data remains preserved until purge date  
+- Restore within 30–60 days  
+- SaaS Admin override delete  
+- Danger zone UI inside settings  
+
+### Backend:
+Add:
+- `deleted_at` to workspaces  
+- `workspace_deletion_logs`
+
+### Safety:
+- Prevent deletion if workspace has active subscription  
+- Prevent deletion if it’s the user’s only workspace  
+- Confirm with workspace name before delete  
+- Log every deletion/restore event  
+
+===========================================================
+MODULE 6 — WORKSPACE ONBOARDING WIZARD
+===========================================================
+Add a guided setup wizard for new workspaces.
+
+### Steps:
+1. Add Logo & Colors  
+2. Add Team Members  
+3. Add First Client  
+4. Create First Project  
+5. Create First Proposal or Quotation  
+
+### UI:
+- Progress tracker  
+- “Skip for now” option  
+- Reopen onboarding anytime  
+
+### Backend:
+Add:
+- `workspace_onboarding_progress` table  
+
+===========================================================
+MODULE 7 — TESTING, SAFETY, & DOCUMENTATION
+===========================================================
+### Automated Tests:
+- Billing limits enforcement  
+- Workspace switching  
+- Custom roles  
+- Branding settings  
+- Analytics access rules  
+- Deletion & restore  
+- Onboarding flow  
+- Regression tests for all core existing modules  
+
+### Documentation:
+Add or update:
+- `workspace_billing.md`  
+- `workspace_branding.md`  
+- `workspace_permissions.md`  
+- `workspace_analytics.md`  
+- `workspace_deletion.md`  
+- `workspace_onboarding.md`  
+- `feature_flags.md`  
+- `RELEASE_NOTES.md`  
+
+### Rollout Plan (generate file):
+- Staging validation steps  
+- Migration verification  
+- Canary rollout using feature flags  
+- Post-deployment monitoring  
+- Rollback procedures  
+
+===========================================================
+DELIVERABLES
+===========================================================
+1. Additive DB migrations + rollback scripts  
+2. All new backend endpoints  
+3. All new UI pages and components  
+4. Middleware updates for permissions & billing limits  
+5. Workspace Settings (new sections)  
+6. Full analytics dashboard  
+7. Workspace deletion + restore  
+8. Onboarding wizard  
+9. Updated API documentation  
+10. Updated test suites (unit, integration, E2E)  
+11. Final `FINAL_REPORT.md` describing architecture, diagrams, testing, rollout, and assumptions.
+
+Begin implementation now.  
+Follow safe, incremental commits.  
+All new functionality MUST remain hidden behind feature flags unless explicitly enabled.

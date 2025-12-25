@@ -1,0 +1,212 @@
+You are a Replit Coding Agent. Enhance the existing CRM “Task Module” by adding full team assignment, workflow updates, progress tracking, and notification logic. Do NOT mention or recommend any specific technical stack. Build everything inside the current CRM structure.
+
+=====================================================
+PRIMARY OBJECTIVE
+=====================================================
+Upgrade the CRM’s Task Feature so that:
+1. Tasks can be assigned to one or more team members.
+2. Assigned team members can update the task status, add notes, upload attachments, log time, and mark milestones.
+3. The task creator (or project/agency admin) receives notifications on specific events.
+4. A clear audit log and activity timeline is recorded for every task.
+5. Includes an AI Assistant to help write task descriptions, status updates, and summaries.
+
+=====================================================
+FEATURE REQUIREMENTS
+=====================================================
+
+---------------------------
+1. TASK CREATION UPGRADE
+---------------------------
+Add fields:
+- Task Title
+- Description (with AI-assisted writing)
+- Assigned To (single or multiple team members)
+- Priority (Low, Medium, High, Urgent)
+- Due Date
+- Tags / Labels
+- Related Module (Client / Project / Quotation / Invoice)
+- Attachments
+- Checklist items (subtasks)
+- Estimated completion time (optional)
+
+AI Assistance options:
+- “Write detailed task description”
+- “Break into subtasks”
+- “Summarize task”
+- “Rewrite professionally”
+- “Generate acceptance criteria”
+
+---------------------------
+2. TEAM MEMBER DASHBOARD
+---------------------------
+Each team member should see:
+- Tasks assigned to them
+- Tasks overdue
+- Tasks due today
+- Tasks in progress
+- Recently updated tasks
+
+Actions available to team members:
+- Update status (Not Started → In Progress → Review → Completed)
+- Add comments
+- Upload files
+- Add time log (start/stop or manual entry)
+- Mark checklist items complete
+- Request clarification from task creator
+
+---------------------------
+3. TASK STATUS WORKFLOW
+---------------------------
+Define a standard workflow the system supports:
+- Not Started
+- In Progress
+- On Hold
+- Under Review
+- Completed
+- Cancelled
+
+Allow customization later if needed.
+
+---------------------------
+4. NOTIFICATION SYSTEM
+---------------------------
+Notifications should be sent when:
+- A task is assigned to a team member
+- Status changes
+- Due date is close (24 hours before)
+- Task gets overdue
+- A team member adds a comment or file
+- Checklist items completed
+- Task marked as completed
+- Time log added (optional)
+
+Notification channels:
+- In-app notifications
+- Email notifications
+- Optional SMS/WhatsApp (just placeholder hooks)
+
+Notification Fields:
+- Actor (who performed the action)
+- Action (status updated, comment added, etc.)
+- Timestamp
+- Task link
+- Brief summary
+
+---------------------------
+5. ACTIVITY TIMELINE (AUDIT LOG)
+---------------------------
+Every task must automatically store:
+- When it was created
+- Who it was assigned to
+- All status changes
+- Any comments
+- Any attachments uploaded
+- Any AI-generated updates
+- Time logs entered
+- Completion timestamp
+
+Timeline should appear as:
+- Date → Action → User → Description → Attachments
+
+---------------------------
+6. PERMISSIONS & ROLES
+---------------------------
+Rules:
+- Admin can view/edit all tasks.
+- Task creator can edit everything in their tasks.
+- Assigned team members can update status, add comments, add files.
+- Other users can view only if project-level access is given.
+- No user should see tasks from another project unless explicitly granted.
+
+---------------------------
+7. TASK ANALYTICS (Optional but useful)
+---------------------------
+Create a metrics page showing:
+- Tasks completed this week/month
+- Average time to complete a task
+- Overdue tasks
+- Team member performance summary
+- Workload distribution chart
+
+---------------------------
+8. TASK REMINDERS & AUTOMATION
+---------------------------
+Add automatic reminders:
+- Before due date
+- When overdue
+- Periodic reminders based on priority (e.g., urgent tasks daily)
+
+Optional automation examples:
+- If a task is "In Progress" for more than X days → notify admin
+- If checklist completed but status not updated → prompt user to complete task
+
+---------------------------
+9. DATABASE ENTITIES (Build using existing structure)
+---------------------------
+Implement models/entities for:
+- Task
+- TaskAssignment
+- TaskComment
+- TaskStatusHistory
+- TaskChecklist
+- TaskTimeLog
+- TaskAttachment
+- TaskNotification
+- TaskAIHistory (for AI-generated content tracking)
+
+---------------------------
+10. USER INTERFACE REQUIREMENTS
+---------------------------
+Provide:
+- Task List View (Filters: Assigned To, Status, Priority, Date)
+- Task Detail View (Comments, Timeline, AI tools, Attachments)
+- Kanban View (drag-and-drop status)
+- Calendar View (due dates)
+- Compact mobile-friendly layout
+
+Include quick actions:
+- “Mark Complete”
+- “Add Comment”
+- “Upload File”
+- “Log Time”
+- “Ask AI to Rewrite Update”
+
+---------------------------
+11. AI ASSISTANT INTEGRATION (IMPORTANT)
+---------------------------
+AI must help users:
+- Write task descriptions
+- Break tasks into subtasks
+- Suggest priorities
+- Recommend estimated time
+- Generate updates (e.g., “summarize progress so far”)
+- Rewrite comments professionally
+- Auto-fill status updates like:
+  - “Work started”
+  - “Waiting for client response”
+  - “Completed – handing over now”
+
+AI should NOT remove merge tags or important fields.
+
+---------------------------
+12. FINAL DELIVERABLES
+---------------------------
+Deliver:
+1. Updated Task Module with all features integrated.
+2. UI + Backend logic + notification system.
+3. Activity timeline & audit logs.
+4. AI writing tools for task management.
+5. Sample data fixtures.
+6. Detailed documentation including:
+   - How to assign tasks
+   - How notifications work
+   - How team members update tasks
+   - How AI writing assistant works
+7. “FINAL_REPORT.md” summarizing:
+   - System design
+   - APIs used
+   - Flow diagrams
+   - Assumptions
+   - Limitations
+
+Begin work now. Document assumptions in “ASSUMPTIONS.md”. Build in clean steps with clear commit messages.

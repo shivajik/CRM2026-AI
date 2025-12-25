@@ -1,0 +1,81 @@
+# SUPER PROMPT: Full Stack CRM SaaS with Supabase
+
+You are an expert Coding Agent. You are tasked with building a complete, production-ready, Modular Multi-Tenant CRM SaaS Application.
+
+**CRITICAL INSTRUCTION: PHASE 1 - DB CONNECTION CHECK**
+Before generating any application code, you must verify the database connection.
+1. Create a simple script (e.g., `check-db.js`) using the `pg` client.
+2. Use the credentials below to attempt a connection.
+3. Run the script.
+4. IF connection fails: Stop and report the error.
+5. IF connection succeeds: Proceed immediately to PHASE 2 (Building the App).
+
+**CREDENTIALS FOR ENVIRONMENT:**
+* **Supabase Project URL:** https://ebpqvzeaptrdsftljmpj.supabase.co
+* **Supabase Key:** eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImVicHF2emVhcHRyZHNmdGxqbXBqIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjUzNjEyNzIsImV4cCI6MjA4MDkzNzI3Mn0.8WW1jl1graHNtHjKH3m2eXS1_qLdbC9vNWMiDQF6AfE
+* **Database Connection String:** postgresql://postgres:v9H9riutYU7hOP0o@db.ebpqvzeaptrdsftljmpj.supabase.co:5432/postgres
+
+---
+
+**PHASE 2: BUILD INSTRUCTIONS**
+
+**Tech Stack:**
+- **Backend:** Node.js + Express
+- **Database:** Supabase PostgreSQL (via `pg` or `prisma` - do not use Supabase client for Auth)
+- **Frontend:** Next.js (App Router) + Tailwind CSS
+- **Auth:** Custom authentication (NOT Supabase Auth) using bcrypt + JWT + Refresh Tokens
+- **Multi-tenancy:** Row-level isolation with `tenant_id`
+- **Architecture:** API-first, clean folder structure, reusable services
+
+**SYSTEM REQUIREMENTS:**
+
+**1. CUSTOM AUTHENTICATION**
+Implement a complete auth system:
+- Tables: `users`, `roles`, `auth_tokens`, `tenants`
+- Features: Registration (creates tenant + admin), Login (JWT), Password hashing (bcrypt), Token refresh, Logout.
+- **Strict Rule:** Do NOT use Supabase Auth. Build this logic in the Node backend.
+
+**2. MULTI-TENANT SYSTEM**
+- Every data table must contain `tenant_id`.
+- Middleware must extract user & tenant from JWT and enforce isolation.
+- No cross-tenant data access allowed.
+
+**3. MODULAR SYSTEM ENGINE**
+- Tables: `modules` (master list), `tenant_modules` (enable/disable per tenant).
+- Logic: Backend blocks routes for disabled modules; Frontend hides sidebar items for disabled modules.
+- **MVP Modules:** Contacts, Deals (Pipeline), Tasks.
+
+**4. CORE MODULES DATA STRUCTURE**
+- **Contacts:** id, tenant_id, owner_id, name, email, phone, company, notes.
+- **Deals:** id, tenant_id, contact_id, stage (New -> Qualified -> Proposal -> Won/Lost), value, expected_close_date.
+- **Tasks:** id, tenant_id, assigned_to, title, due_date, status.
+
+**5. BACKEND STRUCTURE**
+Create a clean structure:
+`/backend/src` -> `config`, `db`, `middlewares`, `auth`, `modules` (folder per module), `utils`.
+Include centralized error handling and specific middleware for `validateTenant` and `checkModuleAccess`.
+
+**6. DATABASE MIGRATIONS**
+Create SQL setup scripts for:
+1. `tenants`, `users`, `roles`, `auth_tokens`
+2. `modules`, `tenant_modules`
+3. `contacts`, `deals`, `tasks`
+4. Seed data for modules.
+
+**7. FRONTEND APPLICATION (Next.js)**
+- Pages: Login, Register, Dashboard, Contacts (List/CRUD), Deals (Kanban Board), Tasks, Settings (Module Toggles).
+- Features: Protected Routes, Dynamic Sidebar based on API response of enabled modules.
+
+**8. API ENDPOINTS**
+- Auth: `/auth/register`, `/auth/login`, `/auth/refresh`
+- Tenant: `/tenant/modules` (GET/POST to enable/disable)
+- Modules: Standard CRUD (e.g., `GET /contacts`, `POST /contacts`)
+
+**EXECUTION ORDER:**
+1. Run DB Connection Check.
+2. Initialize Project Structure.
+3. Write Backend Code & Migrations.
+4. Write Frontend Code.
+5. Provide a `start` command to run the full stack.
+
+**Output:** Fully working codebase. No explanations, no questions. Just code.

@@ -1,0 +1,25 @@
+User-agent: *
+Allow: /
+
+# Sitemap
+Sitemap: https://nexus.com/sitemap.xml
+
+# Disallow admin and auth paths
+Disallow: /login
+Disallow: /register
+Disallow: /agency-dashboard
+Disallow: /saas-admin
+Disallow: /team-dashboard
+Disallow: /customer-portal
+Disallow: /api/
+
+# Allow marketing pages
+Allow: /
+Allow: /features
+Allow: /pricing
+Allow: /resources
+Allow: /checkout
+Allow: /us
+Allow: /uk
+Allow: /in
+Allow: /audit

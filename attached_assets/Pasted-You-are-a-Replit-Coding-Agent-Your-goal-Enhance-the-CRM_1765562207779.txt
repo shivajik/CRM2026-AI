@@ -1,0 +1,206 @@
+You are a Replit Coding Agent.
+
+Your goal: 
+Enhance the CRM’s Email Template System — BUT BEFORE building anything, you must first perform an internal audit of the existing implementation and ONLY develop the parts that are missing.
+
+===========================================================
+PHASE 1 — SELF-AUDIT (MANDATORY BEFORE CODING)
+===========================================================
+Before making any changes, analyze the current codebase and check if the following components already exist:
+
+A. TEMPLATE STORAGE LEVELS
+1. System-wide (global) templates  
+2. Workspace-level templates  
+3. User-level templates  
+4. Ability for user to “share” template with workspace  
+
+B. TEMPLATE FIELDS
+- name  
+- subject  
+- body  
+- purpose  
+
+C. OWNERSHIP MODEL
+- ownerType (system | workspace | user)  
+- ownerId  
+- isShared  
+
+D. LOADING PRIORITY LOGIC
+When selecting templates, the system loads them in this order:
+1. User templates  
+2. Workspace templates  
+3. System templates  
+
+E. USER INTERFACE
+- My Templates section  
+- Workspace Templates section  
+- System Templates section  
+- Share toggle  
+- Duplicate template function  
+- Edit/delete permissions  
+- Template preview  
+
+F. API & BACKEND
+- CRUD operations  
+- Ownership enforcement  
+- Template filtering by workspace/user/system  
+
+G. PERMISSIONS
+- User can manage own templates  
+- Workspace admin can manage shared templates  
+- System templates are locked  
+
+H. MIGRATIONS
+- Schema fields exist (`ownerType`, `ownerId`, `isShared`, etc.)  
+- No backward-incompatible changes  
+
+I. INTEGRATIONS
+Templates appear in:
+- Email send modal  
+- Quotation send  
+- Invoice send  
+- Proposal send  
+
+J. FEATURE FLAG
+Check if `email_template_system_v2_enabled` exists.
+
+===========================================================
+PHASE 2 — DECISION LOGIC
+===========================================================
+After completing the audit:
+
+1. If a component is already implemented AND works properly:
+   → Do NOT rebuild it  
+   → Do NOT overwrite it  
+   → Do NOT touch related code
+
+2. If a component exists BUT is partially implemented or buggy:
+   → Only patch the missing or incorrect parts
+
+3. If a component does NOT exist:
+   → Implement it fully following the specification below
+
+All changes must be:
+- Additive  
+- Backward compatible  
+- Feature-flag controlled  
+- Safe for production  
+
+===========================================================
+PHASE 3 — IMPLEMENT ONLY MISSING COMPONENTS
+===========================================================
+Implement the missing parts from the following feature list:
+
+-------------------------------------------
+1. TEMPLATE STORAGE LEVELS
+-------------------------------------------
+- System templates (global)
+- Workspace templates (shared)
+- User templates (private unless shared)
+- Share toggle for user templates
+
+-------------------------------------------
+2. TEMPLATE OWNERSHIP FIELDS
+-------------------------------------------
+Ensure presence of:
+- ownerType
+- ownerId
+- isShared
+- createdBy
+
+Add migrations only if fields do not exist.
+
+-------------------------------------------
+3. TEMPLATE LISTING & PRIORITY HANDLING
+-------------------------------------------
+Implement missing logic:
+- User > Workspace > System ordering
+- Grouping by sections
+
+-------------------------------------------
+4. TEMPLATE PERMISSIONS
+-------------------------------------------
+Implement missing rules:
+- System templates cannot be deleted or edited
+- Workspace templates editable by workspace admins
+- User-only templates editable only by creator
+- Share/unshare applies only to user templates
+
+-------------------------------------------
+5. USER INTERFACE SECTIONS
+-------------------------------------------
+Add missing UI categories:
+- My Templates
+- Workspace Templates
+- System Templates
+
+Add:
+- Preview button
+- Duplicate button
+- Lock icon for system templates
+
+-------------------------------------------
+6. TEMPLATE SELECTION IN MODULES
+-------------------------------------------
+If not implemented:
+- Load templates in correct priority order inside:
+  - Email module
+  - Quotation send modal
+  - Invoice send modal
+  - Proposal send modal
+
+-------------------------------------------
+7. API FIXES
+-------------------------------------------
+Add missing:
+- Filtering by ownerType + ownerId
+- Access control
+- CRUD for user/workspace templates
+- Duplicate endpoint
+
+-------------------------------------------
+8. FEATURE FLAG LOGIC
+-------------------------------------------
+If missing:
+- Add global flag `email_template_system_v2_enabled`
+- Ensure system behaves EXACTLY as before when flag = OFF
+
+-------------------------------------------
+9. TESTS
+-------------------------------------------
+Write tests ONLY for missing or newly added parts:
+- Priority loading  
+- Share/unshare  
+- Duplicate behavior  
+- Workspace admin editing rights  
+- System template lock  
+- API filtering  
+- Backward compatibility  
+
+===========================================================
+PHASE 4 — SAFETY REQUIREMENTS
+===========================================================
+- Do NOT modify or break any feature already implemented correctly  
+- Do NOT modify existing template data unless needed for migration  
+- All migrations must be additive and reversible  
+- When feature flag is OFF, system must behave exactly as before  
+- Auto-generate documentation only for added components  
+
+===========================================================
+FINAL DELIVERABLES
+===========================================================
+Provide only the following outputs:
+
+1. Missing code implementations  
+2. Missing migrations (if required)  
+3. Missing UI components (if required)  
+4. Updated API handlers (only if missing)  
+5. Tests for added functionality  
+6. Updated documentation for new components  
+7. A short summary describing:
+   - What was already complete  
+   - What was missing  
+   - What you implemented  
+
+Begin by performing the audit.  
+Do not write new code until the audit confirms what is missing.

@@ -1,0 +1,51 @@
+modules = ["nodejs-20", "web", "postgresql-16"]
+run = "npm run dev"
+hidden = [".config", ".git", "generated-icon.png", "node_modules", "dist"]
+
+[nix]
+channel = "stable-24_05"
+
+[deployment]
+deploymentTarget = "autoscale"
+build = ["npm", "run", "build"]
+publicDir = "dist/public"
+run = ["npm", "run", "start"]
+
+[[ports]]
+localPort = 5000
+externalPort = 80
+
+[env]
+PORT = "5000"
+
+[workflows]
+runButton = "Project"
+
+[[workflows.workflow]]
+name = "Project"
+mode = "parallel"
+author = "agent"
+
+[[workflows.workflow.tasks]]
+task = "workflow.run"
+args = "Start application"
+
+[[workflows.workflow]]
+name = "Start application"
+author = "agent"
+
+[[workflows.workflow.tasks]]
+task = "shell.exec"
+args = "npm run dev"
+waitForPort = 5000
+
+[agent]
+mockupState = "FULLSTACK"
+
+[userenv]
+
+[userenv.shared]
+SUPABASE_DATABASE_URL = "postgresql://postgres.ebpqvzeaptrdsftljmpj:v9H9riutYU7hOP0o@aws-1-ap-south-1.pooler.supabase.com:6543/postgres?pgbouncer=true"
+SUPABASE_URL = "https://ebpqvzeaptrdsftljmpj.supabase.co"
+SUPABASE_DIRECT_URL = "postgresql://postgres.ebpqvzeaptrdsftljmpj:v9H9riutYU7hOP0o@aws-1-ap-south-1.pooler.supabase.com:5432/postgres"
+JWT_SECRET = "84002576ec74d0a5298809db7cb6066551834f4f216ff5d7f4b176daf2a23a3375ea3b68a84664b4b5e590a1933c146d621e4e93e3373e4b9b10cceac4a0e326"
