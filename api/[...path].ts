@@ -192,16 +192,19 @@ export default async function (req: VercelRequest, res: VercelResponse) {
   try {
     const h = await initHandler();
     
-    // CRITICAL: Ensure req.body is set correctly for serverless-http
-    // Vercel pre-parses JSON bodies, but serverless-http needs to handle them
-    // If body is already parsed (object), we need to ensure Express can still process it
-    if (req.body && typeof req.body === 'object') {
-      // Body is already parsed by Vercel - this is good
-      // Just make sure it's available to the handler
-      req.body = req.body;
+    // CRITICAL FIX: Vercel pre-parses JSON body into req.body (object)
+    // serverless-http doesn't expect this and Express body parser won't re-parse it
+    // We need to preserve the already-parsed body so Express middleware can access it
+    const preRequestBody = req.body;
+    
+    const result = await h(req, res);
+    
+    // If body was lost during handler processing, restore it
+    if (!req.body && preRequestBody && typeof preRequestBody === 'object') {
+      req.body = preRequestBody;
     }
     
-    return await h(req, res);
+    return result;
   } catch (error: any) {
     console.error("Request handler error:", error.message);
     res.status(500).json({ 

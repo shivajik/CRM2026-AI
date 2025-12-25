@@ -41,6 +41,18 @@ export async function createApp(): Promise<express.Express> {
     app.use('/api', apiRateLimiter);
     app.use(inputSanitizationMiddleware);
 
+    // Middleware to handle Vercel's pre-parsed JSON body
+    app.use((req, res, next) => {
+      // If Vercel already parsed the body into an object, preserve it
+      if (req.body && typeof req.body === 'object' && req.headers['content-type']?.includes('application/json')) {
+        // Body is already parsed, skip further parsing
+        return next();
+      }
+      
+      // Otherwise, proceed with normal JSON parsing
+      next();
+    });
+
     app.use(
       express.json({
         verify: (req, _res, buf) => {
