@@ -1930,15 +1930,11 @@ function getPool() {
   return pool2;
 }
 async function initializeAITables() {
-  const isServerless = process.env.VERCEL === "1" || process.env.AWS_LAMBDA_FUNCTION_NAME;
-  const isProduction = process.env.NODE_ENV === "production";
-  if (isServerless || isProduction) {
-    console.log("[DB] Skipping AI table initialization in serverless/production environment");
-    return;
-  }
-  const client = await pool.connect();
+  console.log("[DB] Skipping AI table initialization (managed by drizzle schema)");
+  return;
+  const _skipClient = await pool.connect();
   try {
-    await client.query(`
+    await _skipClient.query(`
       CREATE TABLE IF NOT EXISTS ai_settings (
         id VARCHAR PRIMARY KEY DEFAULT gen_random_uuid()::text,
         tenant_id VARCHAR NOT NULL UNIQUE REFERENCES tenants(id) ON DELETE CASCADE,
@@ -5221,9 +5217,9 @@ async function registerRoutes(httpServer, app) {
   app.get("/api/health", async (_req, res) => {
     try {
       const { pool: pool2 } = await Promise.resolve().then(() => (init_db(), db_exports));
-      const client = await pool2.connect();
-      await client.query("SELECT 1");
-      client.release();
+      const client2 = await pool2.connect();
+      await client2.query("SELECT 1");
+      client2.release();
       res.json({
         status: "ok",
         timestamp: (/* @__PURE__ */ new Date()).toISOString(),
@@ -5249,9 +5245,9 @@ async function registerRoutes(httpServer, app) {
     let dbError = null;
     try {
       const { pool: pool2 } = await Promise.resolve().then(() => (init_db(), db_exports));
-      const client = await pool2.connect();
-      await client.query("SELECT 1");
-      client.release();
+      const client2 = await pool2.connect();
+      await client2.query("SELECT 1");
+      client2.release();
       dbStatus = "connected";
     } catch (error) {
       dbStatus = "failed";
@@ -5269,7 +5265,7 @@ async function registerRoutes(httpServer, app) {
   });
   const isServerless = process.env.VERCEL === "1" || process.env.AWS_LAMBDA_FUNCTION_NAME;
   const isProduction = process.env.NODE_ENV === "production";
-  if (!isServerless && !isProduction) {
+  if (false) {
     try {
       await initializeModules();
       await initializeDefaultPackages();
@@ -5278,7 +5274,7 @@ async function registerRoutes(httpServer, app) {
       console.error("Seeding error (non-critical):", error);
     }
   } else {
-    console.log("[Routes] Skipping seed initialization in serverless/production environment");
+    console.log("[Routes] Skipping seed initialization");
   }
   app.post("/api/auth/register", authRateLimiter, async (req, res) => {
     const clientIp = getClientIp(req);
@@ -10297,131 +10293,6 @@ async function registerRoutes(httpServer, app) {
   });
   return httpServer;
 }
-async function initializeModules() {
-  const defaultModules = [
-    { name: "contacts", displayName: "Contacts", description: "Manage your contacts", icon: "users", isCore: true },
-    { name: "customers", displayName: "Customers", description: "Manage customers and accounts", icon: "building", isCore: true },
-    { name: "deals", displayName: "Deals", description: "Track sales opportunities", icon: "briefcase", isCore: true },
-    { name: "tasks", displayName: "Tasks", description: "Manage tasks and activities", icon: "check-square", isCore: true },
-    { name: "products", displayName: "Products", description: "Product and service catalog", icon: "package", isCore: true },
-    { name: "quotations", displayName: "Quotations", description: "Create and manage quotes", icon: "file-text", isCore: true },
-    { name: "invoices", displayName: "Invoices", description: "Billing and invoicing", icon: "receipt", isCore: true },
-    { name: "activities", displayName: "Activities", description: "Track calls, meetings, and notes", icon: "activity", isCore: true },
-    { name: "reports", displayName: "Reports", description: "Analytics and reporting", icon: "bar-chart", isCore: true }
-  ];
-  for (const module of defaultModules) {
-    const existing = await storage.getModuleByName(module.name);
-    if (!existing) {
-      await storage.createModule(module);
-    }
-  }
-}
-async function initializeDefaultPackages() {
-  const existingPackages = await storage.getAllPackages();
-  if (existingPackages.length > 0) {
-    return;
-  }
-  const modules2 = await storage.getAllModules();
-  const moduleMap = new Map(modules2.map((m) => [m.name, m.id]));
-  const starterModules = ["contacts", "deals", "tasks"];
-  const professionalModules = ["contacts", "customers", "deals", "tasks", "products", "quotations", "activities"];
-  const enterpriseModules = ["contacts", "customers", "deals", "tasks", "products", "quotations", "invoices", "activities", "reports"];
-  const defaultPackages = [
-    {
-      name: "starter",
-      displayName: "Starter",
-      description: "Perfect for small teams just getting started with CRM",
-      price: "29.00",
-      billingCycle: "monthly",
-      isActive: true,
-      isPopular: false,
-      sortOrder: 1,
-      features: [
-        "Up to 5 team members",
-        "1,000 contacts",
-        "Basic pipeline management",
-        "Email support",
-        "Mobile app access"
-      ],
-      moduleNames: starterModules
-    },
-    {
-      name: "professional",
-      displayName: "Professional",
-      description: "For growing teams that need more power and flexibility",
-      price: "79.00",
-      billingCycle: "monthly",
-      isActive: true,
-      isPopular: true,
-      sortOrder: 2,
-      features: [
-        "Up to 25 team members",
-        "10,000 contacts",
-        "Advanced pipeline & forecasting",
-        "Customer management",
-        "Quotation management",
-        "Activity tracking",
-        "Priority email support",
-        "API access"
-      ],
-      moduleNames: professionalModules
-    },
-    {
-      name: "enterprise",
-      displayName: "Enterprise",
-      description: "For large organizations with advanced needs",
-      price: "199.00",
-      billingCycle: "monthly",
-      isActive: true,
-      isPopular: false,
-      sortOrder: 3,
-      features: [
-        "Unlimited team members",
-        "Unlimited contacts",
-        "All CRM modules included",
-        "Advanced reporting & analytics",
-        "Invoice management",
-        "Custom integrations",
-        "Dedicated account manager",
-        "24/7 phone support",
-        "SLA guarantees"
-      ],
-      moduleNames: enterpriseModules
-    }
-  ];
-  for (const pkgData of defaultPackages) {
-    const { moduleNames, ...packageData } = pkgData;
-    const pkg = await storage.createPackage(packageData);
-    const moduleIds = moduleNames.map((name) => moduleMap.get(name)).filter((id) => id !== void 0);
-    if (moduleIds.length > 0) {
-      await storage.setPackageModules(pkg.id, moduleIds);
-    }
-  }
-  console.log("Default packages initialized successfully");
-}
-async function initializeSuperAdmin() {
-  const existingAdmin = await storage.getUserByEmail("superadmin@nexuscrm.com");
-  if (existingAdmin) {
-    return;
-  }
-  let platformTenant = await storage.getTenant("platform-tenant");
-  if (!platformTenant) {
-    const tenant = await storage.createTenant({ name: "Nexus CRM Platform" });
-    platformTenant = tenant;
-  }
-  const passwordHash = await hashPassword("Admin123!");
-  await storage.createUser({
-    tenantId: platformTenant.id,
-    email: "superadmin@nexuscrm.com",
-    passwordHash,
-    firstName: "Super",
-    lastName: "Admin",
-    userType: "saas_admin",
-    isAdmin: true,
-    isActive: true
-  });
-  console.log("Super admin initialized: superadmin@nexuscrm.com / Admin123!");
-}
 
 // server/app.ts
 init_db();
@@ -10567,12 +10438,12 @@ async function path_default(req, res) {
         });
         return;
       }
-      const client = await pool2.connect();
-      const result = await client.query(
+      const client2 = await pool2.connect();
+      const result = await client2.query(
         "SELECT id, email, first_name FROM users WHERE LOWER(email) = LOWER($1) LIMIT 1",
         [body.email]
       );
-      client.release();
+      client2.release();
       res.json({
         status: "success",
         userFound: result.rows.length > 0,
@@ -10593,9 +10464,9 @@ async function path_default(req, res) {
     try {
       const { pool: pool2 } = await Promise.resolve().then(() => (init_db(), db_exports));
       const startTime = Date.now();
-      const client = await pool2.connect();
-      const result = await client.query("SELECT NOW() as time, current_database() as db");
-      client.release();
+      const client2 = await pool2.connect();
+      const result = await client2.query("SELECT NOW() as time, current_database() as db");
+      client2.release();
       const duration = Date.now() - startTime;
       res.json({
         status: "db_connected",

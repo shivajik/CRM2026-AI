@@ -58,19 +58,14 @@ export const pool = getPool();
 export const db = drizzle(pool, { schema });
 
 export async function initializeAITables() {
-  // Skip table initialization in serverless/production environments
-  // Tables should be created via migrations, not at runtime
-  const isServerless = process.env.VERCEL === '1' || process.env.AWS_LAMBDA_FUNCTION_NAME;
-  const isProduction = process.env.NODE_ENV === 'production';
-  
-  if (isServerless || isProduction) {
-    console.log("[DB] Skipping AI table initialization in serverless/production environment");
-    return;
-  }
+  // Skip table initialization - all tables are created via schema push
+  console.log("[DB] Skipping AI table initialization (managed by drizzle schema)");
+  return;
 
-  const client = await pool.connect();
+  // Original code commented out - keeping for reference
+  const _skipClient = await pool.connect();
   try {
-    await client.query(`
+    await _skipClient.query(`
       CREATE TABLE IF NOT EXISTS ai_settings (
         id VARCHAR PRIMARY KEY DEFAULT gen_random_uuid()::text,
         tenant_id VARCHAR NOT NULL UNIQUE REFERENCES tenants(id) ON DELETE CASCADE,

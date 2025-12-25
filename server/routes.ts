@@ -74,7 +74,9 @@ export async function registerRoutes(
   const isServerless = process.env.VERCEL === '1' || process.env.AWS_LAMBDA_FUNCTION_NAME;
   const isProduction = process.env.NODE_ENV === 'production';
   
-  if (!isServerless && !isProduction) {
+  // Don't seed - tables are already in database from schema push
+  // Data seeding should only happen during initial setup
+  if (false) {  // Disabled - keep for reference
     try {
       await initializeModules();
       await initializeDefaultPackages();
@@ -83,7 +85,7 @@ export async function registerRoutes(
       console.error('Seeding error (non-critical):', error);
     }
   } else {
-    console.log('[Routes] Skipping seed initialization in serverless/production environment');
+    console.log('[Routes] Skipping seed initialization');
   }
   
   // ==================== AUTH ROUTES ====================
