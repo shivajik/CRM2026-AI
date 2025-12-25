@@ -66,7 +66,12 @@ app.use((req, res, next) => {
 });
 
 (async () => {
-  await initializeAITables();
+  try {
+    await initializeAITables();
+  } catch (error) {
+    console.error("Failed to initialize AI tables (non-critical):", error);
+  }
+  
   await registerRoutes(httpServer, app);
 
   app.use((err: any, _req: Request, res: Response, _next: NextFunction) => {
@@ -74,7 +79,6 @@ app.use((req, res, next) => {
     const message = err.message || "Internal Server Error";
 
     res.status(status).json({ message });
-    throw err;
   });
 
   // importantly only setup vite in development and after
