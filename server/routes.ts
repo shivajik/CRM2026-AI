@@ -3909,7 +3909,28 @@ export async function registerRoutes(
         customerId: customerId as string | undefined,
         ownerId: ownerId as string | undefined,
       });
-      res.json(proposals);
+
+      // Populate pricing items to calculate totals if needed
+      const proposalsWithTotals = await Promise.all(proposals.map(async (proposal) => {
+        if (parseFloat(proposal.totalAmount as string) === 0) {
+          const pricingItems = await storage.getProposalPricingItems(proposal.id);
+          const subtotal = pricingItems.reduce((sum, item) => {
+            if (item.isSelected) {
+              return sum + (parseFloat(item.totalPrice as string) || 0);
+            }
+            return sum;
+          }, 0);
+          
+          return {
+            ...proposal,
+            totalAmount: subtotal.toString(),
+            pricingItems
+          };
+        }
+        return proposal;
+      }));
+
+      res.json(proposalsWithTotals);
     } catch (error) {
       console.error("Get proposals error:", error);
       res.status(500).json({ message: "Failed to fetch proposals" });
