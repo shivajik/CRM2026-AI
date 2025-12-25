@@ -40,11 +40,21 @@ async function initHandler() {
   
   try {
     console.log("Initializing serverless handler...");
-    console.log("Environment check - SUPABASE_DATABASE_URL exists:", !!process.env.SUPABASE_DATABASE_URL);
-    console.log("Environment check - DATABASE_URL exists:", !!process.env.DATABASE_URL);
-    console.log("Environment check - JWT_SECRET exists:", !!process.env.JWT_SECRET);
     
     const app = await createApp();
+    
+    // CRITICAL: Custom middleware to handle Vercel's pre-parsed body
+    // This must be added BEFORE serverless-http wraps the app
+    const originalUse = app.use.bind(app);
+    app.use((req: any, res: any, next: any) => {
+      // If this is being called from Vercel handler with preserved body, apply it
+      if ((req as any).__vercelBody && !req.body) {
+        req.body = (req as any).__vercelBody;
+        console.log("[Handler] Applied Vercel body to request");
+      }
+      next();
+    });
+    
     handler = serverless(app, {
       binary: ['application/octet-stream', 'image/*'],
     });

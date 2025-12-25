@@ -196,9 +196,28 @@ export async function registerRoutes(
     const userAgent = req.headers['user-agent'] || 'unknown';
     
     try {
-      const { email, password } = req.body;
+      // Debug logging for Vercel deployment issues
+      console.log("[Login] Request body received:", req.body ? `present (type: ${typeof req.body})` : "missing");
+      console.log("[Login] Body keys:", req.body ? Object.keys(req.body) : "N/A");
+      console.log("[Login] Headers:", { 'content-type': req.headers['content-type'], 'content-length': req.headers['content-length'] });
+      
+      let email = req.body?.email;
+      let password = req.body?.password;
+      
+      // Fallback: Check if body is a string (shouldn't happen but just in case)
+      if (!email && typeof req.body === 'string') {
+        try {
+          const parsed = JSON.parse(req.body);
+          email = parsed.email;
+          password = parsed.password;
+          console.log("[Login] Parsed body from string");
+        } catch {
+          console.error("[Login] Failed to parse body string");
+        }
+      }
       
       if (!email || !password) {
+        console.error("[Login] Missing credentials - email:", !!email, "password:", !!password);
         return res.status(400).json({ message: "Email and password are required" });
       }
       
