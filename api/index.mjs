@@ -5247,17 +5247,6 @@ app.get("/api/debug", async (_req, res) => {
 
   // Step 1: Check environment variables
   log("🔍 Checking environment variables");
-  const envCheck = {
-    SUPABASE_DATABASE_URL: !!process.env.SUPABASE_DATABASE_URL,
-    DATABASE_URL: !!process.env.DATABASE_URL,
-    JWT_SECRET: !!process.env.JWT_SECRET,
-    NODE_ENV: process.env.NODE_ENV || "not set",
-  };
-  log("✅ Environment check result", envCheck);
-
-  // Step 2: DB connection test
-  let dbStatus = "unknown";
-  let dbError = null;
 
   try {
     log("🔌 Initializing database");
