@@ -1,9 +1,7 @@
 import { drizzle } from "drizzle-orm/node-postgres";
 import pg from "pg";
 import * as schema from "@shared/schema";
-import dotenv from "dotenv"
 const { Pool } = pg;
-dotenv.config()
 const connectionString = process.env.SUPABASE_DATABASE_URL || process.env.DATABASE_URL;
 
 if (!connectionString) {
@@ -85,7 +83,7 @@ export async function initializeAITables() {
       );
     `);
 
-    await client.query(`
+    await _skipClient.query(`
       CREATE TABLE IF NOT EXISTS ai_usage (
         id VARCHAR PRIMARY KEY DEFAULT gen_random_uuid()::text,
         tenant_id VARCHAR NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
@@ -102,7 +100,7 @@ export async function initializeAITables() {
       );
     `);
 
-    await client.query(`
+    await _skipClient.query(`
       CREATE TABLE IF NOT EXISTS ai_logs (
         id VARCHAR PRIMARY KEY DEFAULT gen_random_uuid()::text,
         tenant_id VARCHAR NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
@@ -121,7 +119,7 @@ export async function initializeAITables() {
       );
     `);
 
-    await client.query(`
+    await _skipClient.query(`
       CREATE TABLE IF NOT EXISTS ai_content_versions (
         id VARCHAR PRIMARY KEY DEFAULT gen_random_uuid()::text,
         tenant_id VARCHAR NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
@@ -142,6 +140,6 @@ export async function initializeAITables() {
   } catch (error) {
     console.error("[DB] Error initializing AI tables:", error);
   } finally {
-    client.release();
+    _skipClient.release();
   }
 }
