@@ -5234,35 +5234,72 @@ async function registerRoutes(httpServer, app) {
       });
     }
   });
-  app.get("/api/debug", async (_req, res) => {
-    const envCheck = {
-      SUPABASE_DATABASE_URL: !!process.env.SUPABASE_DATABASE_URL,
-      DATABASE_URL: !!process.env.DATABASE_URL,
-      JWT_SECRET: !!process.env.JWT_SECRET,
-      NODE_ENV: process.env.NODE_ENV || "not set"
-    };
-    let dbStatus = "unknown";
-    let dbError = null;
-    try {
-      const { pool: pool2 } = await Promise.resolve().then(() => (init_db(), db_exports));
-      const client2 = await pool2.connect();
-      await client2.query("SELECT 1");
-      client2.release();
-      dbStatus = "connected";
-    } catch (error) {
-      dbStatus = "failed";
-      dbError = error.message;
-    }
-    res.json({
-      status: "debug",
-      timestamp: (/* @__PURE__ */ new Date()).toISOString(),
-      environment: envCheck,
-      database: {
-        status: dbStatus,
-        error: dbError
-      }
+app.get("/api/debug", async (_req, res) => {
+  const logs = [];
+
+  const log = (msg, data) => {
+    const entry = data ? `${msg} :: ${JSON.stringify(data)}` : msg;
+    console.log(entry);
+    logs.push(entry);
+  };
+
+  log("➡️ Debug API called");
+
+  // Step 1: Check environment variables
+  log("🔍 Checking environment variables");
+  const envCheck = {
+    SUPABASE_DATABASE_URL: !!process.env.SUPABASE_DATABASE_URL,
+    DATABASE_URL: !!process.env.DATABASE_URL,
+    JWT_SECRET: !!process.env.JWT_SECRET,
+    NODE_ENV: process.env.NODE_ENV || "not set",
+  };
+  log("✅ Environment check result", envCheck);
+
+  // Step 2: DB connection test
+  let dbStatus = "unknown";
+  let dbError = null;
+
+  try {
+    log("🔌 Initializing database");
+
+    const { pool: pool2 } = await Promise.resolve().then(() => {
+      log("📦 Loading DB exports");
+      init_db();
+      return db_exports;
     });
+
+    log("🔗 Getting DB client from pool");
+    const client2 = await pool2.connect();
+
+    log("📡 Running test query: SELECT 1");
+    await client2.query("SELECT 1");
+
+    log("♻️ Releasing DB client");
+    client2.release();
+
+    dbStatus = "connected";
+    log("✅ Database connected successfully");
+  } catch (error) {
+    dbStatus = "failed";
+    dbError = error?.message || String(error);
+    log("❌ Database connection failed", { error: dbError });
+  }
+
+  // Step 3: Send response
+  log("📤 Sending debug response");
+
+  res.json({
+    status: "debug",
+    timestamp: new Date().toISOString(),
+    environment: envCheck,
+    database: {
+      status: dbStatus,
+      error: dbError,
+    },
+    logs, // 👈 all step-by-step console messages
   });
+});
+
   const isServerless = process.env.VERCEL === "1" || process.env.AWS_LAMBDA_FUNCTION_NAME;
   const isProduction = process.env.NODE_ENV === "production";
   if (false) {
