@@ -49,9 +49,22 @@ export default async function (req: VercelRequest, res: VercelResponse) {
       const startTime = Date.now();
       await initHandler();
       const duration = Date.now() - startTime;
+      
+      let dbStatus = "unknown";
+      try {
+        const { pool } = await import("../server/db");
+        const client = await pool.connect();
+        await client.query("SELECT 1");
+        client.release();
+        dbStatus = "connected";
+      } catch (e: any) {
+        dbStatus = `failed: ${e.message}`;
+      }
+
       res.json({
         status: "handler_initialized",
         initDuration: `${duration}ms`,
+        database: dbStatus,
         env: {
           SUPABASE_DATABASE_URL: !!process.env.SUPABASE_DATABASE_URL,
           DATABASE_URL: !!process.env.DATABASE_URL,
@@ -118,9 +131,22 @@ export default async function (req: VercelRequest, res: VercelResponse) {
     try {
       const { pool } = await import("../server/db");
       const startTime = Date.now();
-      const client = await pool.connect();
-      const result = await client.query("SELECT NOW() as time, current_database() as db");
-      client.release();
+      
+      const timeoutPromise = new Promise((_, reject) => 
+        setTimeout(() => reject(new Error("DB Connection Timeout (5s)")), 5000)
+      );
+      
+      const dbPromise = (async () => {
+        const client = await pool.connect();
+        try {
+          const result = await client.query("SELECT NOW() as time, current_database() as db");
+          return result;
+        } finally {
+          client.release();
+        }
+      })();
+
+      const result = await Promise.race([dbPromise, timeoutPromise]) as any;
       const duration = Date.now() - startTime;
       res.json({
         status: "db_connected",
