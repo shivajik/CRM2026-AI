@@ -24,7 +24,10 @@ async function initHandler() {
     console.log("Environment check - JWT_SECRET exists:", !!process.env.JWT_SECRET);
     
     const app = await createApp();
-    handler = serverless(app);
+    handler = serverless(app, {
+      binary: ['image/*', 'application/pdf', 'application/zip'],
+      requestId: 'x-vercel-id'
+    });
     console.log("Serverless handler initialized successfully");
     return handler;
   } catch (error: any) {
