@@ -1,6 +1,10 @@
 import type { VercelRequest, VercelResponse } from "@vercel/node";
-import serverless from "serverless-http";
+import { createRequire } from "module";
 import { createApp } from "../server/app";
+
+// Load serverless-http using createRequire to handle CommonJS in ESM
+const require = createRequire(import.meta.url);
+const serverless = require("serverless-http");
 
 let handler: any = null;
 let initError: Error | null = null;
