@@ -2,10 +2,6 @@ import type { VercelRequest, VercelResponse } from "@vercel/node";
 import { createRequire } from "module";
 import { createApp } from "../server/app";
 
-// Load serverless-http using createRequire to handle CommonJS in ESM
-const require = createRequire(import.meta.url);
-const serverless = require("serverless-http");
-
 let handler: any = null;
 let initError: Error | null = null;
 
@@ -27,7 +23,21 @@ async function initHandler() {
     console.log("Environment check - DATABASE_URL exists:", !!process.env.DATABASE_URL);
     console.log("Environment check - JWT_SECRET exists:", !!process.env.JWT_SECRET);
     
+    // Load serverless-http using createRequire to handle CommonJS in ESM
+    let serverless;
+    try {
+      const require = createRequire(import.meta.url);
+      serverless = require("serverless-http");
+      console.log("serverless-http loaded successfully");
+    } catch (e: any) {
+      console.error("Failed to load serverless-http:", e.message);
+      console.error("serverless-http error stack:", e.stack);
+      throw new Error(`Failed to load serverless-http: ${e.message}`);
+    }
+    
     const app = await createApp();
+    console.log("Express app created successfully");
+    
     handler = serverless(app, {
       binary: ['image/*', 'application/pdf', 'application/zip'],
       requestId: 'x-vercel-id'
@@ -37,6 +47,8 @@ async function initHandler() {
   } catch (error: any) {
     console.error("Failed to initialize handler:", error.message);
     console.error("Stack:", error.stack);
+    console.error("Error name:", error.name);
+    console.error("Error code:", error.code);
     initError = error;
     throw error;
   }
@@ -225,9 +237,17 @@ export default async function (req: VercelRequest, res: VercelResponse) {
     return await h(req, res);
   } catch (error: any) {
     console.error("Request handler error:", error.message);
+    console.error("Error stack:", error.stack);
+    console.error("Error name:", error.name);
+    console.error("Error code:", error.code);
+    
+    // Return detailed error in response
     res.status(500).json({ 
       message: "Server initialization failed",
       error: error.message,
+      name: error.name,
+      code: error.code,
+      stack: process.env.NODE_ENV !== 'production' ? error.stack?.split('\n').slice(0, 10) : undefined,
       hint: "Check Vercel function logs for more details"
     });
   }
