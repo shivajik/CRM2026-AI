@@ -36,6 +36,10 @@ function getPool(): pg.Pool {
     idleTimeoutMillis: 10000,
     connectionTimeoutMillis: 5000,
     allowExitOnIdle: true,
+    ...(hasSupabaseUrl && { 
+      statement_timeout: 10000,
+      query_timeout: 10000,
+    }),
   });
 
   pool.on('error', (err) => {

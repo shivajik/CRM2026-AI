@@ -1915,7 +1915,11 @@ function getPool() {
     max: isServerless ? 1 : 10,
     idleTimeoutMillis: 1e4,
     connectionTimeoutMillis: 5e3,
-    allowExitOnIdle: true
+    allowExitOnIdle: true,
+    ...hasSupabaseUrl && {
+      statement_timeout: 1e4,
+      query_timeout: 1e4
+    }
   });
   pool2.on("error", (err) => {
     console.error("[DB] Pool error:", err.message);
