@@ -212,39 +212,40 @@ export async function registerRoutes(
         
         const failedAttempts = await storage.getFailedLoginCount(normalizedEmail, 15);
         if (failedAttempts >= 5) {
-          await storage.createLoginAttempt({
+          // fire-and-forget to avoid blocking on serverless
+          void storage.createLoginAttempt({
             email: normalizedEmail,
             ipAddress: clientIp,
             userAgent,
             success: false,
             failureReason: 'account_locked',
-          });
+          }).catch(() => {});
           return { status: 429, data: { message: "Account temporarily locked due to too many failed attempts. Please try again in 15 minutes." } };
         }
         
         const user = await storage.getUserByEmail(normalizedEmail);
         if (!user) {
-          await storage.createLoginAttempt({
+          void storage.createLoginAttempt({
             email: normalizedEmail,
             ipAddress: clientIp,
             userAgent,
             success: false,
             failureReason: 'user_not_found',
-          });
+          }).catch(() => {});
           return { status: 401, data: { message: "Invalid credentials" } };
         }
         
         const isValidPassword = await verifyPassword(password, user.passwordHash);
         if (!isValidPassword) {
-          await storage.createLoginAttempt({
+          void storage.createLoginAttempt({
             email: normalizedEmail,
             ipAddress: clientIp,
             userAgent,
             success: false,
             failureReason: 'invalid_password',
-          });
+          }).catch(() => {});
           
-          await storage.createAuditLog({
+          void storage.createAuditLog({
             tenantId: user.tenantId,
             userId: user.id,
             action: AUDIT_LOG_ACTIONS.LOGIN_FAILED,
@@ -255,28 +256,28 @@ export async function registerRoutes(
             requestPath: '/api/auth/login',
             success: false,
             errorMessage: 'Invalid password',
-          });
+          }).catch(() => {});
           
           return { status: 401, data: { message: "Invalid credentials" } };
         }
         
         if (!user.isActive) {
-          await storage.createLoginAttempt({
+          void storage.createLoginAttempt({
             email: normalizedEmail,
             ipAddress: clientIp,
             userAgent,
             success: false,
             failureReason: 'account_inactive',
-          });
+          }).catch(() => {});
           return { status: 401, data: { message: "Account is inactive. Please contact your administrator." } };
         }
         
-        await storage.createLoginAttempt({
+        void storage.createLoginAttempt({
           email: normalizedEmail,
           ipAddress: clientIp,
           userAgent,
           success: true,
-        });
+        }).catch(() => {});
         
         // Check if multi-workspace is enabled for this user's tenant
         let activeWorkspaceId: string | undefined;
@@ -298,13 +299,14 @@ export async function registerRoutes(
         const accessToken = generateAccessToken(user, tokenOptions);
         const refreshToken = generateRefreshToken(user, tokenOptions);
         
-        await storage.createAuthToken({
+        // Do not block on token persistence; if it fails, refresh will not work but login succeeds
+        void storage.createAuthToken({
           userId: user.id,
           refreshToken,
           expiresAt: getRefreshTokenExpiry(),
-        });
+        }).catch(() => {});
         
-        await storage.createAuditLog({
+        void storage.createAuditLog({
           tenantId: user.tenantId,
           userId: user.id,
           action: AUDIT_LOG_ACTIONS.LOGIN_SUCCESS,
@@ -314,7 +316,7 @@ export async function registerRoutes(
           requestMethod: 'POST',
           requestPath: '/api/auth/login',
           success: true,
-        });
+        }).catch(() => {});
         
         return {
           status: 200,
