@@ -1900,6 +1900,7 @@ __export(db_exports, {
 });
 import { drizzle } from "drizzle-orm/node-postgres";
 import pg from "pg";
+import dotenv from "dotenv";
 function getPool() {
   if (globalThis._pgPool) {
     return globalThis._pgPool;
@@ -1911,14 +1912,10 @@ function getPool() {
   const pool2 = new Pool({
     connectionString: connectionString || FALLBACK_CONNECTION,
     ssl: isProduction || hasSupabaseUrl ? { rejectUnauthorized: false } : void 0,
-    max: isServerless ? 1 : 5,
-    idleTimeoutMillis: isServerless ? 1e4 : 3e4,
-    connectionTimeoutMillis: isServerless ? 1e4 : 15e3,
-    allowExitOnIdle: true,
-    // Disable prepared statements for PgBouncer compatibility
-    ...hasSupabaseUrl && {
-      statement_timeout: 1e4
-    }
+    max: isServerless ? 1 : 10,
+    idleTimeoutMillis: 1e4,
+    connectionTimeoutMillis: 5e3,
+    allowExitOnIdle: true
   });
   pool2.on("error", (err) => {
     console.error("[DB] Pool error:", err.message);
@@ -1953,7 +1950,7 @@ async function initializeAITables() {
         updated_at TIMESTAMP NOT NULL DEFAULT NOW()
       );
     `);
-    await client.query(`
+    await _skipClient.query(`
       CREATE TABLE IF NOT EXISTS ai_usage (
         id VARCHAR PRIMARY KEY DEFAULT gen_random_uuid()::text,
         tenant_id VARCHAR NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
@@ -1969,7 +1966,7 @@ async function initializeAITables() {
         created_at TIMESTAMP NOT NULL DEFAULT NOW()
       );
     `);
-    await client.query(`
+    await _skipClient.query(`
       CREATE TABLE IF NOT EXISTS ai_logs (
         id VARCHAR PRIMARY KEY DEFAULT gen_random_uuid()::text,
         tenant_id VARCHAR NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
@@ -1987,7 +1984,7 @@ async function initializeAITables() {
         created_at TIMESTAMP NOT NULL DEFAULT NOW()
       );
     `);
-    await client.query(`
+    await _skipClient.query(`
       CREATE TABLE IF NOT EXISTS ai_content_versions (
         id VARCHAR PRIMARY KEY DEFAULT gen_random_uuid()::text,
         tenant_id VARCHAR NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
@@ -2007,7 +2004,7 @@ async function initializeAITables() {
   } catch (error) {
     console.error("[DB] Error initializing AI tables:", error);
   } finally {
-    client.release();
+    _skipClient.release();
   }
 }
 var Pool, connectionString, FALLBACK_CONNECTION, pool, db;
@@ -2016,6 +2013,7 @@ var init_db = __esm({
     "use strict";
     init_schema();
     ({ Pool } = pg);
+    dotenv.config();
     connectionString = process.env.SUPABASE_DATABASE_URL || process.env.DATABASE_URL;
     if (!connectionString) {
       console.error("DATABASE CONNECTION ERROR: No database URL configured");
@@ -5217,9 +5215,9 @@ async function registerRoutes(httpServer, app) {
   app.get("/api/health", async (_req, res) => {
     try {
       const { pool: pool2 } = await Promise.resolve().then(() => (init_db(), db_exports));
-      const client2 = await pool2.connect();
-      await client2.query("SELECT 1");
-      client2.release();
+      const client = await pool2.connect();
+      await client.query("SELECT 1");
+      client.release();
       res.json({
         status: "ok",
         timestamp: (/* @__PURE__ */ new Date()).toISOString(),
@@ -5234,61 +5232,35 @@ async function registerRoutes(httpServer, app) {
       });
     }
   });
-app.get("/api/debug", async (_req, res) => {
-  const logs = [];
-
-  const log = (msg, data) => {
-    const entry = data ? `${msg} :: ${JSON.stringify(data)}` : msg;
-    console.log(entry);
-    logs.push(entry);
-  };
-
-  log("➡️ Debug API called");
-
-  // Step 1: Check environment variables
-  log("🔍 Checking environment variables");
-
-  try {
-    log("🔌 Initializing database");
-
-    const { pool: pool2 } = await Promise.resolve().then(() => {
-      log("📦 Loading DB exports");
-      init_db();
-      return db_exports;
+  app.get("/api/debug", async (_req, res) => {
+    const envCheck = {
+      SUPABASE_DATABASE_URL: !!process.env.SUPABASE_DATABASE_URL,
+      DATABASE_URL: !!process.env.DATABASE_URL,
+      JWT_SECRET: !!process.env.JWT_SECRET,
+      NODE_ENV: process.env.NODE_ENV || "not set"
+    };
+    let dbStatus = "unknown";
+    let dbError = null;
+    try {
+      const { pool: pool2 } = await Promise.resolve().then(() => (init_db(), db_exports));
+      const client = await pool2.connect();
+      await client.query("SELECT 1");
+      client.release();
+      dbStatus = "connected";
+    } catch (error) {
+      dbStatus = "failed";
+      dbError = error.message;
+    }
+    res.json({
+      status: "debug",
+      timestamp: (/* @__PURE__ */ new Date()).toISOString(),
+      environment: envCheck,
+      database: {
+        status: dbStatus,
+        error: dbError
+      }
     });
-
-    log("🔗 Getting DB client from pool");
-    const client2 = await pool2.connect();
-
-    log("📡 Running test query: SELECT 1");
-    await client2.query("SELECT 1");
-
-    log("♻️ Releasing DB client");
-    client2.release();
-
-    dbStatus = "connected";
-    log("✅ Database connected successfully");
-  } catch (error) {
-    dbStatus = "failed";
-    dbError = error?.message || String(error);
-    log("❌ Database connection failed", { error: dbError });
-  }
-
-  // Step 3: Send response
-  log("📤 Sending debug response");
-
-  res.json({
-    status: "debug",
-    timestamp: new Date().toISOString(),
-    environment: envCheck,
-    database: {
-      status: dbStatus,
-      error: dbError,
-    },
-    logs, // 👈 all step-by-step console messages
   });
-});
-
   const isServerless = process.env.VERCEL === "1" || process.env.AWS_LAMBDA_FUNCTION_NAME;
   const isProduction = process.env.NODE_ENV === "production";
   if (false) {
@@ -10430,9 +10402,20 @@ async function path_default(req, res) {
       const startTime = Date.now();
       await initHandler();
       const duration = Date.now() - startTime;
+      let dbStatus = "unknown";
+      try {
+        const { pool: pool2 } = await Promise.resolve().then(() => (init_db(), db_exports));
+        const client = await pool2.connect();
+        await client.query("SELECT 1");
+        client.release();
+        dbStatus = "connected";
+      } catch (e) {
+        dbStatus = `failed: ${e.message}`;
+      }
       res.json({
         status: "handler_initialized",
         initDuration: `${duration}ms`,
+        database: dbStatus,
         env: {
           SUPABASE_DATABASE_URL: !!process.env.SUPABASE_DATABASE_URL,
           DATABASE_URL: !!process.env.DATABASE_URL,
@@ -10455,27 +10438,29 @@ async function path_default(req, res) {
     try {
       const { pool: pool2 } = await Promise.resolve().then(() => (init_db(), db_exports));
       const body = req.body;
-      if (!body || !body.email) {
+      console.log("Test login body:", JSON.stringify(body));
+      console.log("Test login email:", body?.email);
+      const client = await pool2.connect();
+      try {
+        const result = await client.query(
+          "SELECT id, email, first_name, is_active FROM users WHERE LOWER(email) = LOWER($1) LIMIT 1",
+          [body?.email || ""]
+        );
         res.json({
-          status: "no_body",
-          receivedBody: body,
-          contentType: req.headers["content-type"],
-          method: req.method
+          status: "success",
+          userFound: result.rows.length > 0,
+          emailReceived: body?.email,
+          userPreview: result.rows[0] ? {
+            id: result.rows[0].id.substring(0, 8),
+            email: result.rows[0].email,
+            isActive: result.rows[0].is_active
+          } : null,
+          bodyType: typeof body,
+          hasBody: !!body
         });
-        return;
+      } finally {
+        client.release();
       }
-      const client2 = await pool2.connect();
-      const result = await client2.query(
-        "SELECT id, email, first_name FROM users WHERE LOWER(email) = LOWER($1) LIMIT 1",
-        [body.email]
-      );
-      client2.release();
-      res.json({
-        status: "success",
-        userFound: result.rows.length > 0,
-        email: body.email,
-        userPreview: result.rows[0] ? { id: result.rows[0].id.substring(0, 8), email: result.rows[0].email } : null
-      });
       return;
     } catch (error) {
       res.status(500).json({
@@ -10490,9 +10475,19 @@ async function path_default(req, res) {
     try {
       const { pool: pool2 } = await Promise.resolve().then(() => (init_db(), db_exports));
       const startTime = Date.now();
-      const client2 = await pool2.connect();
-      const result = await client2.query("SELECT NOW() as time, current_database() as db");
-      client2.release();
+      const timeoutPromise = new Promise(
+        (_, reject) => setTimeout(() => reject(new Error("DB Connection Timeout (5s)")), 5e3)
+      );
+      const dbPromise = (async () => {
+        const client = await pool2.connect();
+        try {
+          const result2 = await client.query("SELECT NOW() as time, current_database() as db");
+          return result2;
+        } finally {
+          client.release();
+        }
+      })();
+      const result = await Promise.race([dbPromise, timeoutPromise]);
       const duration = Date.now() - startTime;
       res.json({
         status: "db_connected",

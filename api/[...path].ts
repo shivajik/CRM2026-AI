@@ -90,31 +90,32 @@ export default async function (req: VercelRequest, res: VercelResponse) {
       const { pool } = await import("../server/db");
       const body = req.body;
       
-      // Test if we can read request body
-      if (!body || !body.email) {
-        res.json({
-          status: "no_body",
-          receivedBody: body,
-          contentType: req.headers['content-type'],
-          method: req.method
-        });
-        return;
-      }
+      console.log("Test login body:", JSON.stringify(body));
+      console.log("Test login email:", body?.email);
 
       // Test database query
       const client = await pool.connect();
-      const result = await client.query(
-        "SELECT id, email, first_name FROM users WHERE LOWER(email) = LOWER($1) LIMIT 1",
-        [body.email]
-      );
-      client.release();
+      try {
+        const result = await client.query(
+          "SELECT id, email, first_name, is_active FROM users WHERE LOWER(email) = LOWER($1) LIMIT 1",
+          [body?.email || '']
+        );
 
-      res.json({
-        status: "success",
-        userFound: result.rows.length > 0,
-        email: body.email,
-        userPreview: result.rows[0] ? { id: result.rows[0].id.substring(0, 8), email: result.rows[0].email } : null
-      });
+        res.json({
+          status: "success",
+          userFound: result.rows.length > 0,
+          emailReceived: body?.email,
+          userPreview: result.rows[0] ? { 
+            id: result.rows[0].id.substring(0, 8), 
+            email: result.rows[0].email,
+            isActive: result.rows[0].is_active 
+          } : null,
+          bodyType: typeof body,
+          hasBody: !!body
+        });
+      } finally {
+        client.release();
+      }
       return;
     } catch (error: any) {
       res.status(500).json({

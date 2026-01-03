@@ -32,14 +32,10 @@ function getPool(): pg.Pool {
   const pool = new Pool({
     connectionString: connectionString || FALLBACK_CONNECTION,
     ssl: (isProduction || hasSupabaseUrl) ? { rejectUnauthorized: false } : undefined,
-    max: isServerless ? 1 : 5,
-    idleTimeoutMillis: isServerless ? 10000 : 30000,
-    connectionTimeoutMillis: isServerless ? 10000 : 15000,
+    max: isServerless ? 1 : 10,
+    idleTimeoutMillis: 10000,
+    connectionTimeoutMillis: 5000,
     allowExitOnIdle: true,
-    // Disable prepared statements for PgBouncer compatibility
-    ...(hasSupabaseUrl && { 
-      statement_timeout: 10000,
-    }),
   });
 
   pool.on('error', (err) => {
