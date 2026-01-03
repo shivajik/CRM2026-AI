@@ -1,5 +1,15 @@
 import jwt from "jsonwebtoken";
-import bcrypt from "bcryptjs";
+// Prefer native bcrypt in serverless (faster), fall back to bcryptjs if unavailable
+import { createRequire } from "module";
+const requireModule = createRequire(import.meta.url);
+let bcryptLib: any;
+try {
+  // Try native module first (fast)
+  bcryptLib = requireModule("bcrypt");
+} catch {
+  // Fallback to pure-js implementation
+  bcryptLib = requireModule("bcryptjs");
+}
 import crypto from "crypto";
 import type { User, UserType } from "@shared/schema";
 
@@ -82,11 +92,11 @@ export interface JWTPayload {
 }
 
 export async function hashPassword(password: string): Promise<string> {
-  return bcrypt.hash(password, SALT_ROUNDS);
+  return bcryptLib.hash(password, SALT_ROUNDS);
 }
 
 export async function verifyPassword(password: string, hash: string): Promise<boolean> {
-  return bcrypt.compare(password, hash);
+  return bcryptLib.compare(password, hash);
 }
 
 export interface TokenOptions {
