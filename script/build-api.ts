@@ -16,7 +16,7 @@ async function buildApi() {
     platform: "node",
     bundle: true,
     format: "cjs",
-    outfile: "api/index.js",
+    outfile: "api/index.cjs",
     external: ["@vercel/node", "serverless-http", ...nodeBuiltins],
     minify: false,
     logLevel: "info",
