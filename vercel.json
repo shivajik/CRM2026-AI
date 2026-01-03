@@ -1,6 +1,6 @@
 {
   "version": 2,
-  "buildCommand": "npx vite build && npx esbuild api/[...path].ts --bundle --platform=node --format=esm --outfile=api/index.mjs --packages=external",
+  "buildCommand": "npx vite build && npx tsx script/build-api.ts",
   "outputDirectory": "dist/public",
   "functions": {
     "api/index.mjs": {
