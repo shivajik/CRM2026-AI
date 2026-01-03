@@ -18,9 +18,10 @@ async function buildApi() {
     bundle: true,
     format: "cjs",
     outfile: "api/index.cjs",
-    // Only externalize Vercel runtime and Node built-ins
+    // Externalize Vercel runtime, serverless-http, and Node built-ins
+    // serverless-http uses dynamic requires that don't work when bundled
     // Everything else (including server code, bcryptjs, etc.) gets bundled
-    external: ["@vercel/node", ...nodeBuiltins],
+    external: ["@vercel/node", "serverless-http", ...nodeBuiltins],
     minify: false,
     logLevel: "info",
     // Resolve .ts files and path aliases

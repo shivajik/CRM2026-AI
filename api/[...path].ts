@@ -1,6 +1,8 @@
 import type { VercelRequest, VercelResponse } from "@vercel/node";
-import serverless from "serverless-http";
 import { createApp } from "../server/app";
+
+// Declare require for CommonJS context (bundled code will be CommonJS)
+declare const require: (id: string) => any;
 
 let handler: any = null;
 let initError: Error | null = null;
@@ -22,6 +24,11 @@ async function initHandler() {
     console.log("Environment check - SUPABASE_DATABASE_URL exists:", !!process.env.SUPABASE_DATABASE_URL);
     console.log("Environment check - DATABASE_URL exists:", !!process.env.DATABASE_URL);
     console.log("Environment check - JWT_SECRET exists:", !!process.env.JWT_SECRET);
+    
+    // Load serverless-http using require (it's external, not bundled)
+    // Since the bundled code is CommonJS, require is available globally
+    const serverless = require("serverless-http");
+    console.log("serverless-http loaded successfully");
     
     const app = await createApp();
     console.log("Express app created successfully");
