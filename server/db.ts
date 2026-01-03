@@ -3,7 +3,11 @@ import pg from "pg";
 import * as schema from "@shared/schema";
 
 const { Pool } = pg;
-const connectionString = process.env.SUPABASE_DATABASE_URL || process.env.DATABASE_URL;
+// Prefer direct connection for serverless (avoids PgBouncer prepared statement issues)
+const connectionString =
+  process.env.SUPABASE_DIRECT_URL ||
+  process.env.SUPABASE_DATABASE_URL ||
+  process.env.DATABASE_URL;
 
 if (!connectionString) {
   console.error("DATABASE CONNECTION ERROR: No database URL configured");
