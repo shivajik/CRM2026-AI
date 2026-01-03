@@ -90,6 +90,75 @@ export async function registerRoutes(
   
   // ==================== AUTH ROUTES ====================
   
+  // Diagnostic endpoint for login troubleshooting
+  app.post("/api/auth/login-test", async (req, res) => {
+    try {
+      const steps: any[] = [];
+      
+      // Step 1: Check request body
+      steps.push({ step: 1, name: "parse_body", status: "ok", data: { hasBody: !!req.body, hasEmail: !!req.body?.email } });
+      
+      const { email, password } = req.body || {};
+      if (!email || !password) {
+        return res.json({ steps, error: "Missing email or password" });
+      }
+      
+      // Step 2: Normalize email
+      const normalizedEmail = email.toLowerCase().trim();
+      steps.push({ step: 2, name: "normalize_email", status: "ok", data: { normalizedEmail } });
+      
+      // Step 3: Get user
+      let user;
+      try {
+        user = await storage.getUserByEmail(normalizedEmail);
+        steps.push({ step: 3, name: "get_user", status: user ? "ok" : "not_found", data: { userFound: !!user } });
+      } catch (e: any) {
+        steps.push({ step: 3, name: "get_user", status: "error", error: e.message });
+        return res.json({ steps, error: "Failed to get user" });
+      }
+      
+      if (!user) {
+        return res.json({ steps, error: "User not found" });
+      }
+      
+      // Step 4: Verify password
+      try {
+        const isValid = await verifyPassword(password, user.passwordHash);
+        steps.push({ step: 4, name: "verify_password", status: isValid ? "ok" : "invalid", data: { isValid } });
+        if (!isValid) {
+          return res.json({ steps, error: "Invalid password" });
+        }
+      } catch (e: any) {
+        steps.push({ step: 4, name: "verify_password", status: "error", error: e.message });
+        return res.json({ steps, error: "Password verification failed" });
+      }
+      
+      // Step 5: Generate tokens
+      try {
+        const accessToken = generateAccessToken(user);
+        const refreshToken = generateRefreshToken(user);
+        steps.push({ step: 5, name: "generate_tokens", status: "ok", data: { hasAccessToken: !!accessToken, hasRefreshToken: !!refreshToken } });
+        
+        return res.json({ 
+          steps, 
+          success: true, 
+          tokens: { accessToken, refreshToken },
+          user: {
+            id: user.id,
+            email: user.email,
+            firstName: user.firstName,
+            lastName: user.lastName
+          }
+        });
+      } catch (e: any) {
+        steps.push({ step: 5, name: "generate_tokens", status: "error", error: e.message });
+        return res.json({ steps, error: "Token generation failed" });
+      }
+    } catch (error: any) {
+      res.status(500).json({ error: error.message, stack: error.stack });
+    }
+  });
+  
   app.post("/api/auth/register", authRateLimiter, async (req, res) => {
     const clientIp = getClientIp(req);
     const userAgent = req.headers['user-agent'] || 'unknown';
@@ -343,10 +412,25 @@ export async function registerRoutes(
 
     } catch (error: any) {
       console.error("Login error:", error);
+      console.error("Login error stack:", error.stack);
+      console.error("Login error name:", error.name);
+      console.error("Login error code:", error.code);
+      
       if (error.message === 'Login request timed out') {
         res.status(504).json({ message: "Login request timed out. Please try again." });
       } else {
-        res.status(500).json({ message: "Login failed" });
+        // Return detailed error in development, generic in production
+        const errorMessage = process.env.NODE_ENV === 'production' 
+          ? "Login failed" 
+          : error.message || "Login failed";
+        res.status(500).json({ 
+          message: errorMessage,
+          ...(process.env.NODE_ENV !== 'production' && { 
+            error: error.name,
+            code: error.code,
+            stack: error.stack?.split('\n').slice(0, 3).join('\n')
+          })
+        });
       }
     }
   });
