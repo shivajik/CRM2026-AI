@@ -12,6 +12,13 @@ app.use(securityHeaders);
 app.use('/api', apiRateLimiter);
 app.use(inputSanitizationMiddleware);
 
+const isProduction = process.env.NODE_ENV === 'production';
+const isServerless = process.env.VERCEL === '1' || process.env.AWS_LAMBDA_FUNCTION_NAME;
+
+if (isProduction || isServerless) {
+  app.set('trust proxy', 1);
+}
+
 declare module "http" {
   interface IncomingMessage {
     rawBody: unknown;

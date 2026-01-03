@@ -1900,7 +1900,6 @@ __export(db_exports, {
 });
 import { drizzle } from "drizzle-orm/node-postgres";
 import pg from "pg";
-import dotenv from "dotenv";
 function getPool() {
   if (globalThis._pgPool) {
     return globalThis._pgPool;
@@ -2017,7 +2016,6 @@ var init_db = __esm({
     "use strict";
     init_schema();
     ({ Pool } = pg);
-    dotenv.config();
     connectionString = process.env.SUPABASE_DATABASE_URL || process.env.DATABASE_URL;
     if (!connectionString) {
       console.error("DATABASE CONNECTION ERROR: No database URL configured");
