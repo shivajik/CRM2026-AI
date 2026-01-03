@@ -1,5 +1,5 @@
 import type { VercelRequest, VercelResponse } from "@vercel/node";
-import { createRequire } from "module";
+import serverless from "serverless-http";
 import { createApp } from "../server/app";
 
 let handler: any = null;
@@ -22,18 +22,6 @@ async function initHandler() {
     console.log("Environment check - SUPABASE_DATABASE_URL exists:", !!process.env.SUPABASE_DATABASE_URL);
     console.log("Environment check - DATABASE_URL exists:", !!process.env.DATABASE_URL);
     console.log("Environment check - JWT_SECRET exists:", !!process.env.JWT_SECRET);
-    
-    // Load serverless-http using createRequire to handle CommonJS in ESM
-    let serverless;
-    try {
-      const require = createRequire(import.meta.url);
-      serverless = require("serverless-http");
-      console.log("serverless-http loaded successfully");
-    } catch (e: any) {
-      console.error("Failed to load serverless-http:", e.message);
-      console.error("serverless-http error stack:", e.stack);
-      throw new Error(`Failed to load serverless-http: ${e.message}`);
-    }
     
     const app = await createApp();
     console.log("Express app created successfully");

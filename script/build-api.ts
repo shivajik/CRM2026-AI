@@ -1,4 +1,5 @@
 import { build as esbuild } from "esbuild";
+import path from "path";
 
 // Node.js built-in modules that should be external
 const nodeBuiltins = [
@@ -17,9 +18,19 @@ async function buildApi() {
     bundle: true,
     format: "cjs",
     outfile: "api/index.cjs",
-    external: ["@vercel/node", "serverless-http", ...nodeBuiltins],
+    // Only externalize Vercel runtime and Node built-ins
+    // Everything else (including server code, bcryptjs, etc.) gets bundled
+    external: ["@vercel/node", ...nodeBuiltins],
     minify: false,
     logLevel: "info",
+    // Resolve .ts files and path aliases
+    loader: {
+      ".ts": "ts",
+    },
+    alias: {
+      "@": path.resolve(process.cwd(), "client/src"),
+      "@shared": path.resolve(process.cwd(), "shared"),
+    },
   });
   
   console.log("API build complete!");
