@@ -195,145 +195,157 @@ export async function registerRoutes(
     const clientIp = getClientIp(req);
     const userAgent = req.headers['user-agent'] || 'unknown';
     
+    // Set a timeout for the login request to prevent 504 Gateway Timeout on Vercel
+    const timeoutPromise = new Promise((_, reject) => {
+      setTimeout(() => reject(new Error('Login request timed out')), 9000);
+    });
+
     try {
-      const { email, password } = req.body;
-      
-      if (!email || !password) {
-        return res.status(400).json({ message: "Email and password are required" });
-      }
-      
-      const normalizedEmail = email.toLowerCase().trim();
-      
-      const failedAttempts = await storage.getFailedLoginCount(normalizedEmail, 15);
-      if (failedAttempts >= 5) {
+      const loginPromise = (async () => {
+        const { email, password } = req.body;
+        
+        if (!email || !password) {
+          return { status: 400, data: { message: "Email and password are required" } };
+        }
+        
+        const normalizedEmail = email.toLowerCase().trim();
+        
+        const failedAttempts = await storage.getFailedLoginCount(normalizedEmail, 15);
+        if (failedAttempts >= 5) {
+          await storage.createLoginAttempt({
+            email: normalizedEmail,
+            ipAddress: clientIp,
+            userAgent,
+            success: false,
+            failureReason: 'account_locked',
+          });
+          return { status: 429, data: { message: "Account temporarily locked due to too many failed attempts. Please try again in 15 minutes." } };
+        }
+        
+        const user = await storage.getUserByEmail(normalizedEmail);
+        if (!user) {
+          await storage.createLoginAttempt({
+            email: normalizedEmail,
+            ipAddress: clientIp,
+            userAgent,
+            success: false,
+            failureReason: 'user_not_found',
+          });
+          return { status: 401, data: { message: "Invalid credentials" } };
+        }
+        
+        const isValidPassword = await verifyPassword(password, user.passwordHash);
+        if (!isValidPassword) {
+          await storage.createLoginAttempt({
+            email: normalizedEmail,
+            ipAddress: clientIp,
+            userAgent,
+            success: false,
+            failureReason: 'invalid_password',
+          });
+          
+          await storage.createAuditLog({
+            tenantId: user.tenantId,
+            userId: user.id,
+            action: AUDIT_LOG_ACTIONS.LOGIN_FAILED,
+            severity: 'warning',
+            ipAddress: clientIp,
+            userAgent,
+            requestMethod: 'POST',
+            requestPath: '/api/auth/login',
+            success: false,
+            errorMessage: 'Invalid password',
+          });
+          
+          return { status: 401, data: { message: "Invalid credentials" } };
+        }
+        
+        if (!user.isActive) {
+          await storage.createLoginAttempt({
+            email: normalizedEmail,
+            ipAddress: clientIp,
+            userAgent,
+            success: false,
+            failureReason: 'account_inactive',
+          });
+          return { status: 401, data: { message: "Account is inactive. Please contact your administrator." } };
+        }
+        
         await storage.createLoginAttempt({
           email: normalizedEmail,
           ipAddress: clientIp,
           userAgent,
-          success: false,
-          failureReason: 'account_locked',
+          success: true,
         });
-        return res.status(429).json({ 
-          message: "Account temporarily locked due to too many failed attempts. Please try again in 15 minutes." 
-        });
-      }
-      
-      const user = await storage.getUserByEmail(normalizedEmail);
-      if (!user) {
-        await storage.createLoginAttempt({
-          email: normalizedEmail,
-          ipAddress: clientIp,
-          userAgent,
-          success: false,
-          failureReason: 'user_not_found',
-        });
-        return res.status(401).json({ message: "Invalid credentials" });
-      }
-      
-      const isValidPassword = await verifyPassword(password, user.passwordHash);
-      if (!isValidPassword) {
-        await storage.createLoginAttempt({
-          email: normalizedEmail,
-          ipAddress: clientIp,
-          userAgent,
-          success: false,
-          failureReason: 'invalid_password',
+        
+        // Check if multi-workspace is enabled for this user's tenant
+        let activeWorkspaceId: string | undefined;
+        const multiWorkspaceEnabled = await storage.getFeatureFlag('multi_workspace_enabled', user.tenantId);
+        
+        if (multiWorkspaceEnabled) {
+          const workspaces = await storage.getUserWorkspaces(user.id);
+          const sortedWorkspaces = workspaces.sort((a, b) => {
+            if (!a.lastAccessedAt && !b.lastAccessedAt) return 0;
+            if (!a.lastAccessedAt) return 1;
+            if (!b.lastAccessedAt) return -1;
+            return new Date(b.lastAccessedAt).getTime() - new Date(a.lastAccessedAt).getTime();
+          });
+          const lastActive = sortedWorkspaces[0];
+          activeWorkspaceId = lastActive?.workspaceId || user.tenantId;
+        }
+        
+        const tokenOptions = activeWorkspaceId ? { activeWorkspaceId } : undefined;
+        const accessToken = generateAccessToken(user, tokenOptions);
+        const refreshToken = generateRefreshToken(user, tokenOptions);
+        
+        await storage.createAuthToken({
+          userId: user.id,
+          refreshToken,
+          expiresAt: getRefreshTokenExpiry(),
         });
         
         await storage.createAuditLog({
           tenantId: user.tenantId,
           userId: user.id,
-          action: AUDIT_LOG_ACTIONS.LOGIN_FAILED,
-          severity: 'warning',
+          action: AUDIT_LOG_ACTIONS.LOGIN_SUCCESS,
+          severity: 'info',
           ipAddress: clientIp,
           userAgent,
           requestMethod: 'POST',
           requestPath: '/api/auth/login',
-          success: false,
-          errorMessage: 'Invalid password',
+          success: true,
         });
         
-        return res.status(401).json({ message: "Invalid credentials" });
-      }
-      
-      if (!user.isActive) {
-        await storage.createLoginAttempt({
-          email: normalizedEmail,
-          ipAddress: clientIp,
-          userAgent,
-          success: false,
-          failureReason: 'account_inactive',
-        });
-        return res.status(401).json({ message: "Account is inactive. Please contact your administrator." });
-      }
-      
-      await storage.createLoginAttempt({
-        email: normalizedEmail,
-        ipAddress: clientIp,
-        userAgent,
-        success: true,
-      });
-      
-      // Check if multi-workspace is enabled for this user's tenant
-      let activeWorkspaceId: string | undefined;
-      const multiWorkspaceEnabled = await storage.getFeatureFlag('multi_workspace_enabled', user.tenantId);
-      
-      if (multiWorkspaceEnabled) {
-        // Get user's last active workspace, or default to primary tenant
-        // When multi-workspace is enabled, always include activeWorkspaceId
-        const workspaces = await storage.getUserWorkspaces(user.id);
-        // Sort by lastAccessedAt descending (nulls last) to get most recent
-        const sortedWorkspaces = workspaces.sort((a, b) => {
-          if (!a.lastAccessedAt && !b.lastAccessedAt) return 0;
-          if (!a.lastAccessedAt) return 1;
-          if (!b.lastAccessedAt) return -1;
-          return new Date(b.lastAccessedAt).getTime() - new Date(a.lastAccessedAt).getTime();
-        });
-        const lastActive = sortedWorkspaces[0];
-        // Use last accessed workspace, or user's primary tenant
-        activeWorkspaceId = lastActive?.workspaceId || user.tenantId;
-      }
-      
-      const tokenOptions = activeWorkspaceId ? { activeWorkspaceId } : undefined;
-      const accessToken = generateAccessToken(user, tokenOptions);
-      const refreshToken = generateRefreshToken(user, tokenOptions);
-      
-      await storage.createAuthToken({
-        userId: user.id,
-        refreshToken,
-        expiresAt: getRefreshTokenExpiry(),
-      });
-      
-      await storage.createAuditLog({
-        tenantId: user.tenantId,
-        userId: user.id,
-        action: AUDIT_LOG_ACTIONS.LOGIN_SUCCESS,
-        severity: 'info',
-        ipAddress: clientIp,
-        userAgent,
-        requestMethod: 'POST',
-        requestPath: '/api/auth/login',
-        success: true,
-      });
-      
-      res.json({
-        accessToken,
-        refreshToken,
-        user: {
-          id: user.id,
-          email: user.email,
-          firstName: user.firstName,
-          lastName: user.lastName,
-          tenantId: user.tenantId,
-          userType: user.userType,
-          isAdmin: user.isAdmin,
-          profileImageUrl: user.profileImageUrl,
-        },
-        ...(activeWorkspaceId && { activeWorkspaceId }),
-      });
-    } catch (error) {
+        return {
+          status: 200,
+          data: {
+            accessToken,
+            refreshToken,
+            user: {
+              id: user.id,
+              email: user.email,
+              firstName: user.firstName,
+              lastName: user.lastName,
+              tenantId: user.tenantId,
+              userType: user.userType,
+              isAdmin: user.isAdmin,
+              profileImageUrl: user.profileImageUrl,
+            },
+            ...(activeWorkspaceId && { activeWorkspaceId }),
+          }
+        };
+      })();
+
+      const result = await Promise.race([loginPromise, timeoutPromise]) as any;
+      res.status(result.status).json(result.data);
+
+    } catch (error: any) {
       console.error("Login error:", error);
-      res.status(500).json({ message: "Login failed" });
+      if (error.message === 'Login request timed out') {
+        res.status(504).json({ message: "Login request timed out. Please try again." });
+      } else {
+        res.status(500).json({ message: "Login failed" });
+      }
     }
   });
   

@@ -32,8 +32,8 @@ function getPool(): pg.Pool {
     connectionString: connectionString || FALLBACK_CONNECTION,
     ssl: (isProduction || hasSupabaseUrl) ? { rejectUnauthorized: false } : undefined,
     max: isServerless ? 1 : 10,
-    idleTimeoutMillis: 10000,
-    connectionTimeoutMillis: 5000,
+    idleTimeoutMillis: 30000,
+    connectionTimeoutMillis: 10000,
     allowExitOnIdle: true,
     ...(hasSupabaseUrl && { 
       statement_timeout: 10000,
