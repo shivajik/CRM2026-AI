@@ -29,7 +29,7 @@ function getPool(): pg.Pool {
   
   const isProduction = process.env.NODE_ENV === 'production';
   const isServerless = process.env.VERCEL === '1' || process.env.AWS_LAMBDA_FUNCTION_NAME;
-  const hasSupabaseUrl = !!process.env.SUPABASE_DATABASE_URL;
+  const hasSupabaseUrl = !!process.env.SUPABASE_DATABASE_URL || !!process.env.SUPABASE_DIRECT_URL;
   
   // For serverless with Supabase PgBouncer, use minimal pool settings
   const pool = new Pool({
@@ -39,9 +39,10 @@ function getPool(): pg.Pool {
     idleTimeoutMillis: 30000,
     connectionTimeoutMillis: 10000,
     allowExitOnIdle: true,
-    ...(hasSupabaseUrl && { 
+    ...(hasSupabaseUrl && {
       statement_timeout: 10000,
       query_timeout: 10000,
+      application_name: "nexus-crm-serverless",
     }),
   });
 

@@ -168,6 +168,54 @@ export default async function (req: VercelRequest, res: VercelResponse) {
     }
   }
 
+  // Debug inserts to validate write operations (login attempts + auth tokens)
+  if (req.url === "/api/debug-inserts" || req.url?.startsWith("/api/debug-inserts")) {
+    try {
+      const { pool } = await import("../server/db");
+      const start = Date.now();
+      const client = await pool.connect();
+      try {
+        const email = (req.body as any)?.email || "superadmin@nexuscrm.com";
+        // Insert login attempt
+        const ins1 = await client.query(
+          "insert into login_attempts (email, success, failure_reason) values ($1, true, null) returning id, created_at",
+          [email]
+        );
+        // Find user id
+        const u = await client.query(
+          "select id from users where lower(email)=lower($1) limit 1",
+          [email]
+        );
+        const userId = u.rows[0]?.id;
+        let tokenId: string | null = null;
+        if (userId) {
+          const ins2 = await client.query(
+            "insert into auth_tokens (user_id, refresh_token, expires_at) values ($1, $2, NOW() + interval '7 days') returning id",
+            [userId, `debug-${Date.now()}`]
+          );
+          tokenId = ins2.rows[0]?.id || null;
+        }
+        const duration = Date.now() - start;
+        res.json({
+          status: "writes_ok",
+          ms: duration,
+          loginAttemptId: ins1.rows[0]?.id || null,
+          tokenInserted: !!tokenId,
+        });
+      } finally {
+        client.release();
+      }
+      return;
+    } catch (error: any) {
+      res.status(500).json({
+        status: "writes_failed",
+        error: error.message,
+        code: error.code,
+      });
+      return;
+    }
+  }
+
   try {
     const h = await initHandler();
     return await h(req, res);
