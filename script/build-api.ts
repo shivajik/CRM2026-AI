@@ -13,7 +13,7 @@ async function buildApi() {
 
   try {
     await build({
-      entryPoints: ["api/[...path].ts"],
+      entryPoints: ["api/index.ts"],
       bundle: true,
       platform: "node",
       target: "node20",
