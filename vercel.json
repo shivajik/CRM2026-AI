@@ -3,13 +3,13 @@
   "buildCommand": "npx vite build && npx tsx script/build-api.ts",
   "outputDirectory": "dist/public",
   "functions": {
-    "api/index.mjs": {
+    "api/index.js": {
       "maxDuration": 60,
       "memory": 1024
     }
   },
   "rewrites": [
-    { "source": "/api/:path*", "destination": "/api/index.mjs" },
+    { "source": "/api/:path*", "destination": "/api/index.js" },
     { "source": "/(.*)", "destination": "/index.html" }
   ]
 }
